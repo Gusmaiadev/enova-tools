@@ -1,65 +1,64 @@
-import Image from "next/image";
+import { ButtonLink } from '@/components/Button'
+import { FundoVideo } from '@/components/FundoVideo'
+import { LogoImg } from '@/components/LogoImg'
+import { redirecionarSeAutenticado } from '@/lib/auth/usuarioAtual'
 
-export default function Home() {
+/**
+ * Home / porta de entrada. Continua sendo uma porta (não uma vitrine de vendas):
+ * a logo sobre o fundo em vídeo, uma descrição simples e os dois caminhos.
+ * Quem já tem sessão válida é mandado direto para /app — não vê a porta de novo.
+ */
+export default async function Home() {
+  await redirecionarSeAutenticado()
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="relative flex min-h-dvh flex-1 flex-col overflow-hidden bg-bg">
+      {/* --- Fundo em vídeo --- */}
+      <FundoVideo />
+
+      {/* --- Conteúdo ---
+          Wrapper 'relative' SEM z-index de propósito: não cria stacking context,
+          então o mix-blend-screen da logo enxerga o vídeo atrás e o preto some. */}
+      <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-16">
+        <div className="flex w-full max-w-2xl animate-fade-in-up flex-col items-center gap-6 text-center">
+          <LogoImg
+            priority
+            className="h-auto w-full max-w-[340px] sm:max-w-[400px]"
+          />
+
+          <p className="font-mono text-xs uppercase tracking-[0.28em] text-white/70 [text-shadow:0_1px_12px_rgba(0,0,0,0.85)]">
+            Ambiente interno · E-nova
+          </p>
+
+          <h1 className="w-full font-display text-3xl font-bold leading-[1.1] sm:text-4xl md:text-5xl [text-shadow:0_2px_28px_rgba(0,0,0,0.65)]">
+            A caixa de ferramentas da equipe, num só lugar.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+
+          <p className="w-full max-w-xl text-base text-text-dim sm:text-lg">
+            Reunimos aqui o que a E-nova usa no dia a dia. Comece pelo{' '}
+            <span className="text-text">Buscador de Leads</span> — empresas que ainda não
+            têm site, prontas para prospectar.
+          </p>
+
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+            <ButtonLink href="/login" className="h-11 px-6 text-base">
+              Entrar
+            </ButtonLink>
+            <ButtonLink
+              href="/cadastro"
+              variante="secondary"
+              className="h-11 px-6 text-base"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              Criar conta
+            </ButtonLink>
+          </div>
+
+          <p className="mt-4 flex items-center gap-2 text-xs text-text-dim">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue" />
+            Acesso restrito à equipe
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+      </div>
+    </main>
+  )
 }

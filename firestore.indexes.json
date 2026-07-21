@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "//": "users/nome propaga ownerName com where teamId== AND where ownerUid== — dois filtros de igualdade em campos distintos exigem indice composto.",
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "teamId", "order": "ASCENDING" },
+        { "fieldPath": "ownerUid", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

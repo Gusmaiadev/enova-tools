@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// NEGA TUDO. Sem excecao. (Secao 5.2)
+//
+// Isto nao e paranoia: o SDK client do Firebase considera o usuario autenticado
+// logo APOS a senha, antes do codigo 2FA. O idToken dele ja seria valido aqui.
+// Se estas rules permitissem leitura por usuario autenticado, o 2FA seria teatro
+// — daria para pular ele inteiro chamando o Firestore direto do console.
+//
+// Todo acesso a dados passa por Route Handler usando o Admin SDK, que ignora
+// estas rules por design. O client nunca fala com o Firestore.
+//
+// Nao afrouxe isto "porque o Admin SDK ignora mesmo". Elas sao a trava.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
