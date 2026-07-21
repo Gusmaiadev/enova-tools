@@ -1,4 +1,4 @@
-import { type LucideIcon, Radar } from 'lucide-react'
+import { LineChart, type LucideIcon, Radar } from 'lucide-react'
 
 /**
  * Registro de ferramentas. Adicionar a segunda ferramenta = adicionar uma entrada
@@ -21,6 +21,14 @@ export const FERRAMENTAS: Ferramenta[] = [
     href: '/app/leads',
     disponivel: true,
     icone: Radar,
+  },
+  {
+    slug: 'ads',
+    nome: 'Acompanhamento Google Ads',
+    descricao: 'Importa relatórios, mostra métricas e sugere melhorias com IA.',
+    href: '/app/ads',
+    disponivel: true,
+    icone: LineChart,
   },
 ]
 
