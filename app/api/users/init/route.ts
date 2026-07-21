@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { lerConfig } from '@/lib/admin/config'
 import { adminAuth } from '@/lib/firebase/admin'
 import { provisionarUsuario } from '@/lib/users/provisionar'
 import { validarNome } from '@/lib/validacao'
@@ -37,6 +38,17 @@ export async function POST(req: Request) {
     email = decoded.email ?? ''
   } catch {
     return NextResponse.json({ erro: 'Sessão inválida.' }, { status: 401 })
+  }
+
+  // Cadastro fechado no Painel: a conta de Auth ja foi criada no client, entao
+  // desfazemos aqui para nao deixar orfa e barramos o provisionamento.
+  const { cadastroAberto } = await lerConfig()
+  if (!cadastroAberto) {
+    await adminAuth.deleteUser(uid).catch(() => {})
+    return NextResponse.json(
+      { erro: 'A criação de novas contas está desativada.' },
+      { status: 403 },
+    )
   }
 
   await provisionarUsuario(uid, email, nome.trim())

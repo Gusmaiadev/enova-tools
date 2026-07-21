@@ -27,8 +27,26 @@ export type Usuario = {
   name: string
   email: string
   teamId: string
+  /**
+   * Acesso ao Painel. Contas antigas (sem o campo) sao tratadas como admin — ver
+   * lerUsuario. Contas novas nascem com admin: false (ver provisionarUsuario).
+   */
+  admin?: boolean
   createdAt: number
   updatedAt: number
+}
+
+/** Uma acao registrada no log das ferramentas. Hoje so buscas de leads. */
+export type AcaoLog = 'busca_leads'
+
+export type RegistroLog = {
+  uid: string
+  /** Desnormalizado para o Painel listar sem join. */
+  nome: string
+  teamId: string
+  acao: AcaoLog
+  detalhe: string
+  createdAt: number
 }
 
 export type Equipe = {

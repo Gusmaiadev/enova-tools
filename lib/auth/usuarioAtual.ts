@@ -11,6 +11,7 @@ export type SessaoUsuario = {
   email: string | null
   name: string
   teamId: string
+  admin: boolean
 }
 
 /**
@@ -33,6 +34,11 @@ export async function lerUsuario(checkRevoked = false): Promise<SessaoUsuario | 
     email: sessao.email,
     name: dados?.name ?? sessao.email ?? '',
     teamId: dados?.teamId ?? (process.env.DEFAULT_TEAM_ID ?? 'trinca'),
+    // Contas antigas nao tem o campo `admin`: sao os usuarios que ja existiam
+    // quando o Painel nasceu, e por decisao viram admin. Contas novas gravam
+    // admin: false explicitamente (provisionarUsuario), entao so o legado cai no
+    // default true.
+    admin: dados?.admin ?? true,
   }
 }
 
@@ -40,6 +46,14 @@ export async function lerUsuario(checkRevoked = false): Promise<SessaoUsuario | 
 export async function exigirUsuario(): Promise<SessaoUsuario> {
   const u = await lerUsuario(false)
   if (!u) redirect('/login')
+  return u
+}
+
+/** Exige sessao E papel de admin. Nao-admin volta para /app; sem sessao, /login. */
+export async function exigirAdmin(): Promise<SessaoUsuario> {
+  const u = await lerUsuario(false)
+  if (!u) redirect('/login')
+  if (!u.admin) redirect('/app')
   return u
 }
 

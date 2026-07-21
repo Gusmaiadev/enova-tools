@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
+import { lerConfig } from '@/lib/admin/config'
 import { criarCookieDeSessao, gravarCookieDeSessao } from '@/lib/auth/sessao'
-import { adminAuth } from '@/lib/firebase/admin'
+import { adminAuth, db } from '@/lib/firebase/admin'
 import { provisionarUsuario } from '@/lib/users/provisionar'
 
 export const runtime = 'nodejs'
@@ -39,6 +40,20 @@ export async function POST(req: Request) {
   const uid = decoded.uid
   const email = decoded.email ?? ''
   const nome = decoded.name ?? email.split('@')[0] ?? 'Usuário'
+
+  // Cadastro fechado: usuarios que ja existem seguem entrando; contas novas via
+  // Google sao barradas (e a conta de Auth recem-criada e desfeita).
+  const jaExiste = (await db.collection('users').doc(uid).get()).exists
+  if (!jaExiste) {
+    const { cadastroAberto } = await lerConfig()
+    if (!cadastroAberto) {
+      await adminAuth.deleteUser(uid).catch(() => {})
+      return NextResponse.json(
+        { erro: 'A criação de novas contas está desativada.' },
+        { status: 403 },
+      )
+    }
+  }
 
   await provisionarUsuario(uid, email, nome)
 

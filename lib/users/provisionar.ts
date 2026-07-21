@@ -21,6 +21,8 @@ export async function provisionarUsuario(uid: string, email: string, nome: strin
       name: nome,
       email,
       teamId: TEAM_ID,
+      // Contas novas nascem sem acesso ao Painel; um admin promove depois.
+      admin: false,
       createdAt: agora,
       updatedAt: agora,
     })

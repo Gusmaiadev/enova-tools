@@ -28,7 +28,12 @@ export default async function AppLayout({
         <div className="absolute inset-0 opacity-[0.035] [background-image:linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] [background-size:46px_46px]" />
       </div>
 
-      <Header uid={usuario.uid} nome={usuario.name} email={usuario.email} />
+      <Header
+        uid={usuario.uid}
+        nome={usuario.name}
+        email={usuario.email}
+        admin={usuario.admin}
+      />
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
     </div>
   )
