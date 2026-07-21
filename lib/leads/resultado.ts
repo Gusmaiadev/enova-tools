@@ -1,13 +1,12 @@
 import type { Classificacao } from '@/lib/places/classificar'
 import type { Place } from '@/lib/places/searchText'
-import type { StatusLead } from '@/lib/tipos'
 
-/** Um negocio pronto para a lista da UI: dado do Places + estado no time. */
+/**
+ * Um negocio pronto para a lista da UI. So chega aqui o que ainda nao foi salvo
+ * por ninguem da equipe — leads de colegas sao filtrados no server (secao 8.4).
+ */
 export type LeadResultado = Place & {
   classificacao: Classificacao
-  /** Nome do colega que ja tocou este lead, ou null. Vira badge rosa. */
-  tocadoPor: string | null
-  statusEquipe: StatusLead | null
 }
 
 /** Ordena: lead_quente (ouro) primeiro, depois sem_nada, depois tem_site. */

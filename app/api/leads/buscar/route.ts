@@ -1,3 +1,4 @@
+import { registrarLog } from '@/lib/admin/log'
 import { lerUsuario } from '@/lib/auth/usuarioAtual'
 import { indiceDaEquipe } from '@/lib/leads/equipe'
 import { type LeadResultado, ordenarLeads } from '@/lib/leads/resultado'
@@ -89,17 +90,12 @@ export async function POST(req: Request) {
         // Registra o custo real (paginas de fato billadas).
         await registrarChamadas(resultado.chamadas)
 
-        // Classifica, remove os MEUS, marca os da EQUIPE.
+        // Classifica e descarta o que ja e de alguem da equipe — meu ou de colega
+        // (secao 8.4): lead ja salvo por qualquer um nunca reaparece nas buscas.
         const leads: LeadResultado[] = []
         for (const place of resultado.places.values()) {
-          if (indice.meus.has(place.id)) continue // meu lead nunca reaparece
-          const marca = indice.equipe.get(place.id)
-          leads.push({
-            ...place,
-            classificacao: classificar(place),
-            tocadoPor: marca?.ownerName ?? null,
-            statusEquipe: marca?.status ?? null,
-          })
+          if (indice.meus.has(place.id) || indice.equipe.has(place.id)) continue
+          leads.push({ ...place, classificacao: classificar(place) })
         }
 
         enviar({
@@ -109,6 +105,16 @@ export async function POST(req: Request) {
           truncado: resultado.truncado,
           total: leads.length,
         })
+
+        // Log para o Painel (best-effort, nao bloqueia o fechamento do stream).
+        await registrarLog({
+          uid: usuario.uid,
+          nome: usuario.name,
+          teamId: usuario.teamId,
+          acao: 'busca_leads',
+          detalhe: `${corpo.tipo} em ${bairro}, ${cidade}/${uf} — ${leads.length} encontrados`,
+        })
+
         controller.close()
       } catch (e) {
         // Cliente desconectou (abort) ou erro inesperado.

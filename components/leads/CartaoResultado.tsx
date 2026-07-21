@@ -1,9 +1,9 @@
 'use client'
 
-import { Check } from 'lucide-react'
+import { Check, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 import type { LeadResultado } from '@/lib/leads/resultado'
-import { ROTULO_STATUS } from '@/lib/tipos'
+import { urlGoogleMaps } from '@/lib/places/googleMaps'
 import { ClassBadge } from './ClassBadge'
 
 type EstadoSalvar = 'idle' | 'salvando' | 'erro'
@@ -35,17 +35,12 @@ export function CartaoResultado({
     }
   }
 
-  // Lead ja tocado por colega -> borda rosa (secao 8.4).
-  const daEquipe = lead.tocadoPor !== null
   const quente = lead.classificacao === 'lead_quente'
 
-  // Cores semânticas: amarelo (ouro) só em lead quente; rosa em lead da equipe;
-  // azul (sistema) no resto.
+  // Cores semânticas: amarelo (ouro) só em lead quente; azul (sistema) no resto.
   const acento = quente
     ? 'border-yellow/45 hover:border-yellow/70 hover:shadow-[0_10px_40px_-14px_var(--yellow)]'
-    : daEquipe
-      ? 'border-pink/40 hover:border-pink/60 hover:shadow-[0_10px_40px_-16px_var(--pink)]'
-      : 'border-border hover:border-blue/50 hover:shadow-[0_10px_40px_-16px_var(--blue)]'
+    : 'border-border hover:border-blue/50 hover:shadow-[0_10px_40px_-16px_var(--blue)]'
 
   return (
     <li
@@ -54,7 +49,16 @@ export function CartaoResultado({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate font-display text-base font-semibold">{lead.displayName}</h3>
+          <a
+            href={urlGoogleMaps(lead.id, lead.displayName)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir no Google Maps"
+            className="group/nome flex items-center gap-1.5 text-text hover:text-blue"
+          >
+            <h3 className="truncate font-display text-base font-semibold">{lead.displayName}</h3>
+            <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-50 transition-opacity group-hover/nome:opacity-100" />
+          </a>
           {lead.primaryType ? (
             <p className="text-xs text-text-dim">{lead.primaryType}</p>
           ) : null}
@@ -77,12 +81,6 @@ export function CartaoResultado({
           </a>
         ) : null}
       </div>
-
-      {daEquipe ? (
-        <p className="mt-3 inline-block rounded border border-pink/40 bg-pink/10 px-2 py-0.5 text-xs text-pink">
-          {ROTULO_STATUS[lead.statusEquipe ?? 'salvo']} por {lead.tocadoPor}
-        </p>
-      ) : null}
 
       <div className="mt-3 flex items-center gap-3">
         {salvo ? (

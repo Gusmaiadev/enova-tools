@@ -92,9 +92,9 @@ export function AbaGerar() {
     }
   }
 
-  // Quantos visíveis ainda dá para salvar (não salvos e não são de colega).
+  // Quantos visíveis ainda dá para salvar (os já salvos nesta sessão não contam).
   const restantesSalvar = visiveis
-    ? visiveis.filter((l) => !salvosIds.has(l.id) && l.tocadoPor === null).length
+    ? visiveis.filter((l) => !salvosIds.has(l.id)).length
     : 0
 
   return (
