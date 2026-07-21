@@ -169,3 +169,114 @@
     animation: none;
   }
 }
+
+/* --- Cena do 404: robozinho morto na praia --- */
+
+/* A maré desliza de lado. Cada faixa de onda é desenhada com o dobro da
+   largura do viewBox e arrastada -50% para emendar sem costura. */
+@keyframes onda-deriva {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-600px);
+  }
+}
+
+/* Espuma da arrebentação respirando na linha da água. */
+@keyframes espuma-respira {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* Reflexo da lua tremeluzindo sobre a água. */
+@keyframes reflexo-treme {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scaleX(0.85);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scaleX(1.1);
+  }
+}
+
+/* Ondulações concêntricas ao redor do corpo, como a água lambendo o robô. */
+@keyframes ondulacao {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+/* Bolhas escapando do robô afogado — glub, glub. */
+@keyframes bolha-sobe {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  15% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-70px) scale(1);
+  }
+}
+
+/* Estrelas piscando no céu. */
+@keyframes cintila {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.onda-deriva {
+  animation: onda-deriva 7s linear infinite;
+}
+.onda-deriva-lenta {
+  animation: onda-deriva 12s linear infinite;
+}
+.espuma-respira {
+  animation: espuma-respira 3.5s ease-in-out infinite;
+}
+.reflexo-treme {
+  transform-origin: center;
+  animation: reflexo-treme 2.8s ease-in-out infinite;
+}
+.ondulacao {
+  transform-origin: center;
+  animation: ondulacao 4s ease-out infinite;
+}
+.bolha-sobe {
+  animation: bolha-sobe 5s ease-in infinite;
+}
+.cintila {
+  animation: cintila 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onda-deriva,
+  .onda-deriva-lenta,
+  .espuma-respira,
+  .reflexo-treme,
+  .ondulacao,
+  .bolha-sobe,
+  .cintila {
+    animation: none;
+  }
+}
