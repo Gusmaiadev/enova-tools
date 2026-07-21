@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { criarEnvio, reverterEnvio } from '@/lib/auth/challenge'
+import { dispositivoConfiavel, lerCookieDispositivo } from '@/lib/auth/dispositivo'
 import { enviarCodigo } from '@/lib/auth/email'
+import { criarCookieDeSessao, gravarCookieDeSessao } from '@/lib/auth/sessao'
 import { adminAuth } from '@/lib/firebase/admin'
 
 export async function POST(req: Request) {
@@ -26,6 +28,20 @@ export async function POST(req: Request) {
 
   if (!email) {
     return NextResponse.json({ erro: 'Conta sem e-mail.' }, { status: 400 })
+  }
+
+  // Dispositivo confiavel (2FA aprovado aqui nos ultimos 20 dias): pula o codigo
+  // e cria a sessao direto. O cookie `e_disp` so existe apos um 2FA anterior neste
+  // navegador e so vale para este uid — por isso serve de segundo fator.
+  const tokenDispositivo = await lerCookieDispositivo()
+  if (await dispositivoConfiavel(uid, tokenDispositivo)) {
+    try {
+      const cookie = await criarCookieDeSessao(idToken)
+      await gravarCookieDeSessao(cookie)
+      return NextResponse.json({ trusted: true })
+    } catch {
+      // Se falhar a sessao, cai no fluxo normal do codigo abaixo.
+    }
   }
 
   const agora = Date.now()

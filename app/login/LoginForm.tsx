@@ -37,12 +37,13 @@ function Form() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       })
+      const data = await r.json().catch(() => ({}))
       if (!r.ok) {
-        const { erro } = await r.json().catch(() => ({ erro: null }))
-        throw new Error(erro ?? 'Não foi possível enviar o código.')
+        throw new Error(data.erro ?? 'Não foi possível enviar o código.')
       }
 
-      router.push('/verificar')
+      // Dispositivo confiavel: a sessao ja foi criada no server, sem 2FA.
+      router.push(data.trusted ? '/app' : '/verificar')
     } catch (e) {
       setErro(mensagemDeErroFirebase(e))
       setEnviando(false)

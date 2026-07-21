@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { verificar } from '@/lib/auth/challenge'
 import { normalizarCodigo } from '@/lib/auth/codigo'
+import { confiarDispositivo, gravarCookieDispositivo } from '@/lib/auth/dispositivo'
 import { criarCookieDeSessao, gravarCookieDeSessao } from '@/lib/auth/sessao'
 import { adminAuth } from '@/lib/firebase/admin'
 
@@ -44,6 +45,16 @@ export async function POST(req: Request) {
       { erro: 'Não foi possível criar a sessão. Entre novamente.' },
       { status: 500 },
     )
+  }
+
+  // Marca ESTE navegador como confiavel por 20 dias: nos proximos logins o codigo
+  // nao sera pedido de novo aqui. Best-effort — se falhar, o pior caso e pedir o
+  // codigo no proximo login.
+  try {
+    const token = await confiarDispositivo(uid)
+    await gravarCookieDispositivo(token)
+  } catch {
+    // ignora: sessao ja criada, so nao "lembrou" do dispositivo
   }
 
   return NextResponse.json({ ok: true })

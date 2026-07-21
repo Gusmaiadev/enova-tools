@@ -187,6 +187,7 @@ function SecaoSenha({ user }: { user: User | null }) {
     setErro(null)
     setAviso(null)
     if (!user?.email) return
+    if (!atual) return setErro('Informe sua senha atual.')
     if (nova.length < SENHA_MIN) return setErro(`A nova senha precisa de ${SENHA_MIN}+ caracteres.`)
 
     setSalvando(true)
@@ -195,11 +196,31 @@ function SecaoSenha({ user }: { user: User | null }) {
       const cred = EmailAuthProvider.credential(user.email, atual)
       await reauthenticateWithCredential(user, cred)
       await updatePassword(user, nova)
+
+      // A troca de senha "revoga" a sessao antiga (o proxy verifica com
+      // checkRevoked). Re-emitimos o cookie a partir de um idToken fresco para
+      // manter o usuario logado. force=true garante um token pos-revogacao.
+      const idToken = await user.getIdToken(true)
+      await fetch('/api/auth/renovar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      })
+
       setAviso('Senha atualizada.')
       setAtual('')
       setNova('')
     } catch (e) {
-      setErro(mensagemDeErroFirebase(e))
+      // Aqui o e-mail e o do proprio usuario logado; o unico campo que pode
+      // estar errado e a senha atual. Por isso nao usamos a mensagem generica
+      // "E-mail ou senha incorretos" do mapeamento compartilhado.
+      const codigo =
+        typeof e === 'object' && e !== null && 'code' in e ? (e as { code: string }).code : ''
+      if (codigo === 'auth/wrong-password' || codigo === 'auth/invalid-credential') {
+        setErro('Senha atual incorreta.')
+      } else {
+        setErro(mensagemDeErroFirebase(e))
+      }
     } finally {
       setSalvando(false)
     }
