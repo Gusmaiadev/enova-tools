@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/Button'
+import { useFocoModal } from '@/components/useFocoModal'
 
 type Variante = 'primary' | 'danger'
 
@@ -34,6 +35,9 @@ export function ModalConfirmacao({
   onConfirmar,
   onCancelar,
 }: Props) {
+  const painelRef = useRef<HTMLDivElement>(null)
+  useFocoModal(painelRef, aberto)
+
   useEffect(() => {
     if (!aberto) return
     function onKey(e: KeyboardEvent) {
@@ -69,7 +73,11 @@ export function ModalConfirmacao({
         onClick={() => !carregando && onCancelar()}
         className="absolute inset-0 cursor-default bg-bg/70 backdrop-blur-sm"
       />
-      <div className="relative w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-2xl">
+      <div
+        ref={painelRef}
+        tabIndex={-1}
+        className="relative w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-2xl outline-none"
+      >
         <h2 id="modal-titulo" className="font-display text-lg font-semibold">
           {titulo}
         </h2>

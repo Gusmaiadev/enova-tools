@@ -1,4 +1,4 @@
-import { LineChart, type LucideIcon, Radar } from 'lucide-react'
+import { LayoutTemplate, LineChart, type LucideIcon, Radar } from 'lucide-react'
 
 /**
  * Registro de ferramentas. Adicionar a segunda ferramenta = adicionar uma entrada
@@ -29,6 +29,14 @@ export const FERRAMENTAS: Ferramenta[] = [
     href: '/app/ads',
     disponivel: true,
     icone: LineChart,
+  },
+  {
+    slug: 'lp',
+    nome: 'Criador de Landing Pages',
+    descricao: 'A IA monta a página e você ajusta tudo num editor visual.',
+    href: '/app/lp',
+    disponivel: true,
+    icone: LayoutTemplate,
   },
 ]
 
