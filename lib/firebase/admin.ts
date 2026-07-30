@@ -3,10 +3,11 @@ import 'server-only'
 import { cert, getApp, getApps, initializeApp, type App } from 'firebase-admin/app'
 import { getAuth, type Auth } from 'firebase-admin/auth'
 import { getFirestore, type Firestore } from 'firebase-admin/firestore'
+import { getStorage } from 'firebase-admin/storage'
 
 /**
- * Admin SDK — a unica porta de entrada para o Firestore neste projeto.
- * Ignora as firestore.rules por design, e por isso so pode ser tocado a partir
+ * Admin SDK — a unica porta de entrada para o Firestore e o Storage neste
+ * projeto. Ignora as rules por design, e por isso so pode ser tocado a partir
  * do server. O import 'server-only' faz o build quebrar se um componente
  * client tentar importar isto.
  *
@@ -47,6 +48,21 @@ export function getAdminAuth(): Auth {
 
 export function getDb(): Firestore {
   return getFirestore(app())
+}
+
+/**
+ * Bucket do Storage. O nome vem do env e nao do initializeApp de proposito: as
+ * credenciais podem estar completas sem que exista bucket, e ai so quem chama
+ * isto (upload de midia da LP) quebra — com mensagem clara.
+ */
+export function getBucket() {
+  const nome = process.env.FIREBASE_STORAGE_BUCKET
+  if (!nome) {
+    throw new Error(
+      'FIREBASE_STORAGE_BUCKET ausente. Preencha com o bucket do projeto (ex.: e-nova-tools.firebasestorage.app) no .env.local.',
+    )
+  }
+  return getStorage(app()).bucket(nome)
 }
 
 /**

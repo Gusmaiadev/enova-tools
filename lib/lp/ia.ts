@@ -9,7 +9,7 @@ import 'server-only'
  * A IA não inventa a estrutura: o briefing já define quais seções existem, em
  * que ordem e com que layout. O trabalho dela é escrever o conteúdo (títulos,
  * textos, itens), escolher ícones, fechar a identidade visual quando o usuário
- * não definiu e descrever as mídias a buscar no Envato.
+ * não definiu e descrever as mídias a buscar no banco de imagens.
  *
  * Privacidade: enviamos apenas o briefing que o próprio usuário digitou. Sem
  * nenhuma chave a ferramenta continua funcionando — cai no documento base
@@ -213,8 +213,10 @@ function blocoSecoes(briefing: LpBriefing): string {
         s.titulo && `   título sugerido: ${s.titulo}`,
         s.conteudo && `   o que dizer: ${s.conteudo}`,
         s.colunas && `   colunas: ${s.colunas}`,
-        s.midia?.busca &&
-          `   mídia pedida: ${s.midia.tipo} ${s.midia.orientacao} — "${s.midia.busca}"`,
+        s.midia?.arquivo
+          ? `   mídia: o usuário JÁ ENVIOU o arquivo (${s.midia.tipo}) — não gere o campo "midia" nesta seção`
+          : s.midia?.busca &&
+            `   mídia pedida: ${s.midia.tipo} ${s.midia.orientacao} — "${s.midia.busca}"`,
       ].filter(Boolean)
       return partes.join('\n')
     })
@@ -268,9 +270,11 @@ REGRAS DE IDENTIDADE VISUAL
 
 REGRAS DE MÍDIA
 - Não invente URL de imagem ou vídeo. Preencha apenas { "busca", "tipo", "orientacao" } e o sistema busca no banco de mídias.
-- "busca": 3 a 6 palavras-chave EM INGLÊS (o catálogo é indexado em inglês). Ex.: "modern office team meeting".
+- "busca": 3 a 6 palavras-chave concretas e visuais, de preferência em inglês. Ex.: "modern office team meeting". Português também funciona — o sistema traduz antes de buscar.
+- Descreva o que a CÂMERA vê, não o conceito. "dentist examining patient" acha foto; "excelência em odontologia" não acha nada.
 - "alt": descrição em português do que aparece na imagem.
 - Respeite o tipo e a orientação pedidos no briefing. Se a seção pede mídia e o briefing não descreveu, crie uma busca coerente com o assunto.
+- Seção marcada como "o usuário JÁ ENVIOU o arquivo": omita o campo "midia" dela. O sistema coloca o arquivo enviado no lugar; qualquer busca que você escrever ali seria descartada.
 
 FORMATO DA RESPOSTA
 Responda SOMENTE com um objeto JSON válido (sem markdown, sem comentários) neste formato:

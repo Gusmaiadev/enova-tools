@@ -205,6 +205,44 @@ describe('compilador', () => {
     expect(local.html).not.toContain('cdn.exemplo.com')
   })
 
+  it('põe o poster no <video> e coleta a miniatura para a exportação', () => {
+    const doc = documentoBase(briefing())
+    const secao = novaSecao('texto-midia')
+    secao.midia = {
+      tipo: 'video',
+      url: 'https://cdn.exemplo.com/filme.mp4',
+      thumb: 'https://cdn.exemplo.com/poster.jpg',
+      alt: 'Filme',
+      busca: 'filme',
+      orientacao: 'paisagem',
+    }
+    doc.secoes = [secao]
+
+    const previa = compilar(doc)
+    expect(previa.html).toContain('poster="https://cdn.exemplo.com/poster.jpg"')
+    // O poster entra na coleta como imagem, senão o ZIP exportado fica sem ele.
+    expect(previa.midias.map((m) => [m.tipo, m.url])).toEqual([
+      ['video', 'https://cdn.exemplo.com/filme.mp4'],
+      ['imagem', 'https://cdn.exemplo.com/poster.jpg'],
+    ])
+  })
+
+  it('omite o poster quando a miniatura não passa pelo saneamento de URL', () => {
+    const doc = documentoBase(briefing())
+    const secao = novaSecao('texto-midia')
+    secao.midia = {
+      tipo: 'video',
+      url: 'https://cdn.exemplo.com/filme.mp4',
+      thumb: 'javascript:alert(1)',
+      alt: 'Filme',
+      busca: 'filme',
+      orientacao: 'paisagem',
+    }
+    doc.secoes = [secao]
+
+    expect(compilar(doc).html).not.toContain('poster=')
+  })
+
   it('libera o container nas seções de largura total', () => {
     const doc = documentoBase(briefing())
     const secao = novaSecao('cta')

@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// NEGA TUDO, pelo mesmo motivo das firestore.rules (Secao 5.2): o SDK client
+// considera o usuario autenticado logo APOS a senha, antes do codigo 2FA.
+//
+// O upload de midia das landing pages entra por POST /api/lp/upload, com o Admin
+// SDK, que ignora estas rules por design. O client nunca fala com o bucket.
+//
+// A leitura publica das imagens NAO depende destas rules: o link e o download URL
+// do Firebase com token no metadata do objeto. Apagar o token derruba o link.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

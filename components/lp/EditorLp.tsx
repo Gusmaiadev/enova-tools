@@ -456,6 +456,7 @@ export function EditorLp({
             {aba === 'editar' && (
               <PainelPropriedades
                 doc={doc}
+                lpId={projeto.id}
                 secaoId={secaoId}
                 itemId={itemId}
                 aplicar={aplicar}

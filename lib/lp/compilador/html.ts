@@ -42,6 +42,19 @@ function urlMidia(ctx: Ctx, midia: LpMidia): string {
   return segura
 }
 
+/**
+ * `poster` do <video>: sem ele o navegador mostra um retangulo preto ate o
+ * primeiro quadro carregar. Entra na coleta como imagem para o export baixar.
+ */
+function posterDe(ctx: Ctx, midia: LpMidia): string {
+  if (!midia.thumb) return ''
+  const url = urlMidia(ctx, { ...midia, url: midia.thumb, tipo: 'imagem' })
+  // urlSegura devolve '#' para o que nao passa: melhor sem poster do que com um
+  // poster que dispara uma requisicao para a propria pagina.
+  if (url === '#') return ''
+  return ` poster="${esc(url)}"`
+}
+
 /** <img> ou <video> dentro de .lp-midia. `fundo` = video de fundo sem controles. */
 function htmlMidia(ctx: Ctx, midia: LpMidia, caminho: string, fundo = false): string {
   const url = urlMidia(ctx, midia)
@@ -51,7 +64,7 @@ function htmlMidia(ctx: Ctx, midia: LpMidia, caminho: string, fundo = false): st
     const atrs = fundo
       ? 'autoplay muted loop playsinline'
       : 'controls preload="metadata" playsinline'
-    return `<div class="lp-midia"${marca}><video src="${esc(url)}" ${atrs}></video></div>`
+    return `<div class="lp-midia"${marca}><video src="${esc(url)}"${posterDe(ctx, midia)} ${atrs}></video></div>`
   }
   return `<div class="lp-midia"${marca}><img src="${esc(url)}" alt="${esc(midia.alt)}" loading="lazy"></div>`
 }
@@ -379,7 +392,7 @@ function htmlSecao(ctx: Ctx, s: LpSecao, idHtml: string): string {
     const urlFundo = urlMidia(ctx, midiaFundo)
     fundo = `<div class="lp-fundo-midia"${alvo(ctx, s.tipo === 'banner' && s.midia ? `sec:${s.id}:midia` : `sec:${s.id}:fundo`)}>${
       midiaFundo.tipo === 'video' && !urlFundo.startsWith('data:image')
-        ? `<video src="${esc(urlFundo)}" autoplay muted loop playsinline></video>`
+        ? `<video src="${esc(urlFundo)}"${posterDe(ctx, midiaFundo)} autoplay muted loop playsinline></video>`
         : `<img src="${esc(urlFundo)}" alt="">`
     }</div><div class="lp-veu"></div>`
   }

@@ -156,7 +156,7 @@ export function Assistente({ projeto }: { projeto: LpProjeto }) {
 
       {passo === 1 && <EtapaIdentidade briefing={briefing} aoMudar={aoMudar} />}
       {passo === 2 && <EtapaNavegacao briefing={briefing} aoMudar={aoMudar} />}
-      {passo === 3 && <EtapaSecoes briefing={briefing} aoMudar={aoMudar} />}
+      {passo === 3 && <EtapaSecoes lpId={projeto.id} briefing={briefing} aoMudar={aoMudar} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
         <span className="text-xs text-text-dim">

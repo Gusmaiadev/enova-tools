@@ -33,16 +33,46 @@ export type TipoLayout =
 export type Orientacao = 'paisagem' | 'retrato' | 'quadrado'
 export type TipoMidia = 'imagem' | 'video'
 
+/** Banco de midia de onde o item veio (usado para o credito obrigatorio). */
+export type FonteMidia = 'pexels' | 'pixabay' | 'envato'
+
+export const ROTULO_FONTE: Record<FonteMidia, string> = {
+  pexels: 'Pexels',
+  pixabay: 'Pixabay',
+  envato: 'Envato',
+}
+
 export type LpMidia = {
   tipo: TipoMidia
-  /** URL do preview (Envato) ou data URI de placeholder SVG. */
+  /**
+   * Arquivo que vai para a pagina: imagem grande (~1920px) ou mp4 em Full HD.
+   * Tambem aceita data URI de placeholder SVG.
+   */
   url: string
   alt: string
   /** Descricao usada na busca de midia (editavel no editor). */
   busca: string
   orientacao: Orientacao
-  /** Pagina do item no Envato, para licenciamento/download final. */
+  /**
+   * Caminho no nosso bucket, presente so quando o arquivo foi enviado pelo
+   * usuario (nao veio de banco de imagem). E a chave para apagar o arquivo.
+   */
+  caminho?: string
+  /** Pagina do item na fonte, para credito/licenciamento. */
   origem?: string
+  /** Imagem estatica: miniatura no seletor e `poster` do <video> na pagina. */
+  thumb?: string
+  /** MP4 leve, so para a previa ao passar o mouse no seletor (nunca vai ao HTML). */
+  previa?: string
+  /** Dimensoes do arquivo em `url`, quando a fonte informa. */
+  largura?: number
+  altura?: number
+  /** Duracao do video em segundos. */
+  duracao?: number
+  /** Credito ao autor — exigido pelos termos do Pexels e do Pixabay. */
+  autor?: string
+  autorUrl?: string
+  fonte?: FonteMidia
 }
 
 export type LpBotao = {
@@ -212,6 +242,12 @@ export type MidiaBriefing = {
   tipo: TipoMidia
   busca: string
   orientacao: Orientacao
+  /**
+   * Arquivo que o usuario enviou (ja no bucket). Quando existe, ele manda: a IA
+   * nao descreve busca e o banco de imagens nao e consultado para essa secao.
+   * `busca` passa a ser so o texto alternativo da imagem.
+   */
+  arquivo?: LpMidia | null
 }
 
 export type SecaoBriefing = {

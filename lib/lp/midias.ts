@@ -1,15 +1,16 @@
 import 'server-only'
 
 /**
- * Preenche as mídias do documento com resultados do Envato. A IA descreve o
- * que quer (midia.busca); aqui trocamos os placeholders pelos previews reais.
+ * Preenche as mídias do documento com resultados dos bancos de imagem. A IA
+ * descreve o que quer (midia.busca, em português); o orquestrador em ./bancos
+ * traduz para inglês e busca. Aqui só trocamos os placeholders pelo resultado.
  *
  * Buscas repetidas viram uma única chamada, e cada ocorrência recebe um
  * resultado diferente (evita a mesma foto três vezes na mesma galeria).
- * Sem ENVATO_TOKEN nada acontece: os placeholders continuam e a página funciona.
+ * Sem nenhuma chave nada acontece: os placeholders continuam e a página funciona.
  */
 
-import { buscarMidias, temEnvato } from './envato'
+import { buscarMidias, temBancoMidias } from './bancos'
 import type { LpDocumento, LpMidia } from './tipos'
 
 type Slot = { get: () => LpMidia | null | undefined; set: (m: LpMidia) => void }
@@ -58,7 +59,7 @@ export async function preencherMidias(doc: LpDocumento): Promise<ResultadoMidias
     return m !== null && m !== undefined && ehPlaceholder(m) && m.busca.trim() !== ''
   })
 
-  if (!temEnvato()) {
+  if (!temBancoMidias()) {
     return { preenchidas: 0, pendentes: vagas.length, semChave: true }
   }
   if (vagas.length === 0) {
@@ -76,16 +77,15 @@ export async function preencherMidias(doc: LpDocumento): Promise<ResultadoMidias
   let preenchidas = 0
   const tarefas = [...grupos.values()].map((grupo) => async () => {
     const modelo = grupo[0].get() as LpMidia
-    const resultado = await buscarMidias(
-      modelo.busca,
-      modelo.tipo,
-      modelo.orientacao,
-      Math.min(grupo.length, 12),
-    )
+    const resultado = await buscarMidias(modelo.busca, modelo.tipo, modelo.orientacao, {
+      limite: Math.min(grupo.length, 12),
+    })
     if (!resultado.ok || resultado.midias.length === 0) return
     grupo.forEach((vaga, i) => {
       const achada = resultado.midias[i % resultado.midias.length]
       const atual = vaga.get() as LpMidia
+      // `busca` é o que o usuário/IA pediu, em português: o editor mostra e
+      // permite editar esse texto, então não pode virar o termo traduzido.
       vaga.set({ ...achada, alt: atual.alt || achada.alt, busca: atual.busca })
       preenchidas++
     })

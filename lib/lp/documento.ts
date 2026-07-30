@@ -12,8 +12,10 @@ import type {
   EstiloTipografia,
   LpBriefing,
   LpDocumento,
+  LpMidia,
   LpSecao,
   LpTema,
+  MidiaBriefing,
 } from './tipos'
 import { corSegura, gerarId, limitar, slugificar } from './util'
 
@@ -66,9 +68,71 @@ export function clonar<T>(valor: T): T {
 }
 
 /**
+ * Midia de uma secao a partir do briefing: o arquivo que o usuario enviou,
+ * quando existe, ou um placeholder que a busca em banco de imagens preenche
+ * depois. `busca` do briefing e o texto alternativo do arquivo enviado.
+ */
+export function midiaDoBriefing(mb: MidiaBriefing): LpMidia {
+  if (!mb.arquivo) return placeholderMidia(mb.busca, mb.orientacao, mb.tipo)
+  return { ...mb.arquivo, busca: mb.busca, alt: mb.busca || mb.arquivo.alt }
+}
+
+/**
+ * Reimpoe no documento as midias que o usuario enviou. A IA descreve a midia de
+ * cada secao e a busca em banco preencheria por cima — arquivo do usuario vence
+ * sempre. Casa por id (a IA mantem os ids do briefing) e, quando nao acha,
+ * pela posicao, so se o layout confere. Muta no lugar, como preencherMidias.
+ */
+export function aplicarArquivos(
+  doc: LpDocumento,
+  briefing: LpBriefing,
+): { aplicadas: number; perdidas: number } {
+  let aplicadas = 0
+  let perdidas = 0
+  briefing.secoes.forEach((sb, i) => {
+    if (!sb.midia?.arquivo) return
+    const naPosicao = doc.secoes[i]?.tipo === sb.layout ? doc.secoes[i] : undefined
+    const secao = doc.secoes.find((s) => s.id === sb.id) ?? naPosicao
+    if (!secao) {
+      perdidas++
+      return
+    }
+    const midia = midiaDoBriefing(sb.midia)
+    // Hero/banner em que a IA usou a midia como fundo: o arquivo vai para o
+    // fundo, senao a imagem do usuario apareceria fora do lugar previsto.
+    if (secao.fundo?.midia && !secao.midia) secao.fundo.midia = midia
+    else secao.midia = midia
+    aplicadas++
+  })
+  return { aplicadas, perdidas }
+}
+
+/**
+ * Caminhos de arquivo nosso (no bucket) que o projeto ainda cita — no documento
+ * e no briefing. O que estiver na pasta do projeto e nao aparecer aqui nao serve
+ * mais a ninguem: e o que a limpeza de orfaos apaga.
+ */
+export function arquivosUsados(projeto: {
+  documento?: LpDocumento | null
+  briefing?: LpBriefing | null
+}): Set<string> {
+  const usados = new Set<string>()
+  const anotar = (m: LpMidia | null | undefined) => {
+    if (m?.caminho) usados.add(m.caminho)
+  }
+  for (const secao of projeto.documento?.secoes ?? []) {
+    anotar(secao.midia)
+    anotar(secao.fundo?.midia)
+    for (const item of secao.itens) anotar(item.imagem)
+  }
+  for (const secao of projeto.briefing?.secoes ?? []) anotar(secao.midia?.arquivo)
+  return usados
+}
+
+/**
  * Documento deterministico construido so com o briefing (sem IA): usado como
- * fallback quando GEMINI_API_KEY nao esta configurada e como base que a IA
- * enriquece. Midias viram placeholders ate a busca no Envato preencher.
+ * fallback quando nao ha chave de IA configurada e como base que a IA enriquece.
+ * Midia sem arquivo enviado vira placeholder ate a busca em banco preencher.
  */
 export function documentoBase(briefing: LpBriefing): LpDocumento {
   const tema = temaDoBriefing(briefing)
@@ -95,9 +159,7 @@ export function documentoBase(briefing: LpBriefing): LpDocumento {
       espacamento: { topo: 88, base: 88 },
     }
     if (sb.colunas) secao.colunas = sb.colunas
-    if (sb.midia?.busca) {
-      secao.midia = placeholderMidia(sb.midia.busca, sb.midia.orientacao, sb.midia.tipo)
-    }
+    if (sb.midia?.busca || sb.midia?.arquivo) secao.midia = midiaDoBriefing(sb.midia)
     const modelo = novoItem(sb.layout)
     if (Object.keys(modelo).length > 1) {
       secao.itens = [novoItem(sb.layout), novoItem(sb.layout), novoItem(sb.layout)]

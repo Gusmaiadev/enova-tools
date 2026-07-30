@@ -1,13 +1,21 @@
 'use client'
 
-import { ChevronDown, Copy, ImageIcon, Plus, Trash2, Video } from 'lucide-react'
+import { ChevronDown, Copy, ImageIcon, Plus, Search, Trash2, Upload, Video } from 'lucide-react'
 import { useState } from 'react'
 import { Alca } from './Alca'
 import { Area, Bloco, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
 import { reordenar, useArrastar } from './arrastar'
+import { apagarArquivo, EnviarMidia } from './EnviarMidia'
 import { SeletorLayout } from './SeletorLayout'
 import { infoLayout } from '@/lib/lp/layouts'
-import type { LpBriefing, Orientacao, SecaoBriefing, TipoLayout, TipoMidia } from '@/lib/lp/tipos'
+import type {
+  LpBriefing,
+  MidiaBriefing,
+  Orientacao,
+  SecaoBriefing,
+  TipoLayout,
+  TipoMidia,
+} from '@/lib/lp/tipos'
 import { gerarId } from '@/lib/lp/util'
 
 /** Estruturas prontas para quem não sabe por onde começar. */
@@ -78,15 +86,20 @@ function novaSecaoBriefing(nome: string, layout: TipoLayout): SecaoBriefing {
 }
 
 export function EtapaSecoes({
+  lpId,
   briefing,
   aoMudar,
 }: {
+  lpId: string
   briefing: LpBriefing
   aoMudar: (patch: Partial<LpBriefing>) => void
 }) {
   const [expandida, setExpandida] = useState<string | null>(briefing.secoes[0]?.id ?? null)
   const [trocandoLayout, setTrocandoLayout] = useState<string | null>(null)
   const [adicionando, setAdicionando] = useState(false)
+  // Quem escolheu enviar arquivo mas ainda não enviou: sem isso o painel voltaria
+  // para o modo de busca a cada tecla digitada.
+  const [modoEnvio, setModoEnvio] = useState<Record<string, boolean>>({})
 
   const arrastar = useArrastar((de, para) =>
     aoMudar({ secoes: reordenar(briefing.secoes, de, para) }),
@@ -94,6 +107,44 @@ export function EtapaSecoes({
 
   const mudarSecao = (id: string, patch: Partial<SecaoBriefing>) =>
     aoMudar({ secoes: briefing.secoes.map((s) => (s.id === id ? { ...s, ...patch } : s)) })
+
+  /** Patch na mídia da seção, preservando o que já existe (inclusive o arquivo). */
+  const mudarMidia = (s: SecaoBriefing, patch: Partial<MidiaBriefing>) =>
+    mudarSecao(s.id, {
+      midia: {
+        busca: s.midia?.busca ?? '',
+        tipo: s.midia?.tipo ?? 'imagem',
+        orientacao: s.midia?.orientacao ?? 'paisagem',
+        ...(s.midia?.arquivo ? { arquivo: s.midia.arquivo } : {}),
+        ...patch,
+      },
+    })
+
+  /**
+   * Seção duplicada copia o arquivo junto: as duas apontam para o mesmo objeto
+   * no bucket. Só quem é a última referência pode apagar de verdade.
+   */
+  const usoUnico = (caminho: string | undefined) =>
+    !caminho ||
+    briefing.secoes.filter((x) => x.midia?.arquivo?.caminho === caminho).length <= 1
+
+  const trocarModoMidia = (s: SecaoBriefing, modo: 'buscar' | 'enviar') => {
+    setModoEnvio((m) => ({ ...m, [s.id]: modo === 'enviar' }))
+    if (modo === 'buscar' && s.midia?.arquivo) {
+      const caminho = s.midia.arquivo.caminho
+      const sozinho = usoUnico(caminho)
+      mudarMidia(s, { arquivo: null })
+      if (caminho && sozinho) void apagarArquivo(caminho)
+    }
+  }
+
+  const remover = (s: SecaoBriefing) => {
+    const caminho = s.midia?.arquivo?.caminho
+    const sozinho = usoUnico(caminho)
+    aoMudar({ secoes: briefing.secoes.filter((x) => x.id !== s.id) })
+    // O arquivo da seção removida não serve mais a ninguém: sai do bucket.
+    if (caminho && sozinho) void apagarArquivo(caminho)
+  }
 
   const adicionar = (layout: TipoLayout) => {
     const secao = novaSecaoBriefing(infoLayout(layout).rotulo, layout)
@@ -207,9 +258,7 @@ export function EtapaSecoes({
                     <button
                       type="button"
                       aria-label={`Remover ${s.nome}`}
-                      onClick={() =>
-                        aoMudar({ secoes: briefing.secoes.filter((x) => x.id !== s.id) })
-                      }
+                      onClick={() => remover(s)}
                       className="shrink-0 rounded-md p-2 text-text-dim transition-colors hover:text-pink"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -288,52 +337,98 @@ export function EtapaSecoes({
 
                       {temMidia && (
                         <div className="rounded-md border border-border bg-surface p-4">
-                          <p className="mb-3 text-sm font-medium">Imagem ou vídeo</p>
-                          <div className="space-y-3">
-                            <Texto
-                              rotulo="Descreva o que deve aparecer"
-                              dica="a IA busca a mídia"
-                              placeholder="Ex.: pessoa usando notebook em escritório moderno"
-                              value={s.midia?.busca ?? ''}
-                              onChange={(e) =>
-                                mudarSecao(s.id, {
-                                  midia: {
-                                    busca: e.target.value,
-                                    tipo: s.midia?.tipo ?? 'imagem',
-                                    orientacao: s.midia?.orientacao ?? 'paisagem',
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm font-medium">Imagem ou vídeo</p>
+                            <div className="w-full sm:w-72">
+                              <Opcoes<'buscar' | 'enviar'>
+                                valor={
+                                  s.midia?.arquivo || modoEnvio[s.id] ? 'enviar' : 'buscar'
+                                }
+                                aoMudar={(v) => trocarModoMidia(s, v)}
+                                opcoes={[
+                                  {
+                                    valor: 'buscar',
+                                    rotulo: 'A IA busca',
+                                    icone: <Search className="h-3.5 w-3.5" />,
                                   },
-                                })
-                              }
-                              maxLength={200}
-                            />
-                            {s.midia && s.midia.busca !== '' && (
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <Opcoes<TipoMidia>
-                                  rotulo="Tipo"
-                                  valor={s.midia.tipo}
-                                  aoMudar={(v) =>
-                                    mudarSecao(s.id, { midia: { ...s.midia!, tipo: v } })
-                                  }
-                                  opcoes={[
-                                    { valor: 'imagem', rotulo: 'Imagem', icone: <ImageIcon className="h-3.5 w-3.5" /> },
-                                    { valor: 'video', rotulo: 'Vídeo', icone: <Video className="h-3.5 w-3.5" /> },
-                                  ]}
-                                />
-                                <Opcoes<Orientacao>
-                                  rotulo="Formato"
-                                  valor={s.midia.orientacao}
-                                  aoMudar={(v) =>
-                                    mudarSecao(s.id, { midia: { ...s.midia!, orientacao: v } })
-                                  }
-                                  opcoes={[
-                                    { valor: 'paisagem', rotulo: 'Paisagem' },
-                                    { valor: 'retrato', rotulo: 'Retrato' },
-                                    { valor: 'quadrado', rotulo: 'Quadrado' },
-                                  ]}
-                                />
-                              </div>
-                            )}
+                                  {
+                                    valor: 'enviar',
+                                    rotulo: 'Enviar arquivo',
+                                    icone: <Upload className="h-3.5 w-3.5" />,
+                                  },
+                                ]}
+                              />
+                            </div>
                           </div>
+
+                          {s.midia?.arquivo || modoEnvio[s.id] ? (
+                            <div className="space-y-3">
+                              <EnviarMidia
+                                lpId={lpId}
+                                arquivo={s.midia?.arquivo ?? null}
+                                apagarNoServidor={usoUnico(s.midia?.arquivo?.caminho)}
+                                aoEnviar={(m) =>
+                                  mudarMidia(s, {
+                                    arquivo: m,
+                                    tipo: m.tipo,
+                                    orientacao: m.orientacao,
+                                  })
+                                }
+                                aoRemover={() => mudarMidia(s, { arquivo: null })}
+                              />
+                              {s.midia?.arquivo && (
+                                <Texto
+                                  rotulo="Descrição da imagem"
+                                  dica="texto alternativo — ajuda no Google e em leitores de tela"
+                                  placeholder="Ex.: fachada da loja em dia de sol"
+                                  value={s.midia.busca}
+                                  onChange={(e) => mudarMidia(s, { busca: e.target.value })}
+                                  maxLength={200}
+                                />
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <Texto
+                                rotulo="Descreva o que deve aparecer"
+                                dica="a IA busca a mídia"
+                                placeholder="Ex.: pessoa usando notebook em escritório moderno"
+                                value={s.midia?.busca ?? ''}
+                                onChange={(e) => mudarMidia(s, { busca: e.target.value })}
+                                maxLength={200}
+                              />
+                              {s.midia && s.midia.busca !== '' && (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <Opcoes<TipoMidia>
+                                    rotulo="Tipo"
+                                    valor={s.midia.tipo}
+                                    aoMudar={(v) => mudarMidia(s, { tipo: v })}
+                                    opcoes={[
+                                      { valor: 'imagem', rotulo: 'Imagem', icone: <ImageIcon className="h-3.5 w-3.5" /> },
+                                      { valor: 'video', rotulo: 'Vídeo', icone: <Video className="h-3.5 w-3.5" /> },
+                                    ]}
+                                  />
+                                  <Opcoes<Orientacao>
+                                    rotulo="Formato"
+                                    valor={s.midia.orientacao}
+                                    aoMudar={(v) => mudarMidia(s, { orientacao: v })}
+                                    opcoes={[
+                                      { valor: 'paisagem', rotulo: 'Paisagem' },
+                                      { valor: 'retrato', rotulo: 'Retrato' },
+                                      { valor: 'quadrado', rotulo: 'Quadrado' },
+                                    ]}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {info.itens?.campos.includes('imagem') && (
+                            <p className="mt-3 text-xs text-text-dim">
+                              Este layout também tem imagem em cada item. Envie as dessas caixas no
+                              editor, depois de gerar a página.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

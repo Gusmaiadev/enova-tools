@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { coergirBriefing, coergirDocumento, coergirDocumentoIA } from './validar'
 import { briefingVazio } from './tipos'
-import { aplicarTexto, documentoBase, duplicarSecao, moverSecao, removerSecao } from './documento'
+import { orientacaoDe, recusar } from './formatos'
+import {
+  aplicarArquivos,
+  aplicarTexto,
+  arquivosUsados,
+  documentoBase,
+  duplicarSecao,
+  moverSecao,
+  removerSecao,
+} from './documento'
 import { novaSecao } from './layouts'
 import { gerarZip } from './zip'
 
@@ -154,6 +163,132 @@ describe('coergirBriefing', () => {
       'P',
     )
     expect(briefing.referencias).toEqual(['https://www.exemplo.com.br'])
+  })
+})
+
+describe('mídia enviada pelo usuário', () => {
+  /** Como a mídia volta de POST /api/lp/upload. */
+  const enviada = {
+    tipo: 'imagem',
+    url: 'https://firebasestorage.googleapis.com/v0/b/e-nova.firebasestorage.app/o/lp%2Ftrinca%2Flp1%2Fabc.jpg?alt=media&token=t',
+    caminho: 'lp/trinca/lp1/abc.jpg',
+    alt: 'fachada.jpg',
+    busca: '',
+    orientacao: 'paisagem',
+    largura: 1600,
+    altura: 900,
+  }
+
+  const briefingCom = (arquivo: unknown, busca = '') =>
+    coergirBriefing(
+      {
+        nome: 'P',
+        secoes: [
+          {
+            id: 's1',
+            nome: 'Início',
+            layout: 'hero',
+            vincularMenu: true,
+            midia: { busca, tipo: 'video', orientacao: 'retrato', arquivo },
+          },
+        ],
+      },
+      'P',
+    )
+
+  it('guarda o arquivo mesmo sem descrição, e tira tipo/formato dele', () => {
+    const midia = briefingCom(enviada).secoes[0].midia
+    expect(midia?.arquivo?.caminho).toBe('lp/trinca/lp1/abc.jpg')
+    expect(midia?.arquivo?.largura).toBe(1600)
+    // O client mandou video/retrato; vale o que o arquivo é de verdade.
+    expect(midia?.tipo).toBe('imagem')
+    expect(midia?.orientacao).toBe('paisagem')
+  })
+
+  it('descarta caminho fora da árvore do bucket sem perder a mídia', () => {
+    const arquivo = briefingCom({ ...enviada, caminho: '../../outro-time/x.jpg' }).secoes[0].midia
+      ?.arquivo
+    expect(arquivo?.url).toBe(enviada.url)
+    expect(arquivo?.caminho).toBeUndefined()
+  })
+
+  it('documentoBase usa o arquivo em vez de placeholder', () => {
+    const midia = documentoBase(briefingCom(enviada, 'fachada da loja')).secoes[0].midia
+    expect(midia?.url).toBe(enviada.url)
+    expect(midia?.alt).toBe('fachada da loja')
+  })
+
+  it('vence a mídia que a IA descreveu, casando por id', () => {
+    const briefing = briefingCom(enviada)
+    const doc = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'hero',
+          nome: 'Início',
+          itens: [],
+          midia: { busca: 'stock photo', tipo: 'imagem', orientacao: 'paisagem' },
+        },
+      ],
+    })!
+    expect(aplicarArquivos(doc, briefing)).toEqual({ aplicadas: 1, perdidas: 0 })
+    expect(doc.secoes[0].midia?.url).toBe(enviada.url)
+  })
+
+  it('casa pela posição quando a IA trocou o id, e só se o layout confere', () => {
+    const briefing = briefingCom(enviada)
+    const doc = coergirDocumento({
+      secoes: [{ id: 'outro', tipo: 'hero', nome: 'Início', itens: [] }],
+    })!
+    expect(aplicarArquivos(doc, briefing)).toEqual({ aplicadas: 1, perdidas: 0 })
+    expect(doc.secoes[0].midia?.url).toBe(enviada.url)
+
+    const trocado = coergirDocumento({
+      secoes: [{ id: 'outro', tipo: 'cards', nome: 'Serviços', itens: [] }],
+    })!
+    expect(aplicarArquivos(trocado, briefing)).toEqual({ aplicadas: 0, perdidas: 1 })
+  })
+
+  it('lista os arquivos que o projeto ainda usa, do documento e do briefing', () => {
+    const briefing = briefingCom(enviada)
+    const documento = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'cards',
+          nome: 'Serviços',
+          midia: { url: 'https://x/a.jpg', caminho: 'lp/trinca/lp1/no-doc.jpg', alt: 'a', busca: 'a' },
+          fundo: {
+            midia: { url: 'https://x/b.jpg', caminho: 'lp/trinca/lp1/no-fundo.jpg', alt: 'b', busca: 'b' },
+          },
+          itens: [
+            {
+              id: 'i1',
+              imagem: { url: 'https://x/c.jpg', caminho: 'lp/trinca/lp1/no-item.jpg', alt: 'c', busca: 'c' },
+            },
+            // Foto de banco não tem caminho: nada a apagar no bucket.
+            { id: 'i2', imagem: { url: 'https://pexels.com/d.jpg', alt: 'd', busca: 'd' } },
+          ],
+        },
+      ],
+    })!
+
+    expect([...arquivosUsados({ documento, briefing })].sort()).toEqual([
+      'lp/trinca/lp1/abc.jpg',
+      'lp/trinca/lp1/no-doc.jpg',
+      'lp/trinca/lp1/no-fundo.jpg',
+      'lp/trinca/lp1/no-item.jpg',
+    ])
+    expect(arquivosUsados({ documento: null, briefing: null }).size).toBe(0)
+  })
+
+  it('recusa formato e tamanho antes de enviar', () => {
+    expect(recusar('image/jpeg', 1024)).toBeNull()
+    expect(recusar('video/quicktime', 1024)).toMatch(/Formato não aceito/)
+    expect(recusar('video/mp4', 80 * 1024 * 1024)).toMatch(/limite/)
+    expect(recusar('image/png', 0)).toMatch(/vazio/)
+    expect(orientacaoDe(900, 900)).toBe('quadrado')
+    expect(orientacaoDe(800, 1200)).toBe('retrato')
   })
 })
 

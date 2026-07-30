@@ -1,5 +1,6 @@
 import { lerUsuario } from '@/lib/auth/usuarioAtual'
-import { documentoBase } from '@/lib/lp/documento'
+import { limparOrfaos } from '@/lib/lp/armazenamento'
+import { aplicarArquivos, arquivosUsados, documentoBase } from '@/lib/lp/documento'
 import { gerarDocumento } from '@/lib/lp/ia'
 import { preencherMidias } from '@/lib/lp/midias'
 import { atualizarProjeto, obterProjeto } from '@/lib/lp/persistencia'
@@ -8,7 +9,7 @@ import { coergirBriefing } from '@/lib/lp/validar'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-// IA (até 120s) + análise de referências + buscas no Envato em lotes.
+// IA (até 120s) + análise de referências + buscas no banco de mídia em lotes.
 export const maxDuration = 300
 
 /**
@@ -83,10 +84,19 @@ export async function POST(req: Request) {
     )
   }
 
+  // Antes da busca em banco: com o arquivo do usuário no lugar, a mídia deixa de
+  // ser placeholder e preencherMidias nem tenta buscar nada para essa seção.
+  const arquivos = aplicarArquivos(documento, briefing)
+  if (arquivos.perdidas > 0) {
+    avisos.push(
+      `${arquivos.perdidas} ${arquivos.perdidas === 1 ? 'arquivo que você enviou não encontrou a seção dele' : 'arquivos que você enviou não encontraram a seção deles'} na página gerada. Coloque no editor pelo botão Trocar.`,
+    )
+  }
+
   const midias = await preencherMidias(documento)
   if (midias.semChave) {
     avisos.push(
-      'Busca de mídia não configurada (ENVATO_TOKEN): as imagens ficaram como espaço reservado. Troque cada uma no editor.',
+      'Busca de mídia não configurada (PEXELS_API_KEY): as imagens ficaram como espaço reservado. Troque cada uma no editor.',
     )
   } else if (midias.pendentes > 0) {
     avisos.push(
@@ -95,6 +105,11 @@ export async function POST(req: Request) {
   }
 
   await atualizarProjeto(corpo.lpId, usuario.teamId, { briefing, documento })
+
+  // A página nova define o que ainda é usado: arquivo enviado que ficou de fora
+  // (trocado no editor, seção removida) sai do bucket. Não bloqueia a resposta em
+  // caso de erro — limparOrfaos nunca lança.
+  await limparOrfaos(usuario.teamId, corpo.lpId, arquivosUsados({ documento, briefing }))
 
   return Response.json({ ok: true, documento, avisos, semChave: semChaveIA })
 }

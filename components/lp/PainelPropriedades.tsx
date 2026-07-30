@@ -1,6 +1,6 @@
 'use client'
 
-import { AlignCenter, AlignLeft, AlignRight, ChevronDown, ImageIcon, Plus, Trash2 } from 'lucide-react'
+import { AlignCenter, AlignLeft, AlignRight, ChevronDown, ImageIcon, Play, Plus, Trash2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Alca } from './Alca'
 import { Area, Cor, Faixa, Fonte, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
@@ -101,11 +101,14 @@ function SeletorIcone({
 
 function CampoMidia({
   rotulo,
+  lpId,
   midia,
   aoMudar,
   aoRemover,
 }: {
   rotulo: string
+  /** Projeto dono da mídia enviada — o upload vai para a pasta dele no bucket. */
+  lpId: string
   midia: LpMidia | null | undefined
   aoMudar: (m: LpMidia) => void
   aoRemover?: () => void
@@ -116,8 +119,28 @@ function CampoMidia({
       <span className="text-sm text-text-dim">{rotulo}</span>
       {midia ? (
         <div className="overflow-hidden rounded-md border border-border bg-surface-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={midia.url} alt={midia.alt} className="aspect-video w-full object-cover" />
+          {/* Vídeo tem `thumb` (poster): sem isso o mp4 iria para o <img> e o
+              painel mostraria o ícone de imagem quebrada. */}
+          <div className="relative aspect-video w-full">
+            {midia.thumb || midia.tipo === 'imagem' ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={midia.thumb ?? midia.url}
+                alt={midia.alt}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-surface text-text-dim">
+                <Play className="h-5 w-5" />
+              </div>
+            )}
+            {midia.tipo === 'video' && (
+              <span className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <Play className="h-2.5 w-2.5 fill-current" />
+                Vídeo
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1 p-2">
             <button
               type="button"
@@ -150,6 +173,7 @@ function CampoMidia({
       )}
       <SeletorMidia
         aberto={aberto}
+        lpId={lpId}
         midia={midia ?? null}
         aoEscolher={aoMudar}
         aoFechar={() => setAberto(false)}
@@ -286,11 +310,13 @@ function EditorItem({
   secao,
   item,
   campos,
+  lpId,
   aplicar,
 }: {
   secao: LpSecao
   item: LpItem
   campos: string[]
+  lpId: string
   aplicar: Aplicar
 }) {
   const mudar = (patch: Partial<LpItem>, agrupar?: string) =>
@@ -308,6 +334,7 @@ function EditorItem({
       {campos.includes('imagem') && (
         <CampoMidia
           rotulo="Imagem"
+          lpId={lpId}
           midia={item.imagem}
           aoMudar={(m) => mudar({ imagem: m })}
           aoRemover={() => mudar({ imagem: null })}
@@ -389,12 +416,14 @@ function EditorItem({
 
 export function PainelPropriedades({
   doc,
+  lpId,
   secaoId,
   itemId,
   aplicar,
   aoSelecionarItem,
 }: {
   doc: LpDocumento
+  lpId: string
   secaoId: string | null
   itemId: string | null
   aplicar: Aplicar
@@ -499,6 +528,7 @@ export function PainelPropriedades({
         {info.campos.midia && (
           <CampoMidia
             rotulo="Mídia"
+            lpId={lpId}
             midia={secao.midia}
             aoMudar={(m) => mudarSecao({ midia: m })}
             aoRemover={() => mudarSecao({ midia: null })}
@@ -573,6 +603,7 @@ export function PainelPropriedades({
                         secao={secao}
                         item={item}
                         campos={info.itens?.campos ?? []}
+                        lpId={lpId}
                         aplicar={aplicar}
                       />
                     </div>
@@ -737,6 +768,7 @@ export function PainelPropriedades({
         />
         <CampoMidia
           rotulo="Imagem ou vídeo de fundo"
+          lpId={lpId}
           midia={secao.fundo?.midia}
           aoMudar={(m) => mudarSecao({ fundo: { ...secao.fundo, midia: m } })}
           aoRemover={() => mudarSecao({ fundo: { ...secao.fundo, midia: null } })}

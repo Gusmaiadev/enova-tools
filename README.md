@@ -6,8 +6,9 @@ de Leads**: encontra empresas que ainda não têm site, para prospecção.
 Stack: Next.js 16 (App Router) + TypeScript · Firebase Spark (Auth + Firestore) ·
 Google Places API (New) + Geocoding · IBGE · Resend · Tailwind v4 · deploy Vercel.
 
-> Roda inteiro no plano **Spark (grátis)**. Sem Cloud Functions, sem Storage.
-> Os Route Handlers do Next são o backend.
+> Sem Cloud Functions: os Route Handlers do Next são o backend. O Cloud Storage
+> entra só para as mídias que o usuário envia nas landing pages — bucket regional
+> em `us-east1` (local da cota gratuita) e escrita apenas pelo Admin SDK.
 
 ---
 
@@ -32,6 +33,7 @@ cp .env.example .env.local
 | `RESEND_API_KEY` | Resend → API Keys |
 | `EMAIL_FROM` | Um endereço de um domínio verificado no Resend (em teste, `onboarding@resend.dev` só envia para o dono da conta) |
 | `DEFAULT_TEAM_ID` | Já vem `trinca`; deixe assim no MVP |
+| `FIREBASE_STORAGE_BUCKET` | Firebase Console → Storage → referência do bucket, sem o `gs://` (**server-only**). Só o upload de mídia das landing pages usa |
 
 > A `FIREBASE_ADMIN_PRIVATE_KEY` do JSON tem quebras de linha reais. No `.env.local`
 > cole entre aspas duplas com os `\n` escapados, ex.: `"-----BEGIN...\n...\n-----END-----\n"`.
@@ -46,10 +48,20 @@ cp .env.example .env.local
 - Em **Firestore**, publique as regras deste repositório (`firestore.rules`) — elas
   **negam tudo**. Isso é proposital e obrigatório (ver seção de segurança abaixo).
 
+- Em **Storage**, crie o bucket padrão em `us-east1` (Standard) e publique
+  `storage.rules`, que também **negam tudo**: o upload entra por Route Handler com o
+  Admin SDK, e o link público das imagens é o download URL com token.
+
   ```bash
-  # com a Firebase CLI, uma vez:
-  npx firebase deploy --only firestore:rules
+  # a CLI é o pacote firebase-tools (o pacote `firebase` é o SDK e não tem
+  # executável — `npx firebase` falha com "could not determine executable to run"):
+  npm i -g firebase-tools
+  firebase login
+  firebase deploy --only firestore:rules,storage:rules
   ```
+
+  Sem instalar nada também dá: Console → Firestore/Storage → **Regras**, colar o
+  arquivo do repositório e publicar.
 
 ## 3. Rodar
 

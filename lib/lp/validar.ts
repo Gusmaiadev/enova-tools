@@ -11,6 +11,7 @@ import { LAYOUTS } from './layouts'
 import { placeholderMidia } from './placeholder'
 import type {
   AjusteTexto,
+  FonteMidia,
   LpBotao,
   LpBriefing,
   LpDocumento,
@@ -28,6 +29,7 @@ import { corSegura, gerarId, limitar, normalizarUrl, slugificar } from './util'
 
 const TIPOS_LAYOUT = new Set<string>(LAYOUTS.map((l) => l.tipo))
 const ORIENTACOES = new Set<string>(['paisagem', 'retrato', 'quadrado'])
+const FONTES_MIDIA = new Set<string>(['pexels', 'pixabay', 'envato'])
 const REDES = new Set<string>(Object.keys(ROTULO_REDE))
 
 const str = (v: unknown, max = 4000): string =>
@@ -71,6 +73,27 @@ function coergirBotao(v: unknown): LpBotao | null {
   return botao
 }
 
+/**
+ * URL auxiliar de mídia (poster, prévia). Ao contrário de `url`, que o
+ * compilador passa por urlSegura, estas vão direto para `<img>`/`<video>` no
+ * editor — o que não for http(s) ou data:image é descartado, não neutralizado.
+ */
+function urlDeMidia(v: unknown): string | undefined {
+  const s = opcional(v, 2000)
+  if (!s) return undefined
+  return /^(https?:\/\/|data:image\/)/i.test(s) ? s : undefined
+}
+
+/**
+ * Caminho de arquivo nosso no bucket (lp/TIME/PROJETO/uuid.ext). Vem do client
+ * junto com o documento; qualquer outra forma e descartada, para o caminho nunca
+ * virar chave de leitura/remocao de algo fora dessa arvore.
+ */
+function caminhoDeBucket(v: unknown): string | undefined {
+  const s = opcional(v, 300)
+  return s && /^lp\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/.test(s) ? s : undefined
+}
+
 function coergirMidia(v: unknown): LpMidia | null {
   const m = obj(v)
   const busca = str(m.busca, 200)
@@ -84,6 +107,26 @@ function coergirMidia(v: unknown): LpMidia | null {
     const alt = opcional(m.alt, 300)
     return alt ? { ...ph, alt } : ph
   }
+  // Campos que vêm do banco de mídia (thumb/crédito/dimensões). A IA não os
+  // inventa, mas o documento salvo passa por aqui de novo a cada gravação — sem
+  // preservá-los, o poster do vídeo e o crédito ao autor se perderiam.
+  const extras: Partial<LpMidia> = {}
+  const caminho = caminhoDeBucket(m.caminho)
+  if (caminho) extras.caminho = caminho
+  const thumb = urlDeMidia(m.thumb)
+  if (thumb) extras.thumb = thumb
+  const previa = urlDeMidia(m.previa)
+  if (previa) extras.previa = previa
+  const autor = opcional(m.autor, 120)
+  if (autor) extras.autor = autor
+  const autorUrl = opcional(m.autorUrl, 600)
+  if (autorUrl) extras.autorUrl = autorUrl
+  if (FONTES_MIDIA.has(String(m.fonte))) extras.fonte = m.fonte as FonteMidia
+  for (const campo of ['largura', 'altura', 'duracao'] as const) {
+    const n = m[campo]
+    if (typeof n === 'number' && Number.isFinite(n) && n > 0) extras[campo] = Math.round(n)
+  }
+
   return {
     tipo,
     url,
@@ -91,6 +134,7 @@ function coergirMidia(v: unknown): LpMidia | null {
     busca,
     orientacao,
     ...(opcional(m.origem, 600) ? { origem: opcional(m.origem, 600) } : {}),
+    ...extras,
   }
 }
 
@@ -322,6 +366,9 @@ export function coergirBriefing(bruto: unknown, nomeAtual: string): LpBriefing {
         if (!TIPOS_LAYOUT.has(layout)) return null
         const midiaBruta = obj(secao.midia)
         const busca = str(midiaBruta.busca, 200)
+        // Arquivo enviado pelo usuário: passa pela mesma coerção da mídia do
+        // documento (url, dimensões, caminho no bucket).
+        const arquivo = coergirMidia(midiaBruta.arquivo)
         const colunas: 2 | 3 | 4 | undefined =
           secao.colunas === 2 || secao.colunas === 3 || secao.colunas === 4
             ? secao.colunas
@@ -335,14 +382,19 @@ export function coergirBriefing(bruto: unknown, nomeAtual: string): LpBriefing {
           layout: layout as TipoLayout,
           ...(colunas ? { colunas } : {}),
           midia:
-            busca === ''
+            busca === '' && !arquivo
               ? null
               : {
                   busca,
-                  tipo: midiaBruta.tipo === 'video' ? ('video' as const) : ('imagem' as const),
-                  orientacao: (ORIENTACOES.has(String(midiaBruta.orientacao))
-                    ? midiaBruta.orientacao
-                    : 'paisagem') as Orientacao,
+                  // Com arquivo enviado, tipo e formato são os do arquivo real.
+                  tipo:
+                    arquivo?.tipo ??
+                    (midiaBruta.tipo === 'video' ? ('video' as const) : ('imagem' as const)),
+                  orientacao: (arquivo?.orientacao ??
+                    (ORIENTACOES.has(String(midiaBruta.orientacao))
+                      ? midiaBruta.orientacao
+                      : 'paisagem')) as Orientacao,
+                  ...(arquivo ? { arquivo } : {}),
                 },
         }
       })

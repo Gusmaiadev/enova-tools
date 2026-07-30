@@ -9,7 +9,8 @@ import { getAuth, type Auth } from 'firebase/auth'
  *
  * NUNCA importe firebase/firestore aqui. O client nao fala com o Firestore —
  * as rules negam tudo (secao 5.2) e todo dado passa por Route Handler.
- * NUNCA importe firebase/storage — o projeto e Spark, nao existe bucket.
+ * NUNCA importe firebase/storage: existe bucket, mas quem grava e apaga e o
+ * Admin SDK em /api/lp/upload — storage.rules nega tudo para o client.
  *
  * Init preguicoso via funcao: getAuth() lanca com apiKey vazia, e nao queremos
  * que o prerender de build (SSR das paginas client) quebre por isso. No browser

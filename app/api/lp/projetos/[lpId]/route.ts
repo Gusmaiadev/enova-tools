@@ -1,4 +1,5 @@
 import { lerUsuario } from '@/lib/auth/usuarioAtual'
+import { removerPastaDoProjeto } from '@/lib/lp/armazenamento'
 import { atualizarProjeto, excluirProjeto, obterProjeto } from '@/lib/lp/persistencia'
 import { coergirBriefing, coergirDocumento } from '@/lib/lp/validar'
 
@@ -69,7 +70,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ lpId: st
   return Response.json({ ok: true, ...(patch.documento ? { documento: patch.documento } : {}) })
 }
 
-/** DELETE /api/lp/projetos/{lpId} — remove a landing page. */
+/**
+ * DELETE /api/lp/projetos/{lpId} — remove a landing page e as mídias que o
+ * usuário enviou para ela (a pasta dela no bucket ficaria órfã para sempre).
+ */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ lpId: string }> }) {
   const usuario = await lerUsuario(true)
   if (!usuario) return Response.json({ erro: 'Sessão inválida.' }, { status: 401 })
@@ -78,6 +82,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ lpId
   const projeto = await obterProjeto(lpId, usuario.teamId)
   if (!projeto) return Response.json({ erro: 'Projeto não encontrado.' }, { status: 404 })
 
+  // Antes do Firestore: se a limpeza falhar, o projeto continua lá e é possível
+  // tentar de novo. O contrário deixaria arquivo sem nada apontando para ele.
+  await removerPastaDoProjeto(usuario.teamId, lpId)
   await excluirProjeto(lpId, usuario.teamId)
   return Response.json({ ok: true })
 }
