@@ -43,7 +43,7 @@ export function pCards(s: LpSecao): LpContainer {
       ...(i.extra ? [wTexto(i.extra, 'subtitulo')] : []),
       ...(i.texto ? [wTexto(i.texto, 'corpo')] : []),
       ...(i.botao ? [wBotao(i.botao)] : []),
-    ]),
+    ], { aparencia: 'card' }),
   )
   return comGrade(s, grade(cards, colunasDe(s.colunas, 3)))
 }
@@ -64,7 +64,7 @@ export function pPrecos(s: LpSecao): LpContainer {
           ]
         : []),
       ...(i.botao ? [wBotao(i.botao)] : []),
-    ]),
+    ], { aparencia: i.destaque ? 'plano-destaque' : 'plano' }),
   )
   return comGrade(s, grade(planos, colunasDe(s.colunas, Math.min(3, Math.max(2, s.itens.length)))))
 }
@@ -76,7 +76,7 @@ export function pGridProdutos(s: LpSecao): LpContainer {
       ...(i.titulo ? [wTitulo(i.titulo, 'h3')] : []),
       ...(i.extra ? [wTexto(i.extra, 'subtitulo')] : []),
       ...(i.botao ? [wBotao(i.botao)] : []),
-    ]),
+    ], { aparencia: 'produto' }),
   )
   return comGrade(s, grade(produtos, colunasDe(s.colunas, 3)))
 }
@@ -89,7 +89,7 @@ function galeriaOuMasonry(s: LpSecao): LpContainer {
       container([
         wMidia(i.imagem as NonNullable<LpItem['imagem']>),
         ...(i.titulo ? [wTexto(i.titulo, 'corpo')] : []),
-      ]),
+      ], { aparencia: 'figura' }),
     )
   return comGrade(s, grade(figuras, colunasDe(s.colunas, 3)))
 }
@@ -113,7 +113,7 @@ export function pTimeline(s: LpSecao): LpContainer {
       ...(i.extra ? [wTexto(i.extra, 'subtitulo')] : []),
       ...(i.titulo ? [wTitulo(i.titulo, 'h3')] : []),
       ...(i.texto ? [wTexto(i.texto, 'corpo')] : []),
-    ]),
+    ], { aparencia: 'marco' }),
   )
   return comGrade(s, container(marcos, { direcao: COL, gap: { desktop: 32 } }))
 }
@@ -144,6 +144,7 @@ export function pBlocosAlternados(s: LpSecao): LpContainer {
       direcao: img.length > 0 ? LINHA : COL,
       colunas: img.length > 0 ? { desktop: 2, tablet: 1 } : undefined,
       alinhar: { desktop: 'centro' },
+      aparencia: 'bloco',
     })
   })
   return comGrade(s, container(blocos, { direcao: COL, gap: { desktop: 48 } }))
@@ -157,7 +158,7 @@ export function pListaBeneficios(s: LpSecao): LpContainer {
         ...(i.titulo ? [wTitulo(i.titulo, 'h3')] : []),
         ...(i.texto ? [wTexto(i.texto, 'corpo')] : []),
       ],
-      { direcao: LINHA, alinhar: { desktop: 'inicio' } },
+      { direcao: LINHA, alinhar: { desktop: 'inicio' }, aparencia: 'beneficio' },
     ),
   )
   const coluna = container([

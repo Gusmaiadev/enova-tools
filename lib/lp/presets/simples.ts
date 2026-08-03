@@ -37,7 +37,11 @@ export function pTextoCentralizado(s: LpSecao): LpContainer {
 }
 
 export function pCta(s: LpSecao): LpContainer {
-  return container([...cabeca(s), ...botaoSecao(s)], { alinhar: { desktop: 'centro' } })
+  // A caixa em gradiente com cantos arredondados era o .lp-cta-caixa do layout.
+  return container([...cabeca(s), ...botaoSecao(s)], {
+    alinhar: { desktop: 'centro' },
+    aparencia: 'caixa-cta',
+  })
 }
 
 export function pBanner(s: LpSecao): LpContainer {

@@ -247,6 +247,63 @@ describe('expandirPreset — composicao livre', () => {
       container: [{ container: [{ container: ['imagem', 'titulo', 'texto', 'botao'] }] }],
     })
   })
+
+  it('cards recebem aparencia de card', () => {
+    const raiz = expandir(secao('cards', { itens: [{ id: 'i1', titulo: 'C' }] }))
+    const grade = raiz.filhos[0]
+    if (grade.tipo !== 'container') throw new Error('esperava container')
+    const card = grade.filhos[0]
+    if (card.tipo !== 'container') throw new Error('esperava container')
+    expect(card.aparencia).toBe('card')
+  })
+
+  it('plano em destaque recebe aparencia propria', () => {
+    const raiz = expandir(
+      secao('precos', {
+        itens: [
+          { id: 'p1', titulo: 'Basico' },
+          { id: 'p2', titulo: 'Pro', destaque: true },
+        ],
+      }),
+    )
+    const grade = raiz.filhos[0]
+    if (grade.tipo !== 'container') throw new Error('esperava container')
+    const [normal, destaque] = grade.filhos
+    if (normal.tipo !== 'container' || destaque.tipo !== 'container') {
+      throw new Error('esperava containers')
+    }
+    expect(normal.aparencia).toBe('plano')
+    expect(destaque.aparencia).toBe('plano-destaque')
+  })
+
+  it('produtos, blocos e figuras recebem a aparencia correspondente', () => {
+    const prod = expandir(secao('grid-produtos', { itens: [{ id: 'i1', titulo: 'P' }] }))
+    const gradeProd = prod.filhos[0]
+    if (gradeProd.tipo !== 'container') throw new Error('esperava container')
+    expect((gradeProd.filhos[0] as { aparencia?: string }).aparencia).toBe('produto')
+
+    const gal = expandir(secao('galeria', { itens: [{ id: 'i1', imagem: midia }] }))
+    const gradeGal = gal.filhos[0]
+    if (gradeGal.tipo !== 'container') throw new Error('esperava container')
+    expect((gradeGal.filhos[0] as { aparencia?: string }).aparencia).toBe('figura')
+
+    const blocos = expandir(
+      secao('blocos-alternados', { itens: [{ id: 'i1', titulo: 'B', imagem: midia }] }),
+    )
+    const gradeBlocos = blocos.filhos[0]
+    if (gradeBlocos.tipo !== 'container') throw new Error('esperava container')
+    expect((gradeBlocos.filhos[0] as { aparencia?: string }).aparencia).toBe('bloco')
+  })
+
+  it('container sem identidade visual nao ganha aparencia', () => {
+    const raiz = expandir(secao('texto-centralizado', { titulo: 'T' }))
+    expect(raiz.aparencia).toBeUndefined()
+  })
+
+  it('cta ganha a caixa em gradiente que o layout tinha', () => {
+    const raiz = expandir(secao('cta', { titulo: 'T' }))
+    expect(raiz.aparencia).toBe('caixa-cta')
+  })
 })
 
 describe('expandirPreset — widgets compostos', () => {

@@ -270,8 +270,28 @@ type NoBase = {
   oculto?: PorDisp<boolean>
 }
 
+/**
+ * Identidade visual pronta de um container. Vira uma classe no HTML e carrega o
+ * que LpEstilo nao alcanca: hover, transicao e pseudo-elemento (o selo "Mais
+ * popular" do plano em destaque e um ::before). Sem isto, migrar uma secao de
+ * cards produziria colunas de texto cru, sem borda, sem fundo e sem hover.
+ * `estilo` sobrepoe por cima.
+ */
+export type Aparencia =
+  | 'card'
+  | 'plano'
+  | 'plano-destaque'
+  | 'produto'
+  | 'bloco'
+  | 'figura'
+  | 'beneficio'
+  | 'marco'
+  | 'caixa-cta'
+
 export type LpContainer = NoBase & {
   tipo: 'container'
+  /** Ausente = container sem identidade visual propria. */
+  aparencia?: Aparencia
   direcao: PorDisp<'linha' | 'coluna'>
   colunas?: PorDisp<number>
   gap?: PorDisp<number>
