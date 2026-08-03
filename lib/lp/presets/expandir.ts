@@ -6,6 +6,18 @@
 
 import type { LpContainer, LpSecao, TipoLayout } from '../tipos'
 import { container } from './comum'
+import {
+  pBlocosAlternados,
+  pCards,
+  pEstatisticas,
+  pGaleria,
+  pGridProdutos,
+  pListaBeneficios,
+  pLogos,
+  pMasonry,
+  pPrecos,
+  pTimeline,
+} from './grades'
 import { pBanner, pCta, pFormulario, pHero, pTextoCentralizado, pTextoMidia } from './simples'
 
 type Expansor = (s: LpSecao) => LpContainer
@@ -17,6 +29,16 @@ const EXPANSORES: Partial<Record<TipoLayout, Expansor>> = {
   cta: pCta,
   banner: pBanner,
   formulario: pFormulario,
+  cards: pCards,
+  precos: pPrecos,
+  'grid-produtos': pGridProdutos,
+  'lista-beneficios': pListaBeneficios,
+  galeria: pGaleria,
+  masonry: pMasonry,
+  logos: pLogos,
+  timeline: pTimeline,
+  'blocos-alternados': pBlocosAlternados,
+  estatisticas: pEstatisticas,
 }
 
 /**

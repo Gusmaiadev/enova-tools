@@ -108,3 +108,142 @@ describe('expandirPreset — presets sem itens', () => {
     expect(forma(raiz)).toEqual({ container: ['formulario'] })
   })
 })
+
+describe('expandirPreset — composicao livre', () => {
+  it('cards: cabeca, grade de containers por item, botao no fim', () => {
+    const raiz = expandir(
+      secao('cards', {
+        titulo: 'T',
+        colunas: 3,
+        botao: { texto: 'B', url: '#' },
+        itens: [
+          {
+            id: 'i1',
+            icone: 'check',
+            titulo: 'C1',
+            extra: 'Sub',
+            texto: 'Txt',
+            botao: { texto: 'x', url: '#' },
+          },
+          { id: 'i2', titulo: 'C2' },
+        ],
+      }),
+    )
+    expect(forma(raiz)).toEqual({
+      container: [
+        'titulo',
+        {
+          container: [
+            { container: ['icone', 'titulo', 'texto', 'texto', 'botao'] },
+            { container: ['titulo'] },
+          ],
+        },
+        'botao',
+      ],
+    })
+    const grade = raiz.filhos[1]
+    if (grade.tipo !== 'container') throw new Error('esperava container')
+    expect(grade.colunas).toEqual({ desktop: 3, tablet: 2, celular: 1 })
+  })
+
+  it('galeria e masonry sem itens com imagem saem com a grade vazia', () => {
+    const raiz = expandir(secao('galeria', { itens: [{ id: 'i1' }] }))
+    expect(forma(raiz)).toEqual({ container: [{ container: [] }] })
+  })
+
+  it('galeria monta um container por imagem, com a legenda depois', () => {
+    const raiz = expandir(
+      secao('galeria', { colunas: 2, itens: [{ id: 'i1', imagem: midia, titulo: 'Legenda' }] }),
+    )
+    expect(forma(raiz)).toEqual({ container: [{ container: [{ container: ['imagem', 'texto'] }] }] })
+  })
+
+  it('estatisticas viram widget numero, valor de extra e rotulo de titulo', () => {
+    const raiz = expandir(
+      secao('estatisticas', { itens: [{ id: 'i1', extra: '100+', titulo: 'Clientes' }] }),
+    )
+    const grade = raiz.filhos[0]
+    if (grade.tipo !== 'container') throw new Error('esperava container')
+    const num = grade.filhos[0]
+    if (num.tipo !== 'numero') throw new Error('esperava numero')
+    expect(num).toMatchObject({ valor: '100+', rotulo: 'Clientes' })
+  })
+
+  it('precos monta nome, preco, periodo, lista de vantagens e botao', () => {
+    const raiz = expandir(
+      secao('precos', {
+        itens: [
+          {
+            id: 'i1',
+            titulo: 'Pro',
+            extra: 'R$ 99',
+            detalhe: '/mês',
+            lista: ['Um', 'Dois'],
+            botao: { texto: 'Assinar', url: '#' },
+          },
+        ],
+      }),
+    )
+    expect(forma(raiz)).toEqual({
+      container: [{ container: [{ container: ['titulo', 'texto', 'texto', 'lista', 'botao'] }] }],
+    })
+  })
+
+  it('timeline usa extra como data antes do titulo', () => {
+    const raiz = expandir(
+      secao('timeline', { itens: [{ id: 'i1', extra: '2020', titulo: 'Marco', texto: 'Txt' }] }),
+    )
+    expect(forma(raiz)).toEqual({
+      container: [{ container: [{ container: ['texto', 'titulo', 'texto'] }] }],
+    })
+  })
+
+  it('logos usa a imagem quando existe e o nome quando nao', () => {
+    const raiz = expandir(
+      secao('logos', { itens: [{ id: 'i1', imagem: midia }, { id: 'i2', titulo: 'Marca' }] }),
+    )
+    expect(forma(raiz)).toEqual({
+      container: [{ container: [{ container: ['imagem'] }, { container: ['titulo'] }] }],
+    })
+  })
+
+  it('blocos-alternados monta texto e imagem por bloco', () => {
+    const raiz = expandir(
+      secao('blocos-alternados', {
+        itens: [{ id: 'i1', titulo: 'B', texto: 'T', imagem: midia }],
+      }),
+    )
+    expect(forma(raiz)).toEqual({
+      container: [{ container: [{ container: [{ container: ['titulo', 'texto'] }, 'imagem'] }] }],
+    })
+  })
+
+  it('lista-beneficios poe a coluna de texto e a midia lado a lado', () => {
+    const raiz = expandir(
+      secao('lista-beneficios', {
+        titulo: 'T',
+        midia,
+        itens: [{ id: 'i1', icone: 'check', titulo: 'B', texto: 'D' }],
+      }),
+    )
+    expect(forma(raiz)).toEqual({
+      container: [
+        { container: ['titulo', { container: [{ container: ['icone', 'titulo', 'texto'] }] }] },
+        'imagem',
+      ],
+    })
+  })
+
+  it('grid-produtos monta foto, nome, preco e botao', () => {
+    const raiz = expandir(
+      secao('grid-produtos', {
+        itens: [
+          { id: 'i1', imagem: midia, titulo: 'P', extra: 'R$ 9', botao: { texto: 'Ver', url: '#' } },
+        ],
+      }),
+    )
+    expect(forma(raiz)).toEqual({
+      container: [{ container: [{ container: ['imagem', 'titulo', 'texto', 'botao'] }] }],
+    })
+  })
+})
