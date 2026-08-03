@@ -100,6 +100,98 @@ describe('renderElemento — container', () => {
   })
 })
 
+describe('renderElemento — widgets compostos', () => {
+  it('faq usa details/summary, com o primeiro aberto', () => {
+    const html = renderElemento(ctx(), {
+      id: 'f1',
+      tipo: 'faq',
+      perguntas: [
+        { id: 'p1', pergunta: 'Um?', resposta: 'R1' },
+        { id: 'p2', pergunta: 'Dois?', resposta: 'R2' },
+      ],
+    })
+    expect(html).toContain('<details open>')
+    expect((html.match(/<details/g) ?? []).length).toBe(2)
+    expect(html).toContain('<summary>')
+    expect(html).toContain('Um?')
+  })
+
+  it('abas emitem nav e paineis casados por indice', () => {
+    const html = renderElemento(ctx(), {
+      id: 'a1',
+      tipo: 'abas',
+      abas: [
+        { id: 't1', titulo: 'A', texto: 'TA' },
+        { id: 't2', titulo: 'B', texto: 'TB' },
+      ],
+    })
+    expect(html).toContain('data-tab="0"')
+    expect(html).toContain('data-painel="0"')
+    expect(html).toContain('class="lp-tabs-nav"')
+  })
+
+  it('comparacao sai como tabela com cabecalho e linhas', () => {
+    const html = renderElemento(ctx(), {
+      id: 'c1',
+      tipo: 'comparacao',
+      rotulos: ['Preco'],
+      colunas: [{ id: 'x', titulo: 'Pro', celulas: ['R$ 9'], destaque: true }],
+    })
+    expect(html).toContain('<table>')
+    expect(html).toContain('<th class="destaque"')
+    expect(html).toContain('R$ 9')
+  })
+
+  it('celula "sim" vira check e "nao" vira travessao', () => {
+    const html = renderElemento(ctx(), {
+      id: 'c2',
+      tipo: 'comparacao',
+      rotulos: ['A', 'B'],
+      colunas: [{ id: 'x', titulo: 'P', celulas: ['sim', 'nao'] }],
+    })
+    expect(html).toContain('class="sim"')
+    expect(html).toContain('class="nao"')
+  })
+
+  it('formulario emite honeypot e so confirma com destino', () => {
+    const comDestino = renderElemento(ctx(), {
+      id: 'fo',
+      tipo: 'formulario',
+      destino: 'https://x/y',
+    })
+    expect(comDestino).toContain('lp-mel')
+    expect(comDestino).toContain('data-destino="https://x/y"')
+    expect(comDestino).toContain('lp-form-ok')
+
+    const sem = renderElemento(ctx(), { id: 'fo2', tipo: 'formulario' })
+    expect(sem).not.toContain('data-destino')
+    expect(sem).not.toContain('lp-form-ok')
+  })
+
+  it('depoimentos e carrossel usam o mesmo mecanismo de slider', () => {
+    const dep = renderElemento(ctx(), {
+      id: 'd1',
+      tipo: 'depoimentos',
+      depoimentos: [
+        { id: '1', texto: 'Otimo', nome: 'Ana', cargo: 'CEO' },
+        { id: '2', texto: 'Bom', nome: 'Beto' },
+      ],
+    })
+    expect(dep).toContain('lp-slider-trilho')
+    expect(dep).toContain('Ana')
+
+    const car = renderElemento(ctx(), {
+      id: 'k1',
+      tipo: 'carrossel',
+      slides: [
+        { id: '1', titulo: 'Um' },
+        { id: '2', titulo: 'Dois' },
+      ],
+    })
+    expect(car).toContain('lp-slider-trilho')
+  })
+})
+
 describe('renderElemento — modo editor', () => {
   it('emite data-lp com o id do no so no editor', () => {
     const el = { id: 'x1', tipo: 'titulo', nivel: 'h2', texto: 'T' } as const

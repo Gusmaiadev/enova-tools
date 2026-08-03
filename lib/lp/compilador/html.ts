@@ -270,7 +270,7 @@ function lFaq(ctx: Ctx, s: LpSecao): string {
   return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-faq">${itens}</div>${acaoSecao(ctx, s, 'centro')}</div>`
 }
 
-function slider(conteudo: string[], rotulo: string): string {
+export function slider(conteudo: string[], rotulo: string): string {
   const slides = conteudo.map((c) => `<div class="lp-slide">${c}</div>`).join('')
   const pontos = conteudo
     .map((_, n) => `<button type="button" class="${n === 0 ? 'ativo' : ''}" aria-label="Ir para ${rotulo} ${n + 1}"></button>`)
@@ -348,7 +348,7 @@ function lPrecos(ctx: Ctx, s: LpSecao): string {
   return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-precos" style="--cols:${s.colunas ?? Math.min(3, Math.max(2, s.itens.length))}">${planos}</div>${acaoSecao(ctx, s, 'centro')}</div>`
 }
 
-function celula(valor: string): string {
+export function celula(valor: string): string {
   const v = valor.trim().toLowerCase()
   if (v === 'sim' || v === 'yes' || v === '✓') return `<span class="sim">${svgIcone('check')}</span>`
   if (v === 'não' || v === 'nao' || v === 'no' || v === '✗' || v === '-') {
