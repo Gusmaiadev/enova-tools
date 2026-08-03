@@ -12,6 +12,7 @@ import {
   arquivosUsados,
   documentoBase,
 } from '@/lib/lp/documento'
+import { migrarDocumentoParaArvore } from '@/lib/lp/migrar'
 import { gerarDocumento } from '@/lib/lp/ia'
 import { preencherMidias } from '@/lib/lp/midias'
 import { atualizarProjeto, obterProjeto } from '@/lib/lp/persistencia'
@@ -132,12 +133,22 @@ export async function POST(req: Request) {
     )
   }
 
-  await atualizarProjeto(corpo.lpId, usuario.teamId, { briefing, documento })
+  // Tudo acima monta a página no formato tipado, que é o que a IA devolve e o
+  // que as funções de aplicar entendem. A gravação é em ÁRVORE: o editor e o
+  // compilador só falam esse formato. É o mesmo expansor da migração — preset
+  // certo lá é preset certo aqui.
+  const emArvore = migrarDocumentoParaArvore(documento)
+
+  await atualizarProjeto(corpo.lpId, usuario.teamId, { briefing, documento: emArvore })
 
   // A página nova define o que ainda é usado: arquivo enviado que ficou de fora
   // (trocado no editor, seção removida) sai do bucket. Não bloqueia a resposta em
   // caso de erro — limparOrfaos nunca lança.
-  await limparOrfaos(usuario.teamId, corpo.lpId, arquivosUsados({ documento, briefing }))
+  await limparOrfaos(
+    usuario.teamId,
+    corpo.lpId,
+    arquivosUsados({ documento: emArvore, briefing }),
+  )
 
-  return Response.json({ ok: true, documento, avisos, semChave: semChaveIA })
+  return Response.json({ ok: true, documento: emArvore, avisos, semChave: semChaveIA })
 }
