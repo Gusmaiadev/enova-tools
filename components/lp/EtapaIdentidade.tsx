@@ -2,10 +2,19 @@
 
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { Bloco, Cor, Fonte, Selecao, Texto, Vazio } from './campos'
+import { Bloco, Cor, Fonte, Marcar, Selecao, Texto, Vazio } from './campos'
+import { EnviarMidia } from './EnviarMidia'
 import { TEMA_PADRAO } from '@/lib/lp/documento'
 import { fontePorNome } from '@/lib/lp/fontes'
-import type { CategoriaTexto, CoresTema, LpBriefing } from '@/lib/lp/tipos'
+import { LOGO_MAX_LADO } from '@/lib/lp/formatos'
+import type {
+  CategoriaTexto,
+  CoresTema,
+  LpBriefing,
+  PaginaLegal,
+  TipoPaginaLegal,
+} from '@/lib/lp/tipos'
+import { PAGINAS_LEGAIS, infoPagina } from '@/lib/lp/tipos'
 
 const CATEGORIAS: { chave: CategoriaTexto; rotulo: string; exemplo: string }[] = [
   { chave: 'titulos', rotulo: 'Títulos', exemplo: 'Transforme seu negócio' },
@@ -71,9 +80,12 @@ const PALETAS: { nome: string; cores: Partial<CoresTema> }[] = [
 ]
 
 export function EtapaIdentidade({
+  lpId,
   briefing,
   aoMudar,
 }: {
+  /** Projeto dono da logo enviada — define a pasta no bucket. */
+  lpId: string
   briefing: LpBriefing
   aoMudar: (patch: Partial<LpBriefing>) => void
 }) {
@@ -103,6 +115,25 @@ export function EtapaIdentidade({
     aoMudar({ referencias })
   }
 
+  /**
+   * Liga/desliga uma página de texto. Desmarcar guarda só a ausência na lista —
+   * o texto já escrito se perde, então o rótulo avisa o que vai acontecer.
+   */
+  const alternarPagina = (tipo: TipoPaginaLegal, ligada: boolean) => {
+    if (!ligada) {
+      aoMudar({ paginas: briefing.paginas.filter((p) => p.tipo !== tipo) })
+      return
+    }
+    if (briefing.paginas.some((p) => p.tipo === tipo)) return
+    // Mesma ordem de PAGINAS_LEGAIS, para a etapa "Páginas" não dançar.
+    const paginas = [...briefing.paginas, { tipo, titulo: infoPagina(tipo).titulo, conteudo: '' }]
+    aoMudar({
+      paginas: PAGINAS_LEGAIS.map((p) => paginas.find((x) => x.tipo === p.tipo)).filter(
+        (p): p is PaginaLegal => p !== undefined,
+      ),
+    })
+  }
+
   return (
     <div className="space-y-5">
       <Bloco
@@ -115,6 +146,44 @@ export function EtapaIdentidade({
           value={briefing.nome}
           onChange={(e) => aoMudar({ nome: e.target.value })}
           maxLength={80}
+        />
+      </Bloco>
+
+      <Bloco
+        titulo="Páginas do site"
+        descricao="Além da landing page, o projeto pode sair com páginas de texto. Marcando aqui, o texto de cada uma é escrito na etapa “Páginas” e o link entra sozinho no rodapé."
+      >
+        <div className="space-y-2.5">
+          {PAGINAS_LEGAIS.map((p) => (
+            <div key={p.tipo}>
+              <Marcar
+                rotulo={p.titulo}
+                valor={briefing.paginas.some((x) => x.tipo === p.tipo)}
+                aoMudar={(v) => alternarPagina(p.tipo, v)}
+              />
+              <p className="ml-6 text-xs text-text-dim/80">{p.descricao}</p>
+            </div>
+          ))}
+        </div>
+      </Bloco>
+
+      <Bloco
+        titulo="Logo"
+        descricao={`Opcional. Aparece no topo da página, no lugar do nome escrito. PNG ou SVG com fundo transparente fica melhor — até ${LOGO_MAX_LADO}×${LOGO_MAX_LADO} px.`}
+      >
+        <EnviarMidia
+          lpId={lpId}
+          arquivo={briefing.logo ?? null}
+          apenasImagem
+          maxLado={LOGO_MAX_LADO}
+          // A página já gerada pode estar usando este mesmo arquivo: apagar aqui
+          // deixaria o topo dela quebrado. A limpeza de órfãos, que enxerga o
+          // briefing e o documento juntos, resolve na próxima geração.
+          apagarNoServidor={false}
+          rotulo="Escolher a imagem da logo"
+          descricao={`ou arraste aqui — JPG, PNG, WebP, AVIF, GIF ou SVG. Imagem maior que ${LOGO_MAX_LADO}×${LOGO_MAX_LADO} px é reduzida para caber.`}
+          aoEnviar={(m) => aoMudar({ logo: m })}
+          aoRemover={() => aoMudar({ logo: null })}
         />
       </Bloco>
 

@@ -1,14 +1,22 @@
 'use client'
 
-import { AlignCenter, AlignLeft, AlignRight, ChevronDown, ImageIcon, Play, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Alca } from './Alca'
-import { Area, Cor, Faixa, Fonte, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
+import { CampoMidia } from './CampoMidia'
+import { CamposAjuste } from './CamposAjuste'
+import { CamposBarra } from './CamposBarra'
+import { CamposBotao } from './CamposBotao'
+import { Area, Cor, Faixa, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
+import { ListaBotoes } from './ListaBotoes'
+import { ListaTelefones } from './ListaTelefones'
 import { Aviso } from '@/components/Campo'
 import { useArrastar } from './arrastar'
+import { SeletorLado } from './SeletorLado'
 import { SeletorLayout } from './SeletorLayout'
-import { SeletorMidia } from './SeletorMidia'
-import { infoLayout, novoItem } from '@/lib/lp/layouts'
+import { SeletorPeriodo } from './SeletorPeriodo'
+import { garantirAncora } from '@/lib/lp/documento'
+import { infoLayout, novoItem, rotuloItem, temLados } from '@/lib/lp/layouts'
 import { NOMES_ICONES, svgIcone } from '@/lib/lp/icones'
 import { reordenar } from './arrastar'
 import type {
@@ -16,11 +24,10 @@ import type {
   ElementoTexto,
   LpDocumento,
   LpItem,
-  LpMidia,
   LpSecao,
   TipoLayout,
 } from '@/lib/lp/tipos'
-import { gerarId, slugificar } from '@/lib/lp/util'
+import { gerarId } from '@/lib/lp/util'
 
 type Aplicar = (mut: (d: LpDocumento) => void, agrupar?: string) => void
 
@@ -49,6 +56,15 @@ function Grupo({
         />
       </button>
       {aberto && <div className="space-y-3 border-t border-border px-3 py-3">{children}</div>}
+    </div>
+  )
+}
+
+/** Faixa azul com o nome do que está selecionado no canvas. */
+function Selecionado({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-md border border-blue/40 bg-blue/10 px-3 py-2">
+      <p className="text-xs text-blue">{children}</p>
     </div>
   )
 }
@@ -99,101 +115,20 @@ function SeletorIcone({
   )
 }
 
-function CampoMidia({
-  rotulo,
-  lpId,
-  midia,
-  aoMudar,
-  aoRemover,
-}: {
-  rotulo: string
-  /** Projeto dono da mídia enviada — o upload vai para a pasta dele no bucket. */
-  lpId: string
-  midia: LpMidia | null | undefined
-  aoMudar: (m: LpMidia) => void
-  aoRemover?: () => void
-}) {
-  const [aberto, setAberto] = useState(false)
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-sm text-text-dim">{rotulo}</span>
-      {midia ? (
-        <div className="overflow-hidden rounded-md border border-border bg-surface-2">
-          {/* Vídeo tem `thumb` (poster): sem isso o mp4 iria para o <img> e o
-              painel mostraria o ícone de imagem quebrada. */}
-          <div className="relative aspect-video w-full">
-            {midia.thumb || midia.tipo === 'imagem' ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={midia.thumb ?? midia.url}
-                alt={midia.alt}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-surface text-text-dim">
-                <Play className="h-5 w-5" />
-              </div>
-            )}
-            {midia.tipo === 'video' && (
-              <span className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                <Play className="h-2.5 w-2.5 fill-current" />
-                Vídeo
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1 p-2">
-            <button
-              type="button"
-              onClick={() => setAberto(true)}
-              className="flex-1 rounded bg-surface px-2 py-1.5 text-xs transition-colors hover:bg-blue hover:text-white"
-            >
-              Trocar
-            </button>
-            {aoRemover && (
-              <button
-                type="button"
-                onClick={aoRemover}
-                aria-label="Remover mídia"
-                className="rounded p-1.5 text-text-dim transition-colors hover:text-pink"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAberto(true)}
-          className="flex h-10 items-center justify-center gap-2 rounded-md border border-dashed border-border text-sm text-text-dim transition-colors hover:border-blue/60 hover:text-text"
-        >
-          <ImageIcon className="h-4 w-4" />
-          Escolher mídia
-        </button>
-      )}
-      <SeletorMidia
-        aberto={aberto}
-        lpId={lpId}
-        midia={midia ?? null}
-        aoEscolher={aoMudar}
-        aoFechar={() => setAberto(false)}
-      />
-    </div>
-  )
-}
-
 function EditorBotao({
   botao,
   aoMudar,
   aoRemover,
   aoCriar,
   agrupar,
+  comPosicao = true,
 }: {
   botao: LpSecao['botao']
   aoMudar: (patch: Partial<NonNullable<LpSecao['botao']>>, agrupar?: string) => void
   aoRemover: () => void
   aoCriar: () => void
   agrupar: string
+  comPosicao?: boolean
 }) {
   if (!botao) {
     return (
@@ -220,18 +155,7 @@ function EditorBotao({
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
-      <Texto
-        rotulo="Texto"
-        value={botao.texto}
-        onChange={(e) => aoMudar({ texto: e.target.value }, `${agrupar}-texto`)}
-        maxLength={80}
-      />
-      <Texto
-        rotulo="Link"
-        dica="#secao ou https://"
-        value={botao.url}
-        onChange={(e) => aoMudar({ url: e.target.value }, `${agrupar}-url`)}
-      />
+      <CamposBotao botao={botao} aoMudar={aoMudar} agrupar={agrupar} comPosicao={comPosicao} />
       <Opcoes
         rotulo="Estilo"
         valor={botao.estilo ?? 'solido'}
@@ -253,55 +177,6 @@ function EditorBotao({
           aoMudar={(v) => aoMudar({ corTexto: v || undefined })}
         />
       </div>
-    </div>
-  )
-}
-
-function EditorAjuste({
-  ajuste,
-  aoMudar,
-}: {
-  ajuste: AjusteTexto
-  aoMudar: (patch: AjusteTexto) => void
-}) {
-  return (
-    <div className="space-y-3">
-      <Cor rotulo="Cor" valor={ajuste.cor} aoMudar={(v) => aoMudar({ cor: v || undefined })} />
-      <Fonte
-        rotulo="Fonte"
-        valor={ajuste.fonte}
-        permitirVazio
-        aoMudar={(v) => aoMudar({ fonte: v || undefined })}
-      />
-      <Texto
-        rotulo="Tamanho"
-        dica="ex.: 32px"
-        placeholder="automático"
-        value={ajuste.tamanho ?? ''}
-        onChange={(e) => aoMudar({ tamanho: e.target.value || undefined })}
-      />
-      <Selecao
-        rotulo="Peso"
-        value={ajuste.peso ?? ''}
-        onChange={(e) => aoMudar({ peso: Number(e.target.value) || undefined })}
-      >
-        <option value="">Automático</option>
-        {[300, 400, 500, 600, 700, 800, 900].map((p) => (
-          <option key={p} value={p}>
-            {p}
-          </option>
-        ))}
-      </Selecao>
-      <Opcoes
-        rotulo="Alinhamento"
-        valor={ajuste.alinhamento ?? 'left'}
-        aoMudar={(v) => aoMudar({ alinhamento: v })}
-        opcoes={[
-          { valor: 'left' as const, rotulo: '', aria: 'À esquerda', icone: <AlignLeft className="h-3.5 w-3.5" /> },
-          { valor: 'center' as const, rotulo: '', aria: 'Centralizado', icone: <AlignCenter className="h-3.5 w-3.5" /> },
-          { valor: 'right' as const, rotulo: '', aria: 'À direita', icone: <AlignRight className="h-3.5 w-3.5" /> },
-        ]}
-      />
     </div>
   )
 }
@@ -340,30 +215,29 @@ function EditorItem({
           aoRemover={() => mudar({ imagem: null })}
         />
       )}
-      {campos.includes('titulo') && (
-        <Texto
-          rotulo="Título"
-          value={item.titulo ?? ''}
-          onChange={(e) => mudar({ titulo: e.target.value }, `item-${item.id}-titulo`)}
-          maxLength={300}
-        />
-      )}
-      {campos.includes('extra') && (
-        <Texto
-          rotulo={secao.tipo === 'estatisticas' ? 'Número' : secao.tipo === 'precos' ? 'Preço' : secao.tipo === 'timeline' ? 'Data' : 'Destaque'}
-          value={item.extra ?? ''}
-          onChange={(e) => mudar({ extra: e.target.value }, `item-${item.id}-extra`)}
-          maxLength={300}
-        />
-      )}
-      {campos.includes('detalhe') && (
-        <Texto
-          rotulo={secao.tipo === 'precos' ? 'Período' : 'Complemento'}
-          value={item.detalhe ?? ''}
-          onChange={(e) => mudar({ detalhe: e.target.value }, `item-${item.id}-detalhe`)}
-          maxLength={300}
-        />
-      )}
+      {/* Na ordem do catálogo: em big numbers o valor vem antes da informação. */}
+      {campos
+        .filter((c): c is 'titulo' | 'extra' => c === 'titulo' || c === 'extra')
+        .map((campo) => (
+          <Texto
+            key={campo}
+            rotulo={rotuloItem(secao.tipo, campo)}
+            value={item[campo] ?? ''}
+            onChange={(e) => mudar({ [campo]: e.target.value }, `item-${item.id}-${campo}`)}
+            maxLength={300}
+          />
+        ))}
+      {campos.includes('detalhe') &&
+        (secao.tipo === 'precos' ? (
+          <SeletorPeriodo valor={item.detalhe ?? ''} aoMudar={(v) => mudar({ detalhe: v })} />
+        ) : (
+          <Texto
+            rotulo={rotuloItem(secao.tipo, 'detalhe')}
+            value={item.detalhe ?? ''}
+            onChange={(e) => mudar({ detalhe: e.target.value }, `item-${item.id}-detalhe`)}
+            maxLength={300}
+          />
+        ))}
       {campos.includes('texto') && (
         <Area
           rotulo="Texto"
@@ -396,6 +270,7 @@ function EditorItem({
         <EditorBotao
           botao={item.botao ?? null}
           agrupar={`item-${item.id}-botao`}
+          comPosicao={false}
           aoMudar={(patch, agrupar) =>
             mudar({ botao: { ...(item.botao ?? { texto: 'Saiba mais', url: '#' }), ...patch } }, agrupar)
           }
@@ -419,6 +294,7 @@ export function PainelPropriedades({
   lpId,
   secaoId,
   itemId,
+  alvo,
   aplicar,
   aoSelecionarItem,
 }: {
@@ -426,6 +302,8 @@ export function PainelPropriedades({
   lpId: string
   secaoId: string | null
   itemId: string | null
+  /** data-lp selecionado no canvas — o rodapé não é seção e vem só por aqui. */
+  alvo: string | null
   aplicar: Aplicar
   aoSelecionarItem: (id: string | null) => void
 }) {
@@ -441,6 +319,80 @@ export function PainelPropriedades({
   )
 
   if (!secao) {
+    // Header selecionado: o texto da logo se edita no canvas, os botões aqui.
+    if (alvo?.startsWith('header')) {
+      return (
+        <div className="space-y-3">
+          <Selecionado>Cabeçalho</Selecionado>
+          <Grupo titulo="Aparência" aberto>
+            <CamposBarra
+              estilo={doc.header.estilo}
+              logoImagem={Boolean(doc.header.logo)}
+              aoMudar={(patch, chave) =>
+                aplicar((d) => {
+                  d.header.estilo = { ...d.header.estilo, ...patch }
+                }, chave ?? 'header-estilo')
+              }
+            />
+          </Grupo>
+          <Grupo titulo="Botões">
+            <ListaBotoes
+              botoes={doc.header.botoes}
+              agrupar="header-botao"
+              vazio="Nenhum botão no topo da página."
+              aoMudar={(botoes, chave) =>
+                aplicar((d) => {
+                  d.header.botoes = botoes
+                }, chave ?? 'header-botoes')
+              }
+            />
+          </Grupo>
+        </div>
+      )
+    }
+    // Rodapé selecionado: os textos dele se editam no canvas, mas as listas de
+    // telefones e de botões precisam de painel.
+    if (alvo?.startsWith('footer')) {
+      return (
+        <div className="space-y-3">
+          <Selecionado>Rodapé</Selecionado>
+          <Grupo titulo="Aparência" aberto>
+            <CamposBarra
+              estilo={doc.footer.estilo}
+              // No rodapé a marca é sempre o nome escrito, nunca a imagem.
+              logoImagem={false}
+              aoMudar={(patch, chave) =>
+                aplicar((d) => {
+                  d.footer.estilo = { ...d.footer.estilo, ...patch }
+                }, chave ?? 'footer-estilo')
+              }
+            />
+          </Grupo>
+          <Grupo titulo="Telefones">
+            <ListaTelefones
+              telefones={doc.footer.telefones ?? []}
+              aoMudar={(telefones) =>
+                aplicar((d) => {
+                  d.footer.telefones = telefones
+                }, 'footer-telefones')
+              }
+            />
+          </Grupo>
+          <Grupo titulo="Botões">
+            <ListaBotoes
+              botoes={doc.footer.botoes ?? []}
+              agrupar="footer-botao"
+              vazio="Nenhum botão no rodapé."
+              aoMudar={(botoes, chave) =>
+                aplicar((d) => {
+                  d.footer.botoes = botoes
+                }, chave ?? 'footer-botoes')
+              }
+            />
+          </Grupo>
+        </div>
+      )
+    }
     return (
       <Vazio>
         Clique em qualquer parte da página ao lado para editar. Dê dois cliques em um texto para
@@ -450,6 +402,8 @@ export function PainelPropriedades({
   }
 
   const info = infoLayout(secao.tipo)
+  // Mesma regra do compilador: no banner a mídia da seção é o fundo atrás do texto.
+  const midiaDeFundo = secao.tipo === 'banner' ? (secao.midia ?? secao.fundo?.midia) : secao.fundo?.midia
 
   const mudarSecao = (patch: Partial<LpSecao>, agrupar?: string) =>
     aplicar((d) => {
@@ -465,6 +419,28 @@ export function PainelPropriedades({
       }
     }, agrupar)
 
+  /** Item do menu que hoje leva a esta seção (o vínculo, no documento, é a âncora). */
+  const itemDoMenu = secao.ancora
+    ? doc.header.menu.find((m) => m.alvo === `#${secao.ancora}`)
+    : undefined
+
+  /**
+   * Move o vínculo para o item escolhido: ele passa a apontar para a âncora
+   * desta seção e os que apontavam para cá saem — um item por seção, senão o
+   * menu fica com duas opções levando ao mesmo lugar. `''` cria um item novo
+   * com o nome da seção (o comportamento de antes).
+   */
+  const ligarItemDoMenu = (itemId: string) =>
+    aplicar((d) => {
+      const s = d.secoes.find((x) => x.id === secao.id)
+      if (!s) return
+      const ancora = garantirAncora(d, s)
+      d.header.menu = d.header.menu.filter((m) => m.alvo !== `#${ancora}` || m.id === itemId)
+      const item = d.header.menu.find((m) => m.id === itemId)
+      if (item) item.alvo = `#${ancora}`
+      else d.header.menu.push({ id: gerarId(), rotulo: s.nome, alvo: `#${ancora}` })
+    })
+
   const mudarAjuste = (patch: AjusteTexto) =>
     aplicar((d) => {
       const s = d.secoes.find((x) => x.id === secao.id)
@@ -474,11 +450,9 @@ export function PainelPropriedades({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-blue/40 bg-blue/10 px-3 py-2">
-        <p className="text-xs text-blue">
-          {secao.nome} · {info.rotulo}
-        </p>
-      </div>
+      <Selecionado>
+        {secao.nome} · {info.rotulo}
+      </Selecionado>
 
       <Grupo titulo="Conteúdo" aberto>
         <Texto
@@ -495,14 +469,14 @@ export function PainelPropriedades({
             maxLength={300}
           />
         )}
-        {info.campos.subtitulo && (
-          <Area
-            rotulo="Subtítulo"
-            value={secao.subtitulo ?? ''}
-            onChange={(e) => mudarSecao({ subtitulo: e.target.value }, 'sec-subtitulo')}
-            maxLength={500}
-          />
-        )}
+        {/* Subtítulo em qualquer layout: todos sabem desenhar um, e o campo do
+            catálogo serve para orientar a IA, não para limitar quem edita. */}
+        <Area
+          rotulo="Subtítulo"
+          value={secao.subtitulo ?? ''}
+          onChange={(e) => mudarSecao({ subtitulo: e.target.value }, 'sec-subtitulo')}
+          maxLength={500}
+        />
         {info.campos.texto && (
           <Area
             rotulo="Texto"
@@ -511,25 +485,27 @@ export function PainelPropriedades({
             maxLength={4000}
           />
         )}
-        {info.campos.botao && (
-          <EditorBotao
-            botao={secao.botao ?? null}
-            agrupar="sec-botao"
-            aoMudar={(patch, agrupar) =>
-              mudarSecao(
-                { botao: { ...(secao.botao ?? { texto: 'Fale conosco', url: '#' }), ...patch } },
-                agrupar,
-              )
-            }
-            aoRemover={() => mudarSecao({ botao: null })}
-            aoCriar={() => mudarSecao({ botao: { texto: 'Fale conosco', url: '#' } })}
-          />
-        )}
+        {/* Botão em qualquer layout: quem monta a página decide onde quer a
+            chamada para ação, não o catálogo de layouts. */}
+        <EditorBotao
+          botao={secao.botao ?? null}
+          agrupar="sec-botao"
+          aoMudar={(patch, agrupar) =>
+            mudarSecao(
+              { botao: { ...(secao.botao ?? { texto: 'Fale conosco', url: '#' }), ...patch } },
+              agrupar,
+            )
+          }
+          aoRemover={() => mudarSecao({ botao: null })}
+          aoCriar={() => mudarSecao({ botao: { texto: 'Fale conosco', url: '#contato' } })}
+        />
         {info.campos.midia && (
           <CampoMidia
             rotulo="Mídia"
             lpId={lpId}
             midia={secao.midia}
+            // No banner a mídia da seção é o fundo atrás do texto.
+            deFundo={secao.tipo === 'banner'}
             aoMudar={(m) => mudarSecao({ midia: m })}
             aoRemover={() => mudarSecao({ midia: null })}
           />
@@ -669,10 +645,10 @@ export function PainelPropriedades({
             <option value={4}>4 colunas</option>
           </Selecao>
         )}
-        {secao.tipo === 'texto-midia' && (
-          <Marcar
-            rotulo="Inverter (mídia à esquerda)"
-            valor={secao.inverter === true}
+        {temLados(secao.tipo) && (
+          <SeletorLado
+            tipo={secao.tipo}
+            inverter={secao.inverter === true}
             aoMudar={(v) => mudarSecao({ inverter: v })}
           />
         )}
@@ -693,9 +669,9 @@ export function PainelPropriedades({
               const s = d.secoes.find((x) => x.id === secao.id)
               if (!s) return
               if (v) {
-                s.ancora = slugificar(s.nome)
-                if (!d.header.menu.some((m) => m.alvo === `#${s.ancora}`)) {
-                  d.header.menu.push({ id: gerarId(), rotulo: s.nome, alvo: `#${s.ancora}` })
+                const ancora = garantirAncora(d, s)
+                if (!d.header.menu.some((m) => m.alvo === `#${ancora}`)) {
+                  d.header.menu.push({ id: gerarId(), rotulo: s.nome, alvo: `#${ancora}` })
                 }
               } else {
                 d.header.menu = d.header.menu.filter((m) => m.alvo !== `#${s.ancora}`)
@@ -704,6 +680,32 @@ export function PainelPropriedades({
             })
           }
         />
+        {secao.ancora !== null && (
+          <Selecao
+            rotulo="Item do menu que leva a esta seção"
+            dica="clicar nele rola até aqui"
+            value={itemDoMenu?.id ?? ''}
+            onChange={(e) => ligarItemDoMenu(e.target.value)}
+          >
+            <option value="">Criar um item com o nome da seção</option>
+            {doc.header.menu.map((m) => {
+              const externo = !m.alvo.startsWith('#')
+              const outra = doc.secoes.find(
+                (x) => x.id !== secao.id && x.ancora !== null && m.alvo === `#${x.ancora}`,
+              )
+              return (
+                <option key={m.id} value={m.id} disabled={externo || Boolean(outra)}>
+                  {m.rotulo}
+                  {externo
+                    ? ' — vai para um link externo'
+                    : outra
+                      ? ` — já leva a “${outra.nome}”`
+                      : ''}
+                </option>
+              )
+            })}
+          </Selecao>
+        )}
       </Grupo>
 
       <Grupo titulo="Estilo do texto">
@@ -716,7 +718,7 @@ export function PainelPropriedades({
             { valor: 'texto' as const, rotulo: 'Texto' },
           ]}
         />
-        <EditorAjuste ajuste={secao.ajustes?.[elemento] ?? {}} aoMudar={mudarAjuste} />
+        <CamposAjuste ajuste={secao.ajustes?.[elemento] ?? {}} aoMudar={mudarAjuste} />
         {secao.ajustes?.[elemento] && (
           <button
             type="button"
@@ -770,18 +772,34 @@ export function PainelPropriedades({
           rotulo="Imagem ou vídeo de fundo"
           lpId={lpId}
           midia={secao.fundo?.midia}
+          deFundo
           aoMudar={(m) => mudarSecao({ fundo: { ...secao.fundo, midia: m } })}
           aoRemover={() => mudarSecao({ fundo: { ...secao.fundo, midia: null } })}
         />
-        {secao.fundo?.midia && (
-          <Faixa
-            rotulo="Escurecer o fundo"
-            min={0}
-            max={90}
-            sufixo="%"
-            valor={secao.fundo.escurecer ?? 55}
-            aoMudar={(v) => mudarSecao({ fundo: { ...secao.fundo, escurecer: v } }, 'sec-veu')}
-          />
+        {midiaDeFundo && (
+          <>
+            <Faixa
+              rotulo="Escurecer o fundo"
+              min={0}
+              max={90}
+              sufixo="%"
+              valor={secao.fundo?.escurecer ?? 55}
+              aoMudar={(v) => mudarSecao({ fundo: { ...secao.fundo, escurecer: v } }, 'sec-veu')}
+            />
+            <Marcar
+              rotulo="Texto em branco sobre a mídia"
+              valor={secao.fundo?.textoClaro !== false}
+              aoMudar={(v) =>
+                mudarSecao({ fundo: { ...secao.fundo, textoClaro: v ? undefined : false } })
+              }
+            />
+            {secao.fundo?.textoClaro === false && (
+              <Aviso>
+                Esta seção usa as cores do tema por cima da mídia. Confira o contraste — se ficar
+                difícil de ler, aumente o escurecimento ou volte para o texto branco.
+              </Aviso>
+            )}
+          </>
         )}
       </Grupo>
 

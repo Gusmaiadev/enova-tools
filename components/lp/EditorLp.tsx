@@ -21,6 +21,7 @@ import { Button } from '@/components/Button'
 import { Erro } from '@/components/Campo'
 import { ModalConfirmacao } from '@/components/ModalConfirmacao'
 import { ModalExportar } from './ModalExportar'
+import { ModalPagina } from './ModalPagina'
 import { PainelCodigo } from './PainelCodigo'
 import { PainelEstrutura } from './PainelEstrutura'
 import { PainelPropriedades } from './PainelPropriedades'
@@ -33,10 +34,18 @@ import {
   inserirSecao,
   moverSecao,
   removerSecao,
+  sincronizarLinksPaginas,
 } from '@/lib/lp/documento'
 import { novaSecao } from '@/lib/lp/layouts'
 import { reordenar } from './arrastar'
-import type { LpDocumento, LpProjeto, TipoLayout } from '@/lib/lp/tipos'
+import type {
+  LpDocumento,
+  LpProjeto,
+  PaginaLegal,
+  TipoLayout,
+  TipoPaginaLegal,
+} from '@/lib/lp/tipos'
+import { PAGINAS_LEGAIS, infoPagina } from '@/lib/lp/tipos'
 
 type Dispositivo = 'desktop' | 'tablet' | 'mobile'
 type Aba = 'estrutura' | 'editar' | 'tema'
@@ -81,6 +90,8 @@ export function EditorLp({
   const [dispositivo, setDispositivo] = useState<Dispositivo>('desktop')
   const [secaoId, setSecaoId] = useState<string | null>(null)
   const [itemId, setItemId] = useState<string | null>(null)
+  // O rodapé não é seção: o painel precisa do alvo cru para editá-lo.
+  const [alvo, setAlvo] = useState<string | null>(null)
   const [mostrarCodigo, setMostrarCodigo] = useState(false)
   const [exportando, setExportando] = useState(false)
   const [salvando, setSalvando] = useState(false)
@@ -88,6 +99,8 @@ export function EditorLp({
   const [erro, setErro] = useState<string | null>(null)
   const [avisosVisiveis, setAvisosVisiveis] = useState(true)
   const [paraExcluir, setParaExcluir] = useState<string | null>(null)
+  const [paginaAberta, setPaginaAberta] = useState<TipoPaginaLegal | null>(null)
+  const [paginaParaExcluir, setPaginaParaExcluir] = useState<TipoPaginaLegal | null>(null)
   const [podeDesfazer, setPodeDesfazer] = useState(false)
   const [podeRefazer, setPodeRefazer] = useState(false)
 
@@ -238,12 +251,14 @@ export function EditorLp({
         return
       }
       if (m.tipo === 'selecionar') {
-        const alvo = typeof m.alvo === 'string' ? m.alvo : null
-        alvoSelecionado.current = alvo
-        const { secaoId: sid, itemId: iid } = lerAlvo(alvo)
+        const selecionado = typeof m.alvo === 'string' ? m.alvo : null
+        alvoSelecionado.current = selecionado
+        setAlvo(selecionado)
+        const { secaoId: sid, itemId: iid } = lerAlvo(selecionado)
         setSecaoId(sid)
         setItemId(iid)
-        if (sid) setAba('editar')
+        // Header e rodapé também têm painel próprio (botões, telefones).
+        if (sid || /^(header|footer)/.test(selecionado ?? '')) setAba('editar')
         return
       }
       if ((m.tipo === 'texto' || m.tipo === 'texto-fim') && typeof m.alvo === 'string') {
@@ -301,13 +316,51 @@ export function EditorLp({
       setSecaoId(id)
       setItemId(null)
       setAba('editar')
+      setAlvo(`sec:${id}`)
       alvoSelecionado.current = `sec:${id}`
       enviarAoCanvas({ tipo: 'destacar', alvo: `sec:${id}`, rolar: true })
     },
     [enviarAoCanvas],
   )
 
+  /**
+   * Páginas de texto (termos, privacidade) vivem no documento, fora do canvas:
+   * mexer nelas aqui evita ter de gerar de novo — o que substituiria a página.
+   */
+  const mudarPagina = useCallback(
+    (tipo: TipoPaginaLegal, patch: Partial<PaginaLegal>, agrupar?: string) => {
+      aplicar((d) => {
+        const pagina = d.paginas?.find((p) => p.tipo === tipo)
+        if (!pagina) return
+        Object.assign(pagina, patch)
+        // O rótulo no rodapé acompanha o título da página.
+        if (patch.titulo !== undefined) sincronizarLinksPaginas(d)
+      }, agrupar)
+    },
+    [aplicar],
+  )
+
+  const adicionarPagina = useCallback(
+    (tipo: TipoPaginaLegal) => {
+      aplicar((d) => {
+        const paginas = [...(d.paginas ?? [])]
+        if (paginas.some((p) => p.tipo === tipo)) return
+        paginas.push({ tipo, titulo: infoPagina(tipo).titulo, conteudo: '' })
+        // Mesma ordem de PAGINAS_LEGAIS, para a lista não depender do clique.
+        d.paginas = PAGINAS_LEGAIS.map((info) =>
+          paginas.find((p) => p.tipo === info.tipo),
+        ).filter((p): p is PaginaLegal => p !== undefined)
+        sincronizarLinksPaginas(d)
+      })
+      setPaginaAberta(tipo)
+    },
+    [aplicar],
+  )
+
   const nomeExcluir = doc.secoes.find((s) => s.id === paraExcluir)?.nome ?? ''
+  const paginaAtual = doc.paginas?.find((p) => p.tipo === paginaAberta) ?? null
+  const nomePaginaExcluir =
+    doc.paginas?.find((p) => p.tipo === paginaParaExcluir)?.titulo ?? 'esta página'
 
   return (
     <div className="fixed inset-x-0 bottom-0 top-14 z-30 flex flex-col bg-bg">
@@ -451,6 +504,9 @@ export function EditorLp({
                   definirDoc(inserirSecao(docRef.current, secao, aposId))
                   selecionarSecao(secao.id)
                 }}
+                aoAbrirPagina={setPaginaAberta}
+                aoAdicionarPagina={adicionarPagina}
+                aoExcluirPagina={setPaginaParaExcluir}
               />
             )}
             {aba === 'editar' && (
@@ -459,12 +515,18 @@ export function EditorLp({
                 lpId={projeto.id}
                 secaoId={secaoId}
                 itemId={itemId}
+                alvo={alvo}
                 aplicar={aplicar}
                 aoSelecionarItem={setItemId}
               />
             )}
             {aba === 'tema' && (
-              <PainelTema doc={doc} aoMudar={(tema) => aplicar((d) => { d.tema = tema }, 'tema')} />
+              <PainelTema
+                doc={doc}
+                lpId={projeto.id}
+                aoMudar={(tema) => aplicar((d) => { d.tema = tema }, 'tema')}
+                aoMudarLogo={(logo) => aplicar((d) => { d.header.logo = logo })}
+              />
             )}
           </div>
         </aside>
@@ -495,6 +557,40 @@ export function EditorLp({
         aoFechar={() => setExportando(false)}
       />
 
+      <ModalPagina
+        doc={doc}
+        pagina={paginaAtual}
+        aoMudar={(patch, agrupar) => {
+          if (paginaAberta) mudarPagina(paginaAberta, patch, agrupar)
+        }}
+        aoFechar={() => setPaginaAberta(null)}
+      />
+
+      <ModalConfirmacao
+        aberto={paginaParaExcluir !== null}
+        titulo="Excluir página"
+        variante="danger"
+        textoConfirmar="Excluir"
+        onConfirmar={() => {
+          const tipo = paginaParaExcluir
+          if (tipo) {
+            aplicar((d) => {
+              d.paginas = (d.paginas ?? []).filter((p) => p.tipo !== tipo)
+              sincronizarLinksPaginas(d)
+            })
+            if (paginaAberta === tipo) setPaginaAberta(null)
+          }
+          setPaginaParaExcluir(null)
+        }}
+        onCancelar={() => setPaginaParaExcluir(null)}
+        mensagem={
+          <>
+            A página <strong className="text-text">{nomePaginaExcluir}</strong> e o texto dela saem
+            do projeto, junto com o link no rodapé. Você pode desfazer com Ctrl+Z.
+          </>
+        }
+      />
+
       <ModalConfirmacao
         aberto={paraExcluir !== null}
         titulo="Excluir seção"
@@ -506,6 +602,7 @@ export function EditorLp({
             if (secaoId === paraExcluir) {
               setSecaoId(null)
               setItemId(null)
+              setAlvo(null)
               alvoSelecionado.current = null
             }
           }

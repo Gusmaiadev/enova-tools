@@ -1,12 +1,13 @@
 'use client'
 
-import { Copy, Eye, Plus, Trash2 } from 'lucide-react'
+import { Copy, Eye, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Alca } from './Alca'
 import { useArrastar } from './arrastar'
 import { SeletorLayout } from './SeletorLayout'
 import { infoLayout } from '@/lib/lp/layouts'
-import type { LpDocumento, TipoLayout } from '@/lib/lp/tipos'
+import type { LpDocumento, TipoLayout, TipoPaginaLegal } from '@/lib/lp/tipos'
+import { PAGINAS_LEGAIS, infoPagina } from '@/lib/lp/tipos'
 
 export function PainelEstrutura({
   doc,
@@ -16,6 +17,9 @@ export function PainelEstrutura({
   aoDuplicar,
   aoExcluir,
   aoAdicionar,
+  aoAbrirPagina,
+  aoAdicionarPagina,
+  aoExcluirPagina,
 }: {
   doc: LpDocumento
   selecionadoId: string | null
@@ -24,9 +28,14 @@ export function PainelEstrutura({
   aoDuplicar: (id: string) => void
   aoExcluir: (id: string) => void
   aoAdicionar: (tipo: TipoLayout, aposId?: string) => void
+  aoAbrirPagina: (tipo: TipoPaginaLegal) => void
+  aoAdicionarPagina: (tipo: TipoPaginaLegal) => void
+  aoExcluirPagina: (tipo: TipoPaginaLegal) => void
 }) {
   const [adicionando, setAdicionando] = useState(false)
   const arrastar = useArrastar(aoMover)
+  const paginas = doc.paginas ?? []
+  const faltando = PAGINAS_LEGAIS.filter((p) => !paginas.some((x) => x.tipo === p.tipo))
 
   return (
     <div className="space-y-3">
@@ -99,6 +108,69 @@ export function PainelEstrutura({
           A página está sem seções. Clique em “Nova”.
         </p>
       )}
+
+      <div className="border-t border-border pt-3">
+        <p className="font-mono text-xs uppercase tracking-[0.28em] text-text-dim">Páginas</p>
+        <p className="mt-1 text-[11px] leading-relaxed text-text-dim/80">
+          Páginas de texto que saem no .zip junto com a landing page. O link entra sozinho nos
+          “Links úteis” do rodapé.
+        </p>
+
+        <ul className="mt-2.5 space-y-1.5">
+          {paginas.map((p) => (
+            <li
+              key={p.tipo}
+              className="group flex items-center gap-1.5 rounded-md border border-border bg-surface-2/40 px-2 py-2 transition-colors hover:border-blue/50"
+            >
+              <FileText className="h-3.5 w-3.5 shrink-0 text-text-dim" />
+              <button
+                type="button"
+                onClick={() => aoAbrirPagina(p.tipo)}
+                className="flex min-w-0 flex-1 flex-col text-left"
+              >
+                <span className="truncate text-xs font-medium">{p.titulo}</span>
+                <span className="truncate text-[11px] text-text-dim">
+                  {infoPagina(p.tipo).arquivo}
+                  {p.conteudo.trim() === ''
+                    ? ' · sem texto'
+                    : ` · ${p.conteudo.trim().length.toLocaleString('pt-BR')} caracteres`}
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-label={`Editar ${p.titulo}`}
+                onClick={() => aoAbrirPagina(p.tipo)}
+                className="shrink-0 rounded p-1 text-text-dim opacity-0 transition-opacity hover:text-text group-hover:opacity-100 focus-visible:opacity-100"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Excluir ${p.titulo}`}
+                onClick={() => aoExcluirPagina(p.tipo)}
+                className="shrink-0 rounded p-1 text-text-dim opacity-0 transition-opacity hover:text-pink group-hover:opacity-100 focus-visible:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {faltando.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {faltando.map((p) => (
+              <button
+                key={p.tipo}
+                type="button"
+                onClick={() => aoAdicionarPagina(p.tipo)}
+                className="rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[11px] transition-colors hover:border-blue/60"
+              >
+                + {p.titulo}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <SeletorLayout
         aberto={adicionando}

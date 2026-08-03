@@ -1,15 +1,22 @@
 'use client'
 
-import { ChevronDown, Copy, ImageIcon, Plus, Search, Trash2, Upload, Video } from 'lucide-react'
+import { ChevronDown, Copy, ImageIcon, Images, Plus, Search, Trash2, Upload, Video } from 'lucide-react'
 import { useState } from 'react'
 import { Alca } from './Alca'
+import { CampoMidia } from './CampoMidia'
+import { CamposBotao } from './CamposBotao'
+import { ItensSecao } from './ItensSecao'
 import { Area, Bloco, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
 import { reordenar, useArrastar } from './arrastar'
 import { apagarArquivo, EnviarMidia } from './EnviarMidia'
+import { OpcoesVideo } from './OpcoesVideo'
+import { SeletorLado } from './SeletorLado'
 import { SeletorLayout } from './SeletorLayout'
-import { infoLayout } from '@/lib/lp/layouts'
+import { mesclarMidiaBriefing } from '@/lib/lp/documento'
+import { infoLayout, temLados } from '@/lib/lp/layouts'
 import type {
   LpBriefing,
+  LpMidia,
   MidiaBriefing,
   Orientacao,
   SecaoBriefing,
@@ -17,6 +24,16 @@ import type {
   TipoMidia,
 } from '@/lib/lp/tipos'
 import { gerarId } from '@/lib/lp/util'
+
+/** De onde vem a mídia da seção: a IA busca, eu escolho no banco ou eu envio. */
+type ModoMidia = 'buscar' | 'biblioteca' | 'enviar'
+
+/**
+ * Em que modo a caixa reabre depois de salvar e recarregar o briefing: mídia de
+ * banco não tem caminho no bucket; arquivo enviado por nós sempre tem.
+ */
+const modoDaMidia = (m: MidiaBriefing | null | undefined): ModoMidia =>
+  !m?.arquivo ? 'buscar' : m.arquivo.caminho ? 'enviar' : 'biblioteca'
 
 /** Estruturas prontas para quem não sabe por onde começar. */
 const MODELOS: { nome: string; descricao: string; secoes: [string, TipoLayout][] }[] = [
@@ -97,9 +114,10 @@ export function EtapaSecoes({
   const [expandida, setExpandida] = useState<string | null>(briefing.secoes[0]?.id ?? null)
   const [trocandoLayout, setTrocandoLayout] = useState<string | null>(null)
   const [adicionando, setAdicionando] = useState(false)
-  // Quem escolheu enviar arquivo mas ainda não enviou: sem isso o painel voltaria
-  // para o modo de busca a cada tecla digitada.
-  const [modoEnvio, setModoEnvio] = useState<Record<string, boolean>>({})
+  // Modo escolhido à mão em cada seção: sem isso quem clicou em "Biblioteca" ou
+  // "Enviar arquivo" e ainda não escolheu nada voltaria para a busca da IA a cada
+  // tecla digitada.
+  const [modoMidia, setModoMidia] = useState<Record<string, ModoMidia>>({})
 
   const arrastar = useArrastar((de, para) =>
     aoMudar({ secoes: reordenar(briefing.secoes, de, para) }),
@@ -110,15 +128,7 @@ export function EtapaSecoes({
 
   /** Patch na mídia da seção, preservando o que já existe (inclusive o arquivo). */
   const mudarMidia = (s: SecaoBriefing, patch: Partial<MidiaBriefing>) =>
-    mudarSecao(s.id, {
-      midia: {
-        busca: s.midia?.busca ?? '',
-        tipo: s.midia?.tipo ?? 'imagem',
-        orientacao: s.midia?.orientacao ?? 'paisagem',
-        ...(s.midia?.arquivo ? { arquivo: s.midia.arquivo } : {}),
-        ...patch,
-      },
-    })
+    mudarSecao(s.id, { midia: mesclarMidiaBriefing(s.midia, patch) })
 
   /**
    * Seção duplicada copia o arquivo junto: as duas apontam para o mesmo objeto
@@ -128,15 +138,33 @@ export function EtapaSecoes({
     !caminho ||
     briefing.secoes.filter((x) => x.midia?.arquivo?.caminho === caminho).length <= 1
 
-  const trocarModoMidia = (s: SecaoBriefing, modo: 'buscar' | 'enviar') => {
-    setModoEnvio((m) => ({ ...m, [s.id]: modo === 'enviar' }))
-    if (modo === 'buscar' && s.midia?.arquivo) {
-      const caminho = s.midia.arquivo.caminho
-      const sozinho = usoUnico(caminho)
-      mudarMidia(s, { arquivo: null })
-      if (caminho && sozinho) void apagarArquivo(caminho)
-    }
+  const modoDaSecao = (s: SecaoBriefing): ModoMidia => modoMidia[s.id] ?? modoDaMidia(s.midia)
+
+  /**
+   * Trocar de modo descarta a mídia do modo anterior — e tira o arquivo do
+   * bucket, quando era um envio e nenhuma outra seção aponta para ele.
+   */
+  const trocarModoMidia = (s: SecaoBriefing, modo: ModoMidia) => {
+    if (modoDaSecao(s) === modo) return
+    setModoMidia((m) => ({ ...m, [s.id]: modo }))
+    if (!s.midia?.arquivo) return
+    const caminho = s.midia.arquivo.caminho
+    const sozinho = usoUnico(caminho)
+    mudarMidia(s, { arquivo: null })
+    if (caminho && sozinho) void apagarArquivo(caminho)
   }
+
+  /**
+   * Mídia escolhida no banco: entra no mesmo lugar do arquivo enviado, porque
+   * vale a mesma regra — o que o usuário escolheu vence a busca da IA.
+   */
+  const usarDaBiblioteca = (s: SecaoBriefing, m: LpMidia) =>
+    mudarMidia(s, {
+      arquivo: m,
+      tipo: m.tipo,
+      orientacao: m.orientacao,
+      busca: m.busca || s.midia?.busca || '',
+    })
 
   const remover = (s: SecaoBriefing) => {
     const caminho = s.midia?.arquivo?.caminho
@@ -220,6 +248,7 @@ export function EtapaSecoes({
               const info = infoLayout(s.layout)
               const aberta = expandida === s.id
               const temMidia = info.campos.midia || Boolean(info.itens?.campos.includes('imagem'))
+              const modo = modoDaSecao(s)
 
               return (
                 <li
@@ -292,14 +321,24 @@ export function EtapaSecoes({
                         </div>
                       </div>
 
-                      <Texto
-                        rotulo="Título"
-                        dica="opcional — a IA escreve se ficar vazio"
-                        placeholder="Ex.: O que fazemos por você"
-                        value={s.titulo}
-                        onChange={(e) => mudarSecao(s.id, { titulo: e.target.value })}
-                        maxLength={300}
-                      />
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Texto
+                          rotulo="Título"
+                          dica="opcional — a IA escreve se ficar vazio"
+                          placeholder="Ex.: O que fazemos por você"
+                          value={s.titulo}
+                          onChange={(e) => mudarSecao(s.id, { titulo: e.target.value })}
+                          maxLength={300}
+                        />
+                        <Texto
+                          rotulo="Subtítulo"
+                          dica="linha de apoio, também opcional"
+                          placeholder="Ex.: Soluções sob medida para a sua obra"
+                          value={s.subtitulo ?? ''}
+                          onChange={(e) => mudarSecao(s.id, { subtitulo: e.target.value })}
+                          maxLength={500}
+                        />
+                      </div>
 
                       <Area
                         rotulo="Conteúdo"
@@ -314,7 +353,10 @@ export function EtapaSecoes({
                         <Marcar
                           rotulo="Vincular ao menu do header"
                           valor={s.vincularMenu}
-                          aoMudar={(v) => mudarSecao(s.id, { vincularMenu: v })}
+                          // Desmarcar solta o item do menu que estava reservado.
+                          aoMudar={(v) =>
+                            mudarSecao(s.id, { vincularMenu: v, itemMenu: v ? s.itemMenu : null })
+                          }
                         />
                         {info.temColunas && (
                           <div className="w-40">
@@ -333,23 +375,125 @@ export function EtapaSecoes({
                             </Selecao>
                           </div>
                         )}
+                        {temLados(s.layout) && (
+                          <div className="w-56">
+                            <SeletorLado
+                              tipo={s.layout}
+                              inverter={s.inverter === true}
+                              aoMudar={(v) => mudarSecao(s.id, { inverter: v })}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {s.vincularMenu &&
+                        (briefing.menu.length === 0 ? (
+                          <p className="text-xs text-text-dim">
+                            Seu menu ainda não tem itens. Cadastre em “Header e Footer” (etapa 2)
+                            para escolher qual deles leva a esta seção — enquanto isso, o item é
+                            criado com o nome da seção.
+                          </p>
+                        ) : (
+                          <div className="sm:max-w-sm">
+                            <Selecao
+                              rotulo="Item do menu que leva a esta seção"
+                              dica="clicar nele rola até aqui"
+                              value={s.itemMenu ?? ''}
+                              onChange={(e) =>
+                                mudarSecao(s.id, { itemMenu: e.target.value || null })
+                              }
+                            >
+                              <option value="">
+                                Criar um item novo com o nome da seção
+                              </option>
+                              {briefing.menu.map((m) => {
+                                const dona = briefing.secoes.find(
+                                  (x) => x.id !== s.id && x.vincularMenu && x.itemMenu === m.id,
+                                )
+                                const externo = m.url.trim() !== ''
+                                return (
+                                  <option key={m.id} value={m.id} disabled={externo || Boolean(dona)}>
+                                    {m.rotulo}
+                                    {externo
+                                      ? ' — vai para um link externo'
+                                      : dona
+                                        ? ` — já leva a “${dona.nome || 'outra seção'}”`
+                                        : ''}
+                                  </option>
+                                )
+                              })}
+                            </Selecao>
+                          </div>
+                        ))}
+
+                      {info.itens && (
+                        <ItensSecao
+                          tipo={s.layout}
+                          rotulo={info.itens.rotulo}
+                          campos={info.itens.campos}
+                          itens={s.itens ?? []}
+                          aoMudar={(itens) => mudarSecao(s.id, { itens })}
+                        />
+                      )}
+
+                      <div className="rounded-md border border-border bg-surface p-4">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-sm font-medium">Botão</p>
+                          {s.botao && (
+                            <button
+                              type="button"
+                              onClick={() => mudarSecao(s.id, { botao: null })}
+                              className="flex items-center gap-1.5 text-xs text-text-dim transition-colors hover:text-pink"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Remover
+                            </button>
+                          )}
+                        </div>
+                        {s.botao ? (
+                          <div className="space-y-3">
+                            <CamposBotao
+                              botao={s.botao}
+                              aoMudar={(patch) =>
+                                mudarSecao(s.id, { botao: { ...s.botao!, ...patch } })
+                              }
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              mudarSecao(s.id, {
+                                botao: { texto: 'Fale conosco', url: '#contato' },
+                              })
+                            }
+                            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-dashed border-border text-sm text-text-dim transition-colors hover:border-blue/60 hover:text-text"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Adicionar botão nesta seção
+                          </button>
+                        )}
                       </div>
 
                       {temMidia && (
                         <div className="rounded-md border border-border bg-surface p-4">
                           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                             <p className="text-sm font-medium">Imagem ou vídeo</p>
-                            <div className="w-full sm:w-72">
-                              <Opcoes<'buscar' | 'enviar'>
-                                valor={
-                                  s.midia?.arquivo || modoEnvio[s.id] ? 'enviar' : 'buscar'
-                                }
+                            <div className="w-full sm:w-auto">
+                              <Opcoes<ModoMidia>
+                                valor={modo}
                                 aoMudar={(v) => trocarModoMidia(s, v)}
                                 opcoes={[
                                   {
                                     valor: 'buscar',
                                     rotulo: 'A IA busca',
                                     icone: <Search className="h-3.5 w-3.5" />,
+                                  },
+                                  {
+                                    valor: 'biblioteca',
+                                    rotulo: 'Biblioteca',
+                                    aria: 'Escolher na biblioteca (Pexels e Pixabay)',
+                                    icone: <Images className="h-3.5 w-3.5" />,
                                   },
                                   {
                                     valor: 'enviar',
@@ -361,7 +505,7 @@ export function EtapaSecoes({
                             </div>
                           </div>
 
-                          {s.midia?.arquivo || modoEnvio[s.id] ? (
+                          {modo === 'enviar' ? (
                             <div className="space-y-3">
                               <EnviarMidia
                                 lpId={lpId}
@@ -385,6 +529,69 @@ export function EtapaSecoes({
                                   onChange={(e) => mudarMidia(s, { busca: e.target.value })}
                                   maxLength={200}
                                 />
+                              )}
+                            </div>
+                          ) : modo === 'biblioteca' ? (
+                            <div className="space-y-3">
+                              <p className="text-xs text-text-dim">
+                                Você mesmo escolhe a foto ou o vídeo no acervo do Pexels e do
+                                Pixabay. O que escolher aqui vai para a página exatamente assim — a
+                                IA não troca a mídia desta seção.
+                              </p>
+                              <CampoMidia
+                                lpId={lpId}
+                                midia={s.midia?.arquivo ?? null}
+                                comOpcoesVideo={false}
+                                rotuloVazio="Abrir a biblioteca (Pexels e Pixabay)"
+                                filtros={{
+                                  busca: s.midia?.busca ?? '',
+                                  tipo: s.midia?.tipo ?? 'imagem',
+                                  orientacao: s.midia?.orientacao ?? 'paisagem',
+                                }}
+                                aoMudar={(m) => usarDaBiblioteca(s, m)}
+                                aoRemover={() => mudarMidia(s, { arquivo: null })}
+                              />
+                              {s.midia?.arquivo ? (
+                                <Texto
+                                  rotulo="Descrição da imagem"
+                                  dica="texto alternativo — ajuda no Google e em leitores de tela"
+                                  placeholder="Ex.: fachada da loja em dia de sol"
+                                  value={s.midia.busca}
+                                  onChange={(e) => mudarMidia(s, { busca: e.target.value })}
+                                  maxLength={200}
+                                />
+                              ) : (
+                                <>
+                                  <Texto
+                                    rotulo="O que você procura"
+                                    dica="a biblioteca já abre com essa busca"
+                                    placeholder="Ex.: pessoa usando notebook em escritório moderno"
+                                    value={s.midia?.busca ?? ''}
+                                    onChange={(e) => mudarMidia(s, { busca: e.target.value })}
+                                    maxLength={200}
+                                  />
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <Opcoes<TipoMidia>
+                                      rotulo="Tipo"
+                                      valor={s.midia?.tipo ?? 'imagem'}
+                                      aoMudar={(v) => mudarMidia(s, { tipo: v })}
+                                      opcoes={[
+                                        { valor: 'imagem', rotulo: 'Imagem', icone: <ImageIcon className="h-3.5 w-3.5" /> },
+                                        { valor: 'video', rotulo: 'Vídeo', icone: <Video className="h-3.5 w-3.5" /> },
+                                      ]}
+                                    />
+                                    <Opcoes<Orientacao>
+                                      rotulo="Formato"
+                                      valor={s.midia?.orientacao ?? 'paisagem'}
+                                      aoMudar={(v) => mudarMidia(s, { orientacao: v })}
+                                      opcoes={[
+                                        { valor: 'paisagem', rotulo: 'Paisagem' },
+                                        { valor: 'retrato', rotulo: 'Retrato' },
+                                        { valor: 'quadrado', rotulo: 'Quadrado' },
+                                      ]}
+                                    />
+                                  </div>
+                                </>
                               )}
                             </div>
                           ) : (
@@ -423,10 +630,27 @@ export function EtapaSecoes({
                             </div>
                           )}
 
+                          {s.midia?.tipo === 'video' && (
+                            <div className="mt-3">
+                              <OpcoesVideo
+                                valor={s.midia}
+                                deFundo={s.layout === 'banner'}
+                                aoMudar={(patch) => mudarMidia(s, patch)}
+                              />
+                              {s.layout === 'hero' && (
+                                <p className="mt-2 text-xs text-text-dim">
+                                  Se a IA usar o vídeo como fundo do hero, ele entra sem som e sem
+                                  controles — o resto vale igual.
+                                </p>
+                              )}
+                            </div>
+                          )}
+
                           {info.itens?.campos.includes('imagem') && (
                             <p className="mt-3 text-xs text-text-dim">
-                              Este layout também tem imagem em cada item. Envie as dessas caixas no
-                              editor, depois de gerar a página.
+                              Neste layout cada item tem a própria imagem: a mídia definida aqui
+                              entra como a primeira. As outras você ajusta no editor, depois de
+                              gerar a página.
                             </p>
                           )}
                         </div>
@@ -454,6 +678,8 @@ export function EtapaSecoes({
           mudarSecao(trocandoLayout, {
             layout,
             ...(info.temColunas ? { colunas: 3 as const } : { colunas: undefined }),
+            // Layout sem lados (galeria, FAQ…) não carrega a escolha antiga.
+            ...(temLados(layout) ? {} : { inverter: undefined }),
           })
         }}
         aoFechar={() => setTrocandoLayout(null)}

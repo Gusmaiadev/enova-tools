@@ -7,14 +7,24 @@ import { Button, ButtonLink } from '@/components/Button'
 import { Aviso, Erro } from '@/components/Campo'
 import { EtapaIdentidade } from './EtapaIdentidade'
 import { EtapaNavegacao } from './EtapaNavegacao'
+import { EtapaPaginas } from './EtapaPaginas'
 import { EtapaSecoes } from './EtapaSecoes'
 import type { LpBriefing, LpProjeto } from '@/lib/lp/tipos'
 
-const PASSOS = [
-  { n: 1, titulo: 'Identidade', descricao: 'Nome, fontes, cores e referências' },
+type Passo = 1 | 2 | 3 | 4
+
+const PASSOS_BASE = [
+  { n: 1, titulo: 'Identidade', descricao: 'Nome, páginas, fontes e cores' },
   { n: 2, titulo: 'Header e Footer', descricao: 'Menu, rodapé e redes sociais' },
   { n: 3, titulo: 'Seções', descricao: 'Os blocos da página, na ordem' },
 ] as const
+
+/** Só entra quando o projeto tem termos de uso e/ou política de privacidade. */
+const PASSO_PAGINAS = {
+  n: 4,
+  titulo: 'Páginas',
+  descricao: 'Termos de uso e privacidade',
+} as const
 
 /** Etapas do que o servidor faz enquanto a geração roda. */
 const ETAPAS_GERACAO = [
@@ -26,7 +36,7 @@ const ETAPAS_GERACAO = [
 
 export function Assistente({ projeto }: { projeto: LpProjeto }) {
   const router = useRouter()
-  const [passo, setPasso] = useState<1 | 2 | 3>(1)
+  const [passo, setPasso] = useState<Passo>(1)
   const [briefing, setBriefing] = useState<LpBriefing>(projeto.briefing)
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(true)
@@ -76,9 +86,22 @@ export function Assistente({ projeto }: { projeto: LpProjeto }) {
     return () => clearInterval(timer)
   }, [gerando])
 
+  const passos = briefing.paginas.length > 0 ? [...PASSOS_BASE, PASSO_PAGINAS] : [...PASSOS_BASE]
+  const ultimo = passos.length as Passo
+  // Desmarcar as páginas na etapa 1 tira a última etapa: o passo exibido nunca
+  // passa do total (e volta sozinho se a etapa reaparecer).
+  const atual = (passo > ultimo ? ultimo : passo) as Passo
+
   const problemas: string[] = []
   if (briefing.nome.trim().length < 2) problemas.push('Dê um nome ao projeto na etapa 1.')
   if (briefing.secoes.length === 0) problemas.push('Adicione pelo menos uma seção na etapa 3.')
+  for (const p of briefing.paginas) {
+    if (p.conteudo.trim() === '') {
+      problemas.push(
+        `Escreva o texto de ${p.titulo} na etapa ${ultimo} (ou desmarque a página na etapa 1).`,
+      )
+    }
+  }
 
   async function gerar() {
     if (problemas.length > 0) {
@@ -121,10 +144,13 @@ export function Assistente({ projeto }: { projeto: LpProjeto }) {
         </div>
       )}
 
-      <nav aria-label="Etapas" className="grid gap-2 sm:grid-cols-3">
-        {PASSOS.map((p) => {
-          const ativo = passo === p.n
-          const concluido = passo > p.n
+      <nav
+        aria-label="Etapas"
+        className={`grid gap-2 ${passos.length === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}
+      >
+        {passos.map((p) => {
+          const ativo = atual === p.n
+          const concluido = atual > p.n
           return (
             <button
               key={p.n}
@@ -154,9 +180,10 @@ export function Assistente({ projeto }: { projeto: LpProjeto }) {
 
       {erro ? <Erro>{erro}</Erro> : null}
 
-      {passo === 1 && <EtapaIdentidade briefing={briefing} aoMudar={aoMudar} />}
-      {passo === 2 && <EtapaNavegacao briefing={briefing} aoMudar={aoMudar} />}
-      {passo === 3 && <EtapaSecoes lpId={projeto.id} briefing={briefing} aoMudar={aoMudar} />}
+      {atual === 1 && <EtapaIdentidade lpId={projeto.id} briefing={briefing} aoMudar={aoMudar} />}
+      {atual === 2 && <EtapaNavegacao briefing={briefing} aoMudar={aoMudar} />}
+      {atual === 3 && <EtapaSecoes lpId={projeto.id} briefing={briefing} aoMudar={aoMudar} />}
+      {atual === 4 && <EtapaPaginas briefing={briefing} aoMudar={aoMudar} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
         <span className="text-xs text-text-dim">
@@ -164,18 +191,18 @@ export function Assistente({ projeto }: { projeto: LpProjeto }) {
         </span>
 
         <div className="flex flex-wrap items-center gap-2">
-          {passo > 1 && (
+          {atual > 1 && (
             <Button
               variante="secondary"
-              onClick={() => setPasso((p) => (p - 1) as 1 | 2)}
+              onClick={() => setPasso((atual - 1) as Passo)}
               disabled={gerando}
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar
             </Button>
           )}
-          {passo < 3 ? (
-            <Button onClick={() => setPasso((p) => (p + 1) as 2 | 3)}>
+          {atual < ultimo ? (
+            <Button onClick={() => setPasso((atual + 1) as Passo)}>
               Avançar
               <ArrowRight className="h-4 w-4" />
             </Button>
@@ -197,7 +224,7 @@ export function Assistente({ projeto }: { projeto: LpProjeto }) {
         </div>
       </div>
 
-      {passo === 3 && problemas.length > 0 && !gerando && (
+      {atual === ultimo && problemas.length > 0 && !gerando && (
         <Aviso>{problemas.join(' ')}</Aviso>
       )}
 

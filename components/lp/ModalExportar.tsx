@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Aviso, Erro } from '@/components/Campo'
 import { useFocoModal } from '@/components/useFocoModal'
+import { paginasGeradas } from '@/lib/lp/documento'
 import type { FormatoExport } from '@/lib/lp/exportar'
 import type { LpDocumento } from '@/lib/lp/tipos'
+import { infoPagina } from '@/lib/lp/tipos'
 
 const OPCOES: {
   formato: FormatoExport
@@ -19,14 +21,15 @@ const OPCOES: {
     formato: 'unico',
     titulo: 'Arquivo único',
     descricao: 'Tudo em um index.html só, com o CSS e o JavaScript dentro. Ideal para hospedagem simples.',
-    estrutura: ['index.html', 'assets/images/', 'assets/videos/'],
+    // '@paginas' vira termos.html / privacidade.html quando o projeto tem.
+    estrutura: ['index.html', '@paginas', 'assets/images/', 'assets/videos/'],
     icone: FileCode,
   },
   {
     formato: 'projeto',
     titulo: 'Projeto separado',
     descricao: 'Arquivos organizados, com as fontes baixadas junto. Ideal para continuar editando o código.',
-    estrutura: ['index.html', 'style.css', 'script.js', 'assets/images/', 'assets/videos/', 'assets/fonts/'],
+    estrutura: ['index.html', 'style.css', 'script.js', '@paginas', 'assets/images/', 'assets/videos/', 'assets/fonts/'],
     icone: FolderTree,
   },
 ]
@@ -50,6 +53,8 @@ function Conteudo({ lpId, doc, aoFechar }: Props) {
   const [avisos, setAvisos] = useState<string[]>([])
   const dialogoRef = useRef<HTMLDivElement>(null)
   useFocoModal(dialogoRef, true)
+
+  const arquivosPaginas = paginasGeradas(doc).map((p) => infoPagina(p.tipo).arquivo)
 
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
@@ -152,7 +157,7 @@ function Conteudo({ lpId, doc, aoFechar }: Props) {
                 {o.descricao}
               </span>
               <span className="mt-3 block font-mono text-[11px] text-text-dim/80">
-                {o.estrutura.join('\n')}
+                {o.estrutura.flatMap((l) => (l === '@paginas' ? arquivosPaginas : [l])).join('\n')}
               </span>
             </button>
           ))}

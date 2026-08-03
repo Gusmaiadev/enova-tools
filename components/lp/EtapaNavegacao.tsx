@@ -3,6 +3,8 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { Alca } from './Alca'
 import { Area, Bloco, Marcar, Selecao, Texto, Vazio } from './campos'
+import { CamposBarra } from './CamposBarra'
+import { ListaTelefones } from './ListaTelefones'
 import { reordenar, useArrastar } from './arrastar'
 import { gerarId } from '@/lib/lp/util'
 import type { LpBriefing, Rede, RedeSocial } from '@/lib/lp/tipos'
@@ -119,6 +121,18 @@ export function EtapaNavegacao({
             ))}
           </ul>
         )}
+
+        <div className="mt-5 border-t border-border pt-4">
+          <p className="mb-3 text-sm font-medium">Aparência do topo</p>
+          <CamposBarra
+            estilo={briefing.estiloHeader}
+            // A logo enviada na Identidade manda: com imagem, o tamanho é altura.
+            logoImagem={Boolean(briefing.logo)}
+            aoMudar={(patch) =>
+              aoMudar({ estiloHeader: { ...briefing.estiloHeader, ...patch } })
+            }
+          />
+        </div>
       </Bloco>
 
       <Bloco titulo="Footer" descricao="Tudo é opcional — preencha o que fizer sentido para o projeto.">
@@ -146,13 +160,6 @@ export function EtapaNavegacao({
               maxLength={300}
             />
             <Texto
-              rotulo="Telefones"
-              placeholder="(11) 99999-9999"
-              value={briefing.footer.telefones}
-              onChange={(e) => mudarFooter({ telefones: e.target.value })}
-              maxLength={120}
-            />
-            <Texto
               rotulo="E-mail"
               placeholder="contato@suaempresa.com.br"
               value={briefing.footer.email}
@@ -161,6 +168,11 @@ export function EtapaNavegacao({
               maxLength={120}
             />
           </div>
+
+          <ListaTelefones
+            telefones={briefing.footer.telefones}
+            aoMudar={(telefones) => mudarFooter({ telefones })}
+          />
 
           <div>
             <div className="mb-2 flex items-center justify-between">
@@ -236,6 +248,18 @@ export function EtapaNavegacao({
             valor={briefing.footer.menuSecundario}
             aoMudar={(v) => mudarFooter({ menuSecundario: v })}
           />
+
+          <div className="border-t border-border pt-4">
+            <p className="mb-3 text-sm font-medium">Aparência do rodapé</p>
+            <CamposBarra
+              estilo={briefing.footer.estilo}
+              // No rodapé a marca é o nome escrito, nunca a imagem da logo.
+              logoImagem={false}
+              aoMudar={(patch) =>
+                mudarFooter({ estilo: { ...briefing.footer.estilo, ...patch } })
+              }
+            />
+          </div>
         </div>
       </Bloco>
 
