@@ -36,7 +36,7 @@ export type OpcoesHtml = {
   urlLocal?: Map<string, string>
 }
 
-type Ctx = {
+export type Ctx = {
   modo: 'editor' | 'export'
   urlLocal?: Map<string, string>
   midias: MidiaColetada[]
@@ -54,10 +54,10 @@ function href(ctx: Ctx, url: string): string {
 }
 
 /** data-lp="<alvo>" so no modo editor (escapado por defesa em profundidade). */
-const alvo = (ctx: Ctx, caminho: string) =>
+export const alvo = (ctx: Ctx, caminho: string) =>
   ctx.modo === 'editor' ? ` data-lp="${esc(caminho)}"` : ''
 
-function urlMidia(ctx: Ctx, midia: LpMidia): string {
+export function urlMidia(ctx: Ctx, midia: LpMidia): string {
   const segura = urlSegura(midia.url)
   if (!midia.url.startsWith('data:')) {
     if (!ctx.midias.some((m) => m.url === midia.url)) {
@@ -113,7 +113,7 @@ function atributosVideoFundo(m: LpMidia): string {
 }
 
 /** <img> ou <video> dentro de .lp-midia. */
-function htmlMidia(ctx: Ctx, midia: LpMidia, caminho: string): string {
+export function htmlMidia(ctx: Ctx, midia: LpMidia, caminho: string): string {
   const url = urlMidia(ctx, midia)
   const marca = alvo(ctx, caminho)
   // Placeholder de video e um SVG (data:image) — rende como imagem.
@@ -123,7 +123,7 @@ function htmlMidia(ctx: Ctx, midia: LpMidia, caminho: string): string {
   return `<div class="lp-midia"${marca}><img src="${esc(url)}" alt="${esc(midia.alt)}" loading="lazy"></div>`
 }
 
-function htmlBotao(ctx: Ctx, botao: LpBotao, caminho: string, extra = ''): string {
+export function htmlBotao(ctx: Ctx, botao: LpBotao, caminho: string, extra = ''): string {
   const classes = ['lp-btn']
   if (botao.estilo === 'contorno') classes.push('contorno')
   // Ausente = o comportamento de sempre (subir um pouco, sem animacao).
@@ -160,7 +160,7 @@ function acaoSecao(
   return `<div class="${classes.join(' ')}">${htmlBotao(ctx, s.botao, `sec:${s.id}:botao`)}</div>`
 }
 
-const quebras = (texto: string) => esc(texto).replace(/\n/g, '<br>')
+export const quebras = (texto: string) => esc(texto).replace(/\n/g, '<br>')
 
 function tituloEl(ctx: Ctx, s: LpSecao, tag: 'h1' | 'h2' | 'h3' = 'h2'): string {
   if (!s.titulo) return ''
