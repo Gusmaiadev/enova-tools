@@ -168,6 +168,39 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
+describe('preencherMidias', () => {
+  it('troca o placeholder pelo resultado do banco sem perder as opções de vídeo', async () => {
+    const { preencherMidias } = await import('../midias')
+    const { documentoBase } = await import('../documento')
+    const { novaSecao } = await import('../layouts')
+    const { briefingVazio } = await import('../tipos')
+    fetchMock.mockReturnValue(responder(VIDEO_PEXELS))
+
+    const doc = documentoBase(briefingVazio('Teste'))
+    const secao = novaSecao('texto-midia')
+    secao.midia = {
+      tipo: 'video',
+      url: '',
+      alt: 'Cidade à noite',
+      busca: 'cidade à noite',
+      orientacao: 'paisagem',
+      controles: false,
+      autoplay: true,
+      loop: true,
+    }
+    doc.secoes = [secao]
+
+    expect((await preencherMidias(doc)).preenchidas).toBe(1)
+    const midia = doc.secoes[0].midia
+    expect(midia?.url).toBe('https://videos.pexels.com/hd.mp4')
+    // Reprodução é do lugar na página: o arquivo achado não a redefine.
+    expect(midia?.controles).toBe(false)
+    expect(midia?.autoplay).toBe(true)
+    expect(midia?.loop).toBe(true)
+    expect(midia?.busca).toBe('cidade à noite')
+  })
+})
+
 describe('buscarNoPexels', () => {
   it('monta a URL da foto na largura da página, sem cortar', async () => {
     const { buscarNoPexels } = await import('./pexels')

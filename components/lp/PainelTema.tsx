@@ -3,8 +3,10 @@
 import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { Cor, Faixa, Fonte, Selecao, Texto } from './campos'
+import { EnviarMidia } from './EnviarMidia'
 import { fontePorNome } from '@/lib/lp/fontes'
-import type { CategoriaTexto, CoresTema, LpDocumento, LpTema } from '@/lib/lp/tipos'
+import { LOGO_MAX_LADO } from '@/lib/lp/formatos'
+import type { CategoriaTexto, CoresTema, LpDocumento, LpMidia, LpTema } from '@/lib/lp/tipos'
 
 const CATEGORIAS: { chave: CategoriaTexto; rotulo: string }[] = [
   { chave: 'titulos', rotulo: 'Títulos' },
@@ -28,10 +30,15 @@ const CORES: { chave: keyof CoresTema; rotulo: string }[] = [
 
 export function PainelTema({
   doc,
+  lpId,
   aoMudar,
+  aoMudarLogo,
 }: {
   doc: LpDocumento
+  /** Projeto dono da logo enviada — define a pasta no bucket. */
+  lpId: string
   aoMudar: (tema: LpTema) => void
+  aoMudarLogo: (logo: LpMidia | null) => void
 }) {
   const [aberta, setAberta] = useState<CategoriaTexto | null>('titulos')
 
@@ -49,6 +56,26 @@ export function PainelTema({
 
   return (
     <div className="space-y-6">
+      <div>
+        <p className="mb-3 font-mono text-xs uppercase tracking-[0.28em] text-text-dim">Logo</p>
+        <EnviarMidia
+          lpId={lpId}
+          arquivo={doc.header.logo ?? null}
+          apenasImagem
+          maxLado={LOGO_MAX_LADO}
+          // O briefing pode apontar para o mesmo arquivo — quem apaga é a
+          // limpeza de órfãos, na próxima geração.
+          apagarNoServidor={false}
+          rotulo="Escolher a imagem da logo"
+          descricao={`ou arraste aqui — maior que ${LOGO_MAX_LADO}×${LOGO_MAX_LADO} px é reduzida`}
+          aoEnviar={aoMudarLogo}
+          aoRemover={() => aoMudarLogo(null)}
+        />
+        <p className="mt-2 text-xs text-text-dim">
+          Sem imagem, o topo mostra “{doc.header.logoTexto}” escrito.
+        </p>
+      </div>
+
       <div>
         <p className="mb-3 font-mono text-xs uppercase tracking-[0.28em] text-text-dim">Cores</p>
         <div className="space-y-3">

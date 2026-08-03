@@ -3,7 +3,7 @@
 import { Loader2, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Erro } from '@/components/Campo'
-import { ACEITA, LIMITE_BYTES, legivel, recusar } from '@/lib/lp/formatos'
+import { ACEITA, ACEITA_IMAGEM, LIMITE_BYTES, legivel, recusar } from '@/lib/lp/formatos'
 import type { LpMidia } from '@/lib/lp/tipos'
 
 type Props = {
@@ -18,6 +18,12 @@ type Props = {
    * quebraria a outra.
    */
   apagarNoServidor?: boolean
+  /** Recusa vídeo (caso da logo). */
+  apenasImagem?: boolean
+  /** Lado máximo em px: imagem maior é reduzida antes de subir. */
+  maxLado?: number
+  rotulo?: string
+  descricao?: string
 }
 
 type Medidas = { largura?: number; altura?: number; duracao?: number }
@@ -56,6 +62,42 @@ async function medir(arquivo: File): Promise<Medidas> {
     return {}
   } finally {
     URL.revokeObjectURL(url)
+  }
+}
+
+/**
+ * Reduz a imagem no navegador para caber em `lado`×`lado`, mantendo a proporção.
+ * SVG passa direto (é vetor: escala sem perder nada). Qualquer falha devolve o
+ * arquivo original — enviar grande é melhor do que travar o envio.
+ */
+async function reduzirImagem(arquivo: File, lado: number): Promise<File> {
+  if (arquivo.type === 'image/svg+xml') return arquivo
+  try {
+    const bitmap = await createImageBitmap(arquivo)
+    const escala = Math.min(lado / bitmap.width, lado / bitmap.height, 1)
+    if (escala === 1) {
+      bitmap.close()
+      return arquivo
+    }
+    const largura = Math.max(1, Math.round(bitmap.width * escala))
+    const altura = Math.max(1, Math.round(bitmap.height * escala))
+    const canvas = document.createElement('canvas')
+    canvas.width = largura
+    canvas.height = altura
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return arquivo
+    ctx.drawImage(bitmap, 0, 0, largura, altura)
+    bitmap.close()
+    // JPEG e WebP mantêm o formato; o resto vira PNG, que preserva a
+    // transparência que quase toda logo tem.
+    const tipo =
+      arquivo.type === 'image/jpeg' || arquivo.type === 'image/webp' ? arquivo.type : 'image/png'
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, tipo, 0.92))
+    if (!blob) return arquivo
+    const ext = tipo === 'image/jpeg' ? 'jpg' : tipo === 'image/webp' ? 'webp' : 'png'
+    return new File([blob], `${arquivo.name.replace(/\.[^.]+$/, '')}.${ext}`, { type: tipo })
+  } catch {
+    return arquivo
   }
 }
 
@@ -117,6 +159,10 @@ export function EnviarMidia({
   aoEnviar,
   aoRemover,
   apagarNoServidor = true,
+  apenasImagem = false,
+  maxLado,
+  rotulo = 'Escolher arquivo do computador',
+  descricao,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [enviando, setEnviando] = useState(false)
@@ -126,7 +172,7 @@ export function EnviarMidia({
 
   async function receber(escolhido: File | undefined) {
     if (!escolhido || enviando) return
-    const recusa = recusar(escolhido.type, escolhido.size)
+    const recusa = recusar(escolhido.type, escolhido.size, apenasImagem)
     if (recusa) {
       setErro(recusa)
       return
@@ -136,7 +182,8 @@ export function EnviarMidia({
     setEnviando(true)
     const anterior = arquivo?.caminho
     try {
-      const midia = await enviarArquivo(escolhido, lpId, await medir(escolhido), setProgresso)
+      const paraEnviar = maxLado ? await reduzirImagem(escolhido, maxLado) : escolhido
+      const midia = await enviarArquivo(paraEnviar, lpId, await medir(paraEnviar), setProgresso)
       aoEnviar(midia)
       // Só depois de o novo entrar: se o envio falhar, o antigo continua servindo.
       if (anterior && apagarNoServidor) void apagarArquivo(anterior)
@@ -159,7 +206,7 @@ export function EnviarMidia({
       <input
         ref={inputRef}
         type="file"
-        accept={ACEITA}
+        accept={apenasImagem ? ACEITA_IMAGEM : ACEITA}
         className="hidden"
         onChange={(e) => {
           const escolhido = e.target.files?.[0]
@@ -250,11 +297,11 @@ export function EnviarMidia({
         >
           <span className="flex items-center gap-2 text-sm">
             <Upload className="h-4 w-4" />
-            Escolher arquivo do computador
+            {rotulo}
           </span>
           <span className="text-xs text-text-dim">
-            ou arraste aqui — imagem até {legivel(LIMITE_BYTES.imagem)}, vídeo MP4/WebM até{' '}
-            {legivel(LIMITE_BYTES.video)}
+            {descricao ??
+              `ou arraste aqui — imagem até ${legivel(LIMITE_BYTES.imagem)}, vídeo MP4/WebM até ${legivel(LIMITE_BYTES.video)}`}
           </span>
         </button>
       )}

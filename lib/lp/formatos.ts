@@ -26,6 +26,19 @@ export const FORMATOS: Record<string, { ext: string; tipo: TipoMidia }> = {
 /** Valor do accept do <input type="file">. */
 export const ACEITA = Object.keys(FORMATOS).join(',')
 
+/** accept quando so imagem serve (logo). */
+export const ACEITA_IMAGEM = Object.entries(FORMATOS)
+  .filter(([, f]) => f.tipo === 'imagem')
+  .map(([mime]) => mime)
+  .join(',')
+
+/**
+ * Lado maximo da logo, em px. Imagem maior e reduzida no navegador antes de
+ * subir: no header ela aparece com poucas dezenas de px de altura, entao guardar
+ * o original de 3000px so gastaria banda de quem visita a pagina.
+ */
+export const LOGO_MAX_LADO = 500
+
 /** Limite por arquivo. Video maior que isso trava o carregamento da pagina. */
 export const LIMITE_BYTES: Record<TipoMidia, number> = {
   imagem: 12 * 1024 * 1024,
@@ -48,9 +61,12 @@ export function orientacaoDe(largura?: number, altura?: number): Orientacao {
 }
 
 /** Recusa o arquivo antes de enviar. Devolve null quando esta tudo certo. */
-export function recusar(mime: string, bytes: number): string | null {
+export function recusar(mime: string, bytes: number, somenteImagem = false): string | null {
   const formato = FORMATOS[mime]
   if (!formato) return ERRO_FORMATO
+  if (somenteImagem && formato.tipo !== 'imagem') {
+    return 'Aqui vai uma imagem: JPG, PNG, WebP, AVIF, GIF ou SVG.'
+  }
   if (bytes === 0) return 'O arquivo está vazio.'
   const limite = LIMITE_BYTES[formato.tipo]
   if (bytes > limite) {

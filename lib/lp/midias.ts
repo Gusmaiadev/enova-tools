@@ -11,6 +11,7 @@ import 'server-only'
  */
 
 import { buscarMidias, temBancoMidias } from './bancos'
+import { opcoesVideo } from './documento'
 import type { LpDocumento, LpMidia } from './tipos'
 
 type Slot = { get: () => LpMidia | null | undefined; set: (m: LpMidia) => void }
@@ -85,8 +86,14 @@ export async function preencherMidias(doc: LpDocumento): Promise<ResultadoMidias
       const achada = resultado.midias[i % resultado.midias.length]
       const atual = vaga.get() as LpMidia
       // `busca` é o que o usuário/IA pediu, em português: o editor mostra e
-      // permite editar esse texto, então não pode virar o termo traduzido.
-      vaga.set({ ...achada, alt: atual.alt || achada.alt, busca: atual.busca })
+      // permite editar esse texto, então não pode virar o termo traduzido. As
+      // opções de reprodução são do lugar na página, não do arquivo achado.
+      vaga.set({
+        ...achada,
+        alt: atual.alt || achada.alt,
+        busca: atual.busca,
+        ...opcoesVideo(atual),
+      })
       preenchidas++
     })
   })

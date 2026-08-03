@@ -1,7 +1,7 @@
 'use client'
 
 import { Loader2, Play, Search, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/Button'
 import { Aviso, Erro } from '@/components/Campo'
@@ -163,46 +163,59 @@ function Conteudo({ lpId, midia, aoEscolher, aoFechar }: Props) {
   }, [aoFechar])
 
   /** `proxima` acumula na lista (botão "carregar mais"); senão recomeça. */
-  async function buscar(proxima = false) {
-    if (busca.trim() === '') return
-    const pedida = proxima ? pagina + 1 : 1
-    setCarregando(true)
-    setErro(null)
-    setAviso(null)
-    try {
-      const r = await fetch('/api/lp/midias', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ busca, tipo, orientacao, pagina: pedida }),
-      })
-      const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.erro ?? 'Falha ao buscar mídias.')
-      if (d.semChave) {
-        setAviso(d.erro)
-        setResultados([])
-        setTemMais(false)
-        return
+  const buscar = useCallback(
+    async (proxima = false) => {
+      if (busca.trim() === '') return
+      const pedida = proxima ? pagina + 1 : 1
+      setCarregando(true)
+      setErro(null)
+      setAviso(null)
+      try {
+        const r = await fetch('/api/lp/midias', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ busca, tipo, orientacao, pagina: pedida }),
+        })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(d.erro ?? 'Falha ao buscar mídias.')
+        if (d.semChave) {
+          setAviso(d.erro)
+          setResultados([])
+          setTemMais(false)
+          return
+        }
+        const achadas: LpMidia[] = d.midias ?? []
+        setResultados((antes) => (proxima ? [...antes, ...achadas] : achadas))
+        setPagina(pedida)
+        // Oferece mais enquanto a página anterior trouxe algo — a API só sabe se
+        // sobrou resultado DELA, não se a próxima página das fontes tem conteúdo.
+        setTemMais(achadas.length > 0)
+        setTraducao(d.traduzido ? (d.termo as string) : null)
+        if (achadas.length === 0) {
+          setAviso(
+            proxima
+              ? 'Não há mais resultados para essa busca.'
+              : 'Nenhum resultado. Tente descrever com outras palavras — algo mais simples e concreto costuma achar mais.',
+          )
+        }
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : 'Falha ao buscar mídias.')
+      } finally {
+        setCarregando(false)
       }
-      const achadas: LpMidia[] = d.midias ?? []
-      setResultados((antes) => (proxima ? [...antes, ...achadas] : achadas))
-      setPagina(pedida)
-      // Oferece mais enquanto a página anterior trouxe algo — a API só sabe se
-      // sobrou resultado DELA, não se a próxima página das fontes tem conteúdo.
-      setTemMais(achadas.length > 0)
-      setTraducao(d.traduzido ? (d.termo as string) : null)
-      if (achadas.length === 0) {
-        setAviso(
-          proxima
-            ? 'Não há mais resultados para essa busca.'
-            : 'Nenhum resultado. Tente descrever com outras palavras — algo mais simples e concreto costuma achar mais.',
-        )
-      }
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Falha ao buscar mídias.')
-    } finally {
-      setCarregando(false)
-    }
-  }
+    },
+    [busca, tipo, orientacao, pagina],
+  )
+
+  // Abrir já com uma descrição escrita (a do briefing ou a da mídia atual) mostra
+  // resultados de cara: quem veio escolher a foto não precisa clicar em Buscar.
+  // A trava é só para a abertura — depois disso quem busca é o usuário.
+  const abriuBuscando = useRef(false)
+  useEffect(() => {
+    if (abriuBuscando.current) return
+    abriuBuscando.current = true
+    void buscar()
+  }, [buscar])
 
   function escolher(escolhida: LpMidia) {
     aoEscolher({ ...escolhida, busca, orientacao, tipo })
@@ -250,10 +263,12 @@ function Conteudo({ lpId, midia, aoEscolher, aoFechar }: Props) {
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="font-display text-lg font-semibold">Trocar mídia</h2>
+            <h2 className="font-display text-lg font-semibold">
+              {midia?.url ? 'Trocar mídia' : 'Escolher mídia'}
+            </h2>
             <p className="mt-1 text-sm text-text-dim">
-              Descreva em português o que você quer ver — a busca é traduzida automaticamente.
-              Passe o mouse num vídeo para ver do que se trata.
+              Busque nas bibliotecas Pexels e Pixabay: descreva em português o que você quer ver —
+              a busca é traduzida automaticamente. Passe o mouse num vídeo para ver do que se trata.
             </p>
           </div>
           <button
