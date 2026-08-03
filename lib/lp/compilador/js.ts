@@ -44,7 +44,7 @@ const NAV = `
   } else {
     reveladas.forEach(function (el) { el.classList.add('lp-vis') })
   }
-})()
+})();
 `
 
 const SLIDER = `
@@ -77,7 +77,7 @@ const SLIDER = `
     slider.addEventListener('mouseleave', auto)
     auto()
   })
-})()
+})();
 `
 
 const TABS = `
@@ -96,7 +96,7 @@ const TABS = `
       })
     })
   })
-})()
+})();
 `
 
 const CONTADOR = `
@@ -140,7 +140,7 @@ const CONTADOR = `
     }, { threshold: 0.5 })
     els.forEach(function (el) { io.observe(el) })
   }
-})()
+})();
 `
 
 const FORM = `
@@ -175,13 +175,17 @@ const FORM = `
         })
     })
   })
-})()
+})();
 `
 
 /** Compila o script.js — so os modulos usados pelos layouts do documento. */
 export function compilarJs(doc: LpDocumento, modo: 'editor' | 'export' = 'export'): string {
   const tipos = new Set(doc.secoes.map((s) => s.tipo))
-  const partes = ["'use strict'", NAV]
+  // Os ponto e vírgula aqui e no fim de cada módulo não são estilo: sem eles a
+  // inserção automática do JS lê `'use strict'\n(function(){…})()` como chamada
+  // da string ("use strict" is not a function) e o script inteiro morre na
+  // primeira linha — sem revelar as seções, sem slider, sem menu no celular.
+  const partes = ["'use strict';", NAV]
   if (tipos.has('depoimentos') || tipos.has('carrossel')) partes.push(SLIDER)
   if (tipos.has('tabs')) partes.push(TABS)
   // No editor o contador reescreveria o número (editável inline) e o form daria
