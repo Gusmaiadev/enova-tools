@@ -11,7 +11,8 @@
  */
 
 import { expandirPreset } from './presets/expandir'
-import type { LpDocumento } from './tipos'
+import type { LpDocumento, LpProjeto } from './tipos'
+import { normalizarBotoes, normalizarTelefones } from './util'
 
 /** Documento salvo antes da arvore (sem `versao`). */
 export function precisaMigrar(doc: LpDocumento | null | undefined): boolean {
@@ -34,5 +35,44 @@ export function migrarDocumentoParaArvore(doc: LpDocumento): LpDocumento {
       const { raiz, secao: ajustada } = expandirPreset(secao)
       return { ...ajustada, preset: secao.tipo, raiz }
     }),
+  }
+}
+
+/**
+ * Formatos antigos convertidos na leitura do projeto: telefones que eram uma
+ * string unica, botao do header que virou lista, paginas legais que nao
+ * existiam — e, por ultimo, o documento em arvore.
+ *
+ * Vive aqui, e nao em persistencia.ts, para ser testavel sem inicializar o
+ * Firebase Admin: e funcao pura sobre os dados do projeto.
+ */
+export function migrarProjeto(dados: Omit<LpProjeto, 'id'>): Omit<LpProjeto, 'id'> {
+  const documento = dados.documento && {
+    ...dados.documento,
+    header: {
+      ...dados.documento.header,
+      botoes: normalizarBotoes(
+        dados.documento.header.botoes ?? (dados.documento.header as { botao?: unknown }).botao,
+      ),
+    },
+    footer: {
+      ...dados.documento.footer,
+      telefones: normalizarTelefones(dados.documento.footer.telefones),
+      botoes: normalizarBotoes(dados.documento.footer.botoes),
+    },
+  }
+  return {
+    ...dados,
+    briefing: {
+      ...dados.briefing,
+      paginas: dados.briefing.paginas ?? [],
+      footer: {
+        ...dados.briefing.footer,
+        telefones: normalizarTelefones(dados.briefing.footer.telefones),
+      },
+    },
+    // A arvore vem por ultimo: as conversoes acima normalizam o formato que o
+    // expansor recebe.
+    documento: documento && migrarDocumentoParaArvore(documento),
   }
 }

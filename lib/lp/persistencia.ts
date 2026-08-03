@@ -1,47 +1,14 @@
 import 'server-only'
 
 import { db } from '@/lib/firebase/admin'
+import { migrarProjeto, precisaMigrar } from './migrar'
 import type { LpBriefing, LpDocumento, LpProjeto, LpProjetoResumo } from './tipos'
 import { briefingVazio } from './tipos'
-import { normalizarBotoes, normalizarTelefones } from './util'
 
 const projetosCol = () => db.collection('lp_projetos')
 
-/**
- * Formatos que mudaram depois que projetos já estavam salvos: os telefones do
- * rodapé viraram lista (eram uma string única com todos os números), o botão do
- * header virou lista de botões e apareceram as páginas de termos/privacidade. A
- * conversão acontece na leitura, para que assistente, editor e compilador só
- * conheçam o formato novo.
- */
-function migrar(dados: Omit<LpProjeto, 'id'>): Omit<LpProjeto, 'id'> {
-  return {
-    ...dados,
-    briefing: {
-      ...dados.briefing,
-      paginas: dados.briefing.paginas ?? [],
-      footer: {
-        ...dados.briefing.footer,
-        telefones: normalizarTelefones(dados.briefing.footer.telefones),
-      },
-    },
-    documento: dados.documento && {
-      ...dados.documento,
-      header: {
-        ...dados.documento.header,
-        botoes: normalizarBotoes(
-          dados.documento.header.botoes ??
-            (dados.documento.header as { botao?: unknown }).botao,
-        ),
-      },
-      footer: {
-        ...dados.documento.footer,
-        telefones: normalizarTelefones(dados.documento.footer.telefones),
-        botoes: normalizarBotoes(dados.documento.footer.botoes),
-      },
-    },
-  }
-}
+// A conversão de formatos antigos — inclusive o documento para árvore — mora em
+// lib/lp/migrar.ts, que é puro e por isso testável sem o Firebase Admin.
 
 /** Remove undefined (o Firestore rejeita) e qualquer prototipo estranho. */
 const paraFirestore = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -100,7 +67,7 @@ export async function obterProjeto(lpId: string, teamId: string): Promise<LpProj
   const doc = await projetosCol().doc(lpId).get()
   const dados = doc.data() as Omit<LpProjeto, 'id'> | undefined
   if (!dados || dados.teamId !== teamId) return null
-  return { id: doc.id, ...migrar(dados) }
+  return { id: doc.id, ...migrarProjeto(dados) }
 }
 
 /** Atualiza nome, briefing e/ou documento; carimba atualizadoEm. */
@@ -117,6 +84,18 @@ export async function atualizarProjeto(
   if (patch.documento !== undefined) {
     dados.documento = patch.documento
     dados.gerada = patch.documento !== null
+    // Rede de proteção: na primeira escrita depois da migração, guarda o
+    // documento como estava. Se um expansor errado estragar a página de um
+    // cliente, o original ainda existe.
+    //
+    // A leitura tem de ser CRUA: obterProjeto já devolve migrado, e gravar isso
+    // como "V1" salvaria justamente a coisa que se quer poder desfazer.
+    const cru = (await projetosCol().doc(lpId).get()).data() as
+      | { documento?: LpDocumento | null; documentoV1?: unknown }
+      | undefined
+    if (cru?.documentoV1 === undefined && cru?.documento && precisaMigrar(cru.documento)) {
+      dados.documentoV1 = cru.documento
+    }
   }
   await projetosCol().doc(lpId).update(paraFirestore(dados))
   return true

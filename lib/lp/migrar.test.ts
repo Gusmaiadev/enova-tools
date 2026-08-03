@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { migrarDocumentoParaArvore, precisaMigrar } from './migrar'
-import type { LpDocumento, LpSecao } from './tipos'
+import { migrarDocumentoParaArvore, migrarProjeto, precisaMigrar } from './migrar'
+import type { LpDocumento, LpProjeto, LpSecao } from './tipos'
+import { briefingVazio } from './tipos'
 
 const doc = (secoes: LpSecao[], versao?: 2): LpDocumento => ({
   ...(versao ? { versao } : {}),
@@ -103,5 +104,49 @@ describe('migrarDocumentoParaArvore', () => {
     expect(migrado.secoes[0].midia).toBeNull()
     expect(original.secoes[0].midia?.url).toBe('faixa.jpg')
     expect(original.secoes[0].fundo).toBeUndefined()
+  })
+})
+
+describe('migrarProjeto', () => {
+  const projeto = (versao?: 2): Omit<LpProjeto, 'id'> => ({
+    nome: 'X',
+    teamId: 't',
+    criadoPor: 'u',
+    createdAt: 1,
+    atualizadoEm: 1,
+    briefing: briefingVazio('X'),
+    documento: doc([secao()], versao),
+  })
+
+  it('documento sem versão sai migrado, com raiz em cada seção', () => {
+    const fora = migrarProjeto(projeto())
+    expect(fora.documento?.versao).toBe(2)
+    expect(fora.documento?.secoes[0].raiz).toBeDefined()
+  })
+
+  it('documento já em v2 não é reprocessado', () => {
+    expect(migrarProjeto(projeto(2)).documento?.secoes[0].raiz).toBeUndefined()
+  })
+
+  it('projeto sem documento passa sem quebrar', () => {
+    expect(migrarProjeto({ ...projeto(), documento: null }).documento).toBeNull()
+  })
+
+  it('as conversões antigas continuam valendo', () => {
+    const entrada = projeto()
+    // Formato antigo: telefones do rodapé como string única.
+    entrada.briefing.footer.telefones = '(11) 3333-4444' as never
+    const fora = migrarProjeto(entrada)
+    expect(Array.isArray(fora.briefing.footer.telefones)).toBe(true)
+    expect(fora.briefing.footer.telefones).toHaveLength(1)
+  })
+
+  it('botão antigo do header (objeto único, sem a lista) vira lista', () => {
+    const entrada = projeto()
+    const header = entrada.documento!.header as { botoes?: unknown; botao?: unknown }
+    // Documento antigo de verdade não tem `botoes` — tem só o `botao` singular.
+    delete header.botoes
+    header.botao = { texto: 'Fale', url: '#' }
+    expect(migrarProjeto(entrada).documento?.header.botoes).toHaveLength(1)
   })
 })
