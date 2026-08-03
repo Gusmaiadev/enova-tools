@@ -28,6 +28,7 @@ import { ModalPagina } from './ModalPagina'
 import { PainelCodigo } from './PainelCodigo'
 import { PainelEstrutura } from './PainelEstrutura'
 import { PainelPropriedades } from './PainelPropriedades'
+import { PainelWidget } from './PainelWidget'
 import { PainelTema } from './PainelTema'
 import { compilarEditor } from '@/lib/lp/compilador'
 import {
@@ -365,6 +366,20 @@ export function EditorLp({
     [enviarAoCanvas],
   )
 
+  /** Seleciona um nó da árvore (canvas ou caminho clicável do painel). */
+  const selecionarNo = useCallback(
+    (id: string) => {
+      setNoId(id)
+      setSecaoId(null)
+      setItemId(null)
+      setAlvo(`el:${id}`)
+      alvoSelecionado.current = `el:${id}`
+      setAba('editar')
+      enviarAoCanvas({ tipo: 'destacar', alvo: `el:${id}`, rolar: true })
+    },
+    [enviarAoCanvas],
+  )
+
   /**
    * Páginas de texto (termos, privacidade) vivem no documento, fora do canvas:
    * mexer nelas aqui evita ter de gerar de novo — o que substituiria a página.
@@ -587,17 +602,28 @@ export function EditorLp({
                 aoExcluirPagina={setPaginaParaExcluir}
               />
             )}
-            {aba === 'editar' && (
-              <PainelPropriedades
-                doc={doc}
-                lpId={projeto.id}
-                secaoId={secaoId}
-                itemId={itemId}
-                alvo={alvo}
-                aplicar={aplicar}
-                aoSelecionarItem={setItemId}
-              />
-            )}
+            {aba === 'editar' &&
+              // Nó da árvore vai para o painel por widget; seção ainda não
+              // migrada (e header/rodapé, que não são seção) segue no antigo.
+              (noId ? (
+                <PainelWidget
+                  doc={doc}
+                  lpId={projeto.id}
+                  noId={noId}
+                  aplicar={aplicar}
+                  aoSelecionar={selecionarNo}
+                />
+              ) : (
+                <PainelPropriedades
+                  doc={doc}
+                  lpId={projeto.id}
+                  secaoId={secaoId}
+                  itemId={itemId}
+                  alvo={alvo}
+                  aplicar={aplicar}
+                  aoSelecionarItem={setItemId}
+                />
+              ))}
             {aba === 'tema' && (
               <PainelTema
                 doc={doc}
