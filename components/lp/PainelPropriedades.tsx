@@ -461,14 +461,14 @@ export function PainelPropriedades({
           onChange={(e) => mudarSecao({ nome: e.target.value }, 'sec-nome')}
           maxLength={80}
         />
-        {secao.titulo !== undefined && (
-          <Area
-            rotulo="Título"
-            value={secao.titulo}
-            onChange={(e) => mudarSecao({ titulo: e.target.value }, 'sec-titulo')}
-            maxLength={300}
-          />
-        )}
+        {/* Sempre visível, como o subtítulo: a seção pode ter nascido sem título
+            (o usuário dispensou no briefing) e ele tem de poder pôr um de volta. */}
+        <Area
+          rotulo="Título"
+          value={secao.titulo ?? ''}
+          onChange={(e) => mudarSecao({ titulo: e.target.value }, 'sec-titulo')}
+          maxLength={300}
+        />
         {/* Subtítulo em qualquer layout: todos sabem desenhar um, e o campo do
             catálogo serve para orientar a IA, não para limitar quem edita. */}
         <Area

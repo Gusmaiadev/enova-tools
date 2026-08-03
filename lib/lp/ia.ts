@@ -247,9 +247,16 @@ function blocoSecoes(briefing: LpBriefing): string {
         s.vincularMenu
           ? `   aparece no menu${itemMenu ? ` como "${itemMenu}"` : ''} (gere uma âncora)`
           : '   fora do menu (ancora = null)',
-        s.titulo && `   título (escrito pelo usuário, use como está): ${s.titulo}`,
-        s.subtitulo && `   subtítulo (escrito pelo usuário, use como está): ${s.subtitulo}`,
-        s.conteudo && `   o que dizer: ${s.conteudo}`,
+        s.titulo
+          ? `   título (escrito pelo usuário, use como está): ${s.titulo}`
+          : s.semIa?.titulo && '   NÃO gere "titulo" aqui — o usuário quer a seção sem título',
+        s.subtitulo
+          ? `   subtítulo (escrito pelo usuário, use como está): ${s.subtitulo}`
+          : s.semIa?.subtitulo && '   NÃO gere "subtitulo" aqui — o usuário quer a seção sem subtítulo',
+        s.conteudo
+          ? `   o que dizer: ${s.conteudo}`
+          : s.semIa?.conteudo &&
+            '   NÃO gere "texto" aqui — o usuário quer a seção sem parágrafo de apoio',
         s.colunas && `   colunas: ${s.colunas}`,
         s.botao &&
           `   botão: o usuário JÁ DEFINIU ("${s.botao.texto}" -> ${s.botao.url}) — não gere o campo "botao" nesta seção`,
@@ -302,6 +309,7 @@ REGRAS DE CONTEÚDO
 - Títulos curtos e concretos (até 8 palavras). Textos de 1 a 3 frases. Fale de benefício, não de característica.
 - NUNCA invente dados verificáveis: prêmios, certificações, número de clientes reais, preços que o briefing não deu. Em estatísticas e preços use valores redondos claramente ilustrativos, que o usuário vai ajustar.
 - Preencha TODAS as seções listadas, na ordem, com o layout indicado. Não crie nem remova seções.
+- Campo marcado com "NÃO gere": omita a chave inteira naquela seção. É espaço que o usuário quer vazio de propósito — qualquer texto ali é descartado.
 - Seções com itens: gere entre 3 e 6 itens (comparacao: 2 a 4 colunas; precos: 3 planos com um "destaque": true).
 - Em "comparacao", "rotulos" são as linhas da tabela e cada item.lista traz as células na mesma ordem dos rótulos (use "sim"/"não" quando for presença de recurso).
 - Ícones: use APENAS estes nomes — ${NOMES_ICONES.join(', ')}.

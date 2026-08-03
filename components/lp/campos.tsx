@@ -189,11 +189,14 @@ export function Fonte({
  */
 export function Opcoes<T extends string>({
   rotulo,
+  aria,
   valor,
   opcoes,
   aoMudar,
 }: {
   rotulo?: string
+  /** Nome do grupo quando ele não tem rótulo visível. */
+  aria?: string
   valor: T
   opcoes: { valor: T; rotulo: string; icone?: ReactNode; aria?: string }[]
   aoMudar: (valor: T) => void
@@ -203,7 +206,7 @@ export function Opcoes<T extends string>({
       {rotulo && <span className="text-sm text-text-dim">{rotulo}</span>}
       <div
         role="group"
-        aria-label={rotulo}
+        aria-label={rotulo ?? aria}
         className="flex flex-wrap gap-1 rounded-md border border-border bg-surface-2 p-1"
       >
         {opcoes.map((o) => (

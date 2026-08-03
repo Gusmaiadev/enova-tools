@@ -4,9 +4,12 @@ import {
   ArrowLeft,
   Code2,
   Download,
+  ExternalLink,
   LayoutList,
   Monitor,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Redo2,
   Settings2,
   Smartphone,
@@ -93,6 +96,8 @@ export function EditorLp({
   // O rodapé não é seção: o painel precisa do alvo cru para editá-lo.
   const [alvo, setAlvo] = useState<string | null>(null)
   const [mostrarCodigo, setMostrarCodigo] = useState(false)
+  // Painel da esquerda fechado = a página ocupando a tela inteira.
+  const [painelAberto, setPainelAberto] = useState(true)
   const [exportando, setExportando] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(true)
@@ -199,31 +204,54 @@ export function EditorLp({
     return () => clearTimeout(timer)
   }, [doc])
 
+  /** Grava o documento agora. Devolve se deu certo (nunca lança). */
+  const salvarAgora = useCallback(async (): Promise<boolean> => {
+    setSalvando(true)
+    try {
+      const r = await fetch(`/api/lp/projetos/${projeto.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documento: docRef.current }),
+      })
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}))
+        throw new Error(d.erro ?? 'Falha ao salvar.')
+      }
+      setSalvo(true)
+      setErro(null)
+      return true
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Falha ao salvar.')
+      return false
+    } finally {
+      setSalvando(false)
+    }
+  }, [projeto.id])
+
   // Salvamento automático.
   useEffect(() => {
     if (salvo) return
-    const timer = setTimeout(async () => {
-      setSalvando(true)
-      try {
-        const r = await fetch(`/api/lp/projetos/${projeto.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ documento: docRef.current }),
-        })
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}))
-          throw new Error(d.erro ?? 'Falha ao salvar.')
-        }
-        setSalvo(true)
-        setErro(null)
-      } catch (e) {
-        setErro(e instanceof Error ? e.message : 'Falha ao salvar.')
-      } finally {
-        setSalvando(false)
-      }
-    }, 1800)
+    const timer = setTimeout(() => void salvarAgora(), 1800)
     return () => clearTimeout(timer)
-  }, [doc, salvo, projeto.id])
+  }, [doc, salvo, salvarAgora])
+
+  /**
+   * Abre só a landing page numa aba nova. Ela é servida a partir do que está
+   * gravado, então o que ainda não foi salvo vai antes — e a aba é aberta já no
+   * clique (depois do `await` o navegador trataria como pop-up e bloquearia).
+   */
+  const abrirEmNovaAba = useCallback(async () => {
+    const aba = window.open('', '_blank')
+    if (!aba) {
+      setErro('O navegador bloqueou a aba nova. Libere os pop-ups deste site e tente de novo.')
+      return
+    }
+    if (salvo || (await salvarAgora())) {
+      aba.location.replace(`/api/lp/previa/${projeto.id}/index.html`)
+    } else {
+      aba.close()
+    }
+  }, [projeto.id, salvo, salvarAgora])
 
   // Mensagens vindas do canvas.
   useEffect(() => {
@@ -377,6 +405,29 @@ export function EditorLp({
           {projeto.nome}
         </span>
 
+        <button
+          type="button"
+          onClick={() => setPainelAberto(!painelAberto)}
+          aria-pressed={!painelAberto}
+          aria-label={painelAberto ? 'Fechar o painel de edição' : 'Abrir o painel de edição'}
+          title={
+            painelAberto
+              ? 'Fechar o painel e ver só a página'
+              : 'Abrir o painel de edição'
+          }
+          className={`ml-1 hidden rounded-md p-2 transition-colors md:block ${
+            painelAberto
+              ? 'text-text-dim hover:bg-surface-2 hover:text-text'
+              : 'bg-blue/10 text-blue'
+          }`}
+        >
+          {painelAberto ? (
+            <PanelLeftClose className="h-4 w-4" />
+          ) : (
+            <PanelLeftOpen className="h-4 w-4" />
+          )}
+        </button>
+
         <div className="mx-1 flex items-center gap-0.5">
           <button
             type="button"
@@ -423,6 +474,15 @@ export function EditorLp({
           </span>
           <button
             type="button"
+            onClick={() => void abrirEmNovaAba()}
+            title="Abrir só a landing page numa aba nova"
+            className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-xs transition-colors hover:border-blue/60"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Nova aba</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setMostrarCodigo(!mostrarCodigo)}
             className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
               mostrarCodigo
@@ -465,7 +525,11 @@ export function EditorLp({
       </p>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-72 shrink-0 flex-col border-r border-border bg-surface md:flex lg:w-80">
+        <aside
+          className={`w-72 shrink-0 flex-col border-r border-border bg-surface lg:w-80 ${
+            painelAberto ? 'hidden md:flex' : 'hidden'
+          }`}
+        >
           <div className="flex shrink-0 border-b border-border">
             {ABAS.map((a) => (
               <button

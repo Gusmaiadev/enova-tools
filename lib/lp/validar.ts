@@ -14,6 +14,7 @@ import type {
   Alinhamento,
   AnimacaoBotao,
   BotaoComId,
+  CampoTextoSecao,
   EstiloBarra,
   FonteMidia,
   HoverBotao,
@@ -37,6 +38,7 @@ import type {
 import {
   ALINHAMENTOS,
   ANIMACOES_BOTAO,
+  CAMPOS_TEXTO_SECAO,
   HOVERS_BOTAO,
   PAGINAS_LEGAIS,
   POSICOES_BOTAO,
@@ -528,14 +530,26 @@ export function coergirBriefing(bruto: unknown, nomeAtual: string): LpBriefing {
           // a tela. Descartar aqui encolhia a secao, porque o prompt pede
           // exatamente o numero de itens do briefing: o card vazio nunca nascia.
           .slice(0, 12)
+        const titulo = str(secao.titulo, 300)
+        const subtitulo = str(secao.subtitulo, 500)
+        const conteudo = str(secao.conteudo, 3000)
+        // "A IA não escreve" só existe para campo em branco: preenchido, o texto
+        // do usuário já é a resposta e a marcação não teria o que dispensar.
+        const semIaBruto = obj(secao.semIa)
+        const escrito: Record<CampoTextoSecao, string> = { titulo, subtitulo, conteudo }
+        const semIa: Partial<Record<CampoTextoSecao, boolean>> = {}
+        for (const campo of CAMPOS_TEXTO_SECAO) {
+          if (semIaBruto[campo] === true && escrito[campo] === '') semIa[campo] = true
+        }
         return {
           id: strOu(secao.id, gerarId(), 24),
           nome: strOu(secao.nome, 'Seção', 80),
           vincularMenu: secao.vincularMenu === true,
           ...(secao.vincularMenu === true && idsMenu.has(itemMenu) ? { itemMenu } : {}),
-          titulo: str(secao.titulo, 300),
-          ...(str(secao.subtitulo, 500) !== '' ? { subtitulo: str(secao.subtitulo, 500) } : {}),
-          conteudo: str(secao.conteudo, 3000),
+          titulo,
+          ...(subtitulo !== '' ? { subtitulo } : {}),
+          conteudo,
+          ...(Object.keys(semIa).length > 0 ? { semIa } : {}),
           layout: layout as TipoLayout,
           ...(colunas ? { colunas } : {}),
           // Lado da mídia: só onde o layout põe conteúdo e mídia lado a lado.

@@ -154,7 +154,11 @@
       "PowerShell(git *)",
       "PowerShell(npx vitest run lib/lp/_scratch.test.ts 2>&1 | Select-Object -First 60)",
       "PowerShell(Set-Content *)",
-      "Bash(grep -o '<section class=\"lp-legal\">.\\\\{0,700\\\\}' termos.html)"
+      "Bash(grep -o '<section class=\"lp-legal\">.\\\\{0,700\\\\}' termos.html)",
+      "PowerShell($dirs = @\\(\"$env:APPDATA\\\\com.vercel.cli\", \"$env:LOCALAPPDATA\\\\com.vercel.cli\", \"$env:USERPROFILE\\\\.vercel\", \"$env:USERPROFILE\\\\.now\"\\); foreach \\($d in $dirs\\) { if \\(Test-Path $d\\) { Write-Output \"EXISTE: $d\"; Get-ChildItem $d -Force | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize | Out-String } else { Write-Output \"não existe: $d\" } }; if \\(Test-Path \"C:\\\\E-nova tools\\\\.vercel\"\\) { Write-Output \"PROJETO LINKADO:\"; Get-ChildItem \"C:\\\\E-nova tools\\\\.vercel\" -Force | Select-Object Name } else { Write-Output \"repo sem pasta .vercel \\(projeto não linkado por CLI\\)\" })",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(grep -E \"^\\(sparkles|ban\\)\\\\.js$\")",
+      "Bash(grep -E \"^\\(sparkles|ban|minus\\)\\\\.js$\")"
     ]
   }
 }

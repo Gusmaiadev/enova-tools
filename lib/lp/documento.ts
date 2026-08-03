@@ -358,18 +358,26 @@ export function aplicarItens(doc: LpDocumento, briefing: LpBriefing): number {
 }
 
 /**
- * Titulo e subtitulo escritos no briefing vencem os da IA. O campo diz "a IA
- * escreve se ficar vazio": preenchido tem de aparecer na pagina como foi escrito.
+ * Titulo, subtitulo e texto de cada secao conforme o briefing: o que o usuario
+ * escreveu vence o da IA (preenchido tem de aparecer na pagina como foi escrito)
+ * e o campo que ele deixou em branco pedindo para a IA nao escrever sai da
+ * pagina — a IA costuma escrever assim mesmo, e ai a marcacao dele nao valeria
+ * nada. "Conteudo" do briefing e o texto de apoio da secao (LpSecao.texto).
  */
 export function aplicarTextos(doc: LpDocumento, briefing: LpBriefing): void {
   briefing.secoes.forEach((sb, i) => {
     const titulo = sb.titulo.trim()
     const subtitulo = (sb.subtitulo ?? '').trim()
-    if (titulo === '' && subtitulo === '') return
+    const semIa = sb.semIa ?? {}
+    const dispensado = semIa.titulo || semIa.subtitulo || semIa.conteudo
+    if (titulo === '' && subtitulo === '' && !dispensado) return
     const secao = secaoCorrespondente(doc, sb, i)
     if (!secao) return
     if (titulo !== '') secao.titulo = titulo
+    else if (semIa.titulo) delete secao.titulo
     if (subtitulo !== '') secao.subtitulo = subtitulo
+    else if (semIa.subtitulo) delete secao.subtitulo
+    if (sb.conteudo.trim() === '' && semIa.conteudo) delete secao.texto
   })
 }
 
@@ -487,9 +495,11 @@ export function documentoBase(briefing: LpBriefing): LpDocumento {
       tipo: sb.layout,
       nome: sb.nome || sb.titulo || 'Seção',
       ancora,
-      titulo: sb.titulo || sb.nome,
-      subtitulo: sb.subtitulo || undefined,
-      texto: sb.conteudo || undefined,
+      // Campo em branco que o usuario dispensou fica em branco tambem aqui: sem
+      // IA nao ha quem escrevesse, e o nome da secao nao e um titulo dele.
+      titulo: sb.semIa?.titulo ? undefined : sb.titulo || sb.nome,
+      subtitulo: sb.semIa?.subtitulo ? undefined : sb.subtitulo || undefined,
+      texto: sb.semIa?.conteudo ? undefined : sb.conteudo || undefined,
       itens: [],
       largura: sb.layout === 'banner' ? 'full' : 'boxed',
       espacamento: { topo: 88, base: 88 },

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Alca } from './Alca'
 import { CampoMidia } from './CampoMidia'
 import { CamposBotao } from './CamposBotao'
+import { EscolhaIa } from './EscolhaIa'
 import { ItensSecao } from './ItensSecao'
 import { Area, Bloco, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
 import { reordenar, useArrastar } from './arrastar'
@@ -15,6 +16,7 @@ import { SeletorLayout } from './SeletorLayout'
 import { mesclarMidiaBriefing } from '@/lib/lp/documento'
 import { infoLayout, temLados } from '@/lib/lp/layouts'
 import type {
+  CampoTextoSecao,
   LpBriefing,
   LpMidia,
   MidiaBriefing,
@@ -125,6 +127,17 @@ export function EtapaSecoes({
 
   const mudarSecao = (id: string, patch: Partial<SecaoBriefing>) =>
     aoMudar({ secoes: briefing.secoes.map((s) => (s.id === id ? { ...s, ...patch } : s)) })
+
+  /**
+   * Guarda só o "não escreva": ausência é o padrão de sempre — campo em branco
+   * é a IA quem preenche.
+   */
+  const mudarSemIa = (s: SecaoBriefing, campo: CampoTextoSecao, escrever: boolean) => {
+    const semIa = { ...s.semIa }
+    if (escrever) delete semIa[campo]
+    else semIa[campo] = true
+    mudarSecao(s.id, { semIa: Object.keys(semIa).length > 0 ? semIa : undefined })
+  }
 
   /** Patch na mídia da seção, preservando o que já existe (inclusive o arquivo). */
   const mudarMidia = (s: SecaoBriefing, patch: Partial<MidiaBriefing>) =>
@@ -322,32 +335,66 @@ export function EtapaSecoes({
                       </div>
 
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <Texto
-                          rotulo="Título"
-                          dica="opcional — a IA escreve se ficar vazio"
-                          placeholder="Ex.: O que fazemos por você"
-                          value={s.titulo}
-                          onChange={(e) => mudarSecao(s.id, { titulo: e.target.value })}
-                          maxLength={300}
-                        />
-                        <Texto
-                          rotulo="Subtítulo"
-                          dica="linha de apoio, também opcional"
-                          placeholder="Ex.: Soluções sob medida para a sua obra"
-                          value={s.subtitulo ?? ''}
-                          onChange={(e) => mudarSecao(s.id, { subtitulo: e.target.value })}
-                          maxLength={500}
-                        />
+                        <div className="space-y-2">
+                          <Texto
+                            rotulo="Título"
+                            dica="opcional"
+                            placeholder="Ex.: O que fazemos por você"
+                            value={s.titulo}
+                            onChange={(e) => mudarSecao(s.id, { titulo: e.target.value })}
+                            maxLength={300}
+                          />
+                          <EscolhaIa
+                            campo="Título"
+                            rotuloSem="Sem título"
+                            vazio={s.titulo.trim() === ''}
+                            escrever={!s.semIa?.titulo}
+                            aoMudar={(v) => mudarSemIa(s, 'titulo', v)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Texto
+                            rotulo="Subtítulo"
+                            dica="linha de apoio, também opcional"
+                            placeholder="Ex.: Soluções sob medida para a sua obra"
+                            value={s.subtitulo ?? ''}
+                            onChange={(e) => mudarSecao(s.id, { subtitulo: e.target.value })}
+                            maxLength={500}
+                          />
+                          <EscolhaIa
+                            campo="Subtítulo"
+                            rotuloSem="Sem subtítulo"
+                            vazio={(s.subtitulo ?? '').trim() === ''}
+                            escrever={!s.semIa?.subtitulo}
+                            aoMudar={(v) => mudarSemIa(s, 'subtitulo', v)}
+                          />
+                        </div>
                       </div>
 
-                      <Area
-                        rotulo="Conteúdo"
-                        dica="o que essa seção precisa comunicar"
-                        placeholder="Escreva em tópicos ou em texto corrido o que você quer dizer aqui. A IA transforma isso em copy profissional."
-                        value={s.conteudo}
-                        onChange={(e) => mudarSecao(s.id, { conteudo: e.target.value })}
-                        maxLength={3000}
-                      />
+                      <div className="space-y-2">
+                        <Area
+                          rotulo="Conteúdo"
+                          dica="o que essa seção precisa comunicar"
+                          placeholder="Escreva em tópicos ou em texto corrido o que você quer dizer aqui. A IA transforma isso em copy profissional."
+                          value={s.conteudo}
+                          onChange={(e) => mudarSecao(s.id, { conteudo: e.target.value })}
+                          maxLength={3000}
+                        />
+                        <EscolhaIa
+                          campo="Conteúdo"
+                          rotuloSem="Sem texto"
+                          vazio={s.conteudo.trim() === ''}
+                          escrever={!s.semIa?.conteudo}
+                          aoMudar={(v) => mudarSemIa(s, 'conteudo', v)}
+                        />
+                        {!s.conteudo.trim() && s.semIa?.conteudo && info.itens && (
+                          <p className="text-xs text-text-dim">
+                            A seção fica sem o parágrafo de apoio — a lista de{' '}
+                            {info.itens.rotulo.toLowerCase()} abaixo continua sendo escrita
+                            normalmente.
+                          </p>
+                        )}
+                      </div>
 
                       <div className="flex flex-wrap items-center gap-6">
                         <Marcar

@@ -429,6 +429,14 @@ export type ItemBriefing = {
   destaque?: boolean
 }
 
+/**
+ * Campos de texto da secao que a IA escreve sozinha quando o usuario deixa em
+ * branco — e que ele pode dispensar um a um (ver SecaoBriefing.semIa).
+ */
+export type CampoTextoSecao = 'titulo' | 'subtitulo' | 'conteudo'
+
+export const CAMPOS_TEXTO_SECAO: CampoTextoSecao[] = ['titulo', 'subtitulo', 'conteudo']
+
 export type SecaoBriefing = {
   id: string
   nome: string
@@ -462,6 +470,13 @@ export type SecaoBriefing = {
    * ficar em branco a IA preenche. Vazia = a IA cria os itens sozinha.
    */
   itens?: ItemBriefing[]
+  /**
+   * Campos em branco que a IA NAO deve escrever: a secao sai sem eles. Ausente
+   * = o padrao de sempre (campo vazio e a IA preenche). So vale enquanto o
+   * campo esta em branco — texto escrito pelo usuario manda em qualquer caso, e
+   * a marcacao sai do briefing na coercao.
+   */
+  semIa?: Partial<Record<CampoTextoSecao, boolean>>
 }
 
 export type ItemMenuBriefing = {

@@ -863,6 +863,99 @@ describe('título e subtítulo escritos no briefing', () => {
   })
 })
 
+describe('campo em branco que a IA não deve escrever', () => {
+  const briefingSemIa = (semIa: unknown, escrito: Record<string, string> = {}) =>
+    coergirBriefing(
+      {
+        nome: 'Felix',
+        secoes: [
+          {
+            id: 's1',
+            nome: 'Serviços',
+            layout: 'cards',
+            vincularMenu: false,
+            titulo: '',
+            subtitulo: '',
+            conteudo: '',
+            ...escrito,
+            semIa,
+          },
+          { id: 's2', nome: 'Números', layout: 'estatisticas', vincularMenu: false },
+        ],
+      },
+      'Felix',
+    )
+
+  const daIA = () =>
+    coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'cards',
+          nome: 'Serviços',
+          titulo: 'Soluções completas',
+          subtitulo: 'Do projeto à entrega',
+          texto: 'Cuidamos de cada etapa da obra.',
+          itens: [],
+        },
+        {
+          id: 's2',
+          tipo: 'estatisticas',
+          nome: 'Números',
+          titulo: 'Nossos números',
+          subtitulo: 'Feitos por quem entende',
+          texto: 'Anos de estrada.',
+          itens: [],
+        },
+      ],
+    })!
+
+  it('guarda só as marcações verdadeiras dos campos conhecidos', () => {
+    expect(briefingSemIa({ titulo: true, conteudo: true }).secoes[0].semIa).toEqual({
+      titulo: true,
+      conteudo: true,
+    })
+    expect(briefingSemIa({ titulo: false, nome: true }).secoes[0].semIa).toBeUndefined()
+    expect(briefingSemIa(undefined).secoes[0].semIa).toBeUndefined()
+  })
+
+  it('some quando o campo foi preenchido — o texto do usuário é a resposta', () => {
+    const secao = briefingSemIa(
+      { titulo: true, subtitulo: true, conteudo: true },
+      { titulo: 'O que fazemos por você' },
+    ).secoes[0]
+    expect(secao.titulo).toBe('O que fazemos por você')
+    expect(secao.semIa).toEqual({ subtitulo: true, conteudo: true })
+  })
+
+  it('apaga o que a IA escreveu assim mesmo, sem tocar nas outras seções', () => {
+    const doc = daIA()
+    aplicarTextos(doc, briefingSemIa({ titulo: true, subtitulo: true, conteudo: true }))
+    expect(doc.secoes[0].titulo).toBeUndefined()
+    expect(doc.secoes[0].subtitulo).toBeUndefined()
+    expect(doc.secoes[0].texto).toBeUndefined()
+    expect(doc.secoes[1].titulo).toBe('Nossos números')
+    expect(doc.secoes[1].subtitulo).toBe('Feitos por quem entende')
+    expect(doc.secoes[1].texto).toBe('Anos de estrada.')
+  })
+
+  it('apaga só o campo dispensado', () => {
+    const doc = daIA()
+    aplicarTextos(doc, briefingSemIa({ subtitulo: true }))
+    expect(doc.secoes[0].titulo).toBe('Soluções completas')
+    expect(doc.secoes[0].subtitulo).toBeUndefined()
+    expect(doc.secoes[0].texto).toBe('Cuidamos de cada etapa da obra.')
+  })
+
+  it('sem IA nenhuma, o título dispensado não vira o nome da seção', () => {
+    const secao = documentoBase(briefingSemIa({ titulo: true, conteudo: true })).secoes[0]
+    expect(secao.titulo).toBeUndefined()
+    expect(secao.texto).toBeUndefined()
+    // Sem marcação, o comportamento de sempre: o nome da seção vira título.
+    expect(documentoBase(briefingSemIa(undefined)).secoes[0].titulo).toBe('Serviços')
+  })
+})
+
 describe('botão da seção definido no briefing', () => {
   const botao = {
     texto: 'Peça um orçamento',
