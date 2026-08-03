@@ -81,8 +81,20 @@ type Base = {
   oculto?: PorDisp<boolean>  // "não mostrar no celular"
 }
 
+/**
+ * Identidade visual pronta de um container: vira uma classe no HTML e carrega o
+ * que `LpEstilo` não alcança — hover, transição e pseudo-elemento (o selo "Mais
+ * popular" do plano em destaque é um `::before`). Sem isso, migrar uma seção de
+ * cards produziria três colunas de texto cru, sem borda, sem fundo e sem hover.
+ * `estilo` sobrepõe por cima.
+ */
+export type Aparencia =
+  | 'card' | 'plano' | 'plano-destaque' | 'produto' | 'bloco'
+  | 'figura' | 'beneficio' | 'marco' | 'caixa-cta'
+
 export type LpContainer = Base & {
   tipo: 'container'
+  aparencia?: Aparencia
   direcao: PorDisp<'linha' | 'coluna'>
   colunas?: PorDisp<number>
   gap?: PorDisp<number>
@@ -400,17 +412,24 @@ Entram as operações de árvore: `acharNo`, `moverNo`, `inserirNo`, `removerNo`
 
 Cada uma com spec e plano próprios.
 
-| | Entrega | Visível ao usuário |
-|---|---|---|
-| 1 | Modelo + expansor + migração + `arquivosUsados` | Nada |
-| 2 | Compilador recursivo + CSS por breakpoint | Nada — a página compila igual |
-| 3 | Canvas: seleção por nó e arrastar dentro da seção | Sim |
-| 4 | Painel por widget com os três dispositivos | Sim |
-| 5 | Biblioteca de widgets e inserção | Sim |
-| 6 | IA e briefing sobre árvore | Não |
+| | Entrega | Visível ao usuário | Estado |
+|---|---|---|---|
+| 1 | Modelo + expansor + migração + `arquivosUsados` | Nada | Concluída |
+| 2 | **A virada**: compilador recursivo, migração ligada, painel por widget, remoção dos campos antigos | Sim | Em andamento |
+| 3 | Canvas: arrastar dentro da seção | Sim | |
+| 4 | Biblioteca de widgets e inserção | Sim | |
+| 5 | IA e briefing sobre árvore | Não | |
 
-Depois da entrega 2 a aplicação está inteira e funcionando, apenas sem a liberdade
-nova. É o ponto de corte seguro para avaliar antes de investir nas três de interface.
+**Por que a 2 é grande.** O plano original separava o compilador (2) do painel (4).
+Não dá: `PainelPropriedades.tsx` lê os campos tipados da seção em 22 lugares. No
+instante em que o compilador passa a renderizar a árvore, o painel continua
+escrevendo em `secao.titulo` — que ninguém mais lê. Editar um título deixaria de
+ter efeito na página, em silêncio. Não é erro de build, é o editor parando de
+funcionar. A virada do compilador e a do painel têm de ser atômicas.
+
+A Entrega 2 é construída em duas partes, na mesma branch e mergeadas juntas:
+**2a** o renderizador (compilador aceita os dois formatos, nada ligado) e **2b**
+a virada propriamente dita.
 
 ## Testes
 
