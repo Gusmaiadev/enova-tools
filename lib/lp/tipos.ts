@@ -191,6 +191,11 @@ export type ElementoTexto = 'titulo' | 'subtitulo' | 'texto'
 export type LpSecao = {
   id: string
   tipo: TipoLayout
+  /**
+   * Conteudo da secao em arvore. Opcional enquanto o compilador nao renderiza
+   * arvore (Entrega 2): documento salvo hoje nao tem, e o expansor produz.
+   */
+  raiz?: LpContainer
   /** Nome interno (aparece no painel de estrutura e vira ancora). */
   nome: string
   /** Slug da ancora para navegacao pelo menu (null = fora do menu). */
@@ -225,6 +230,97 @@ export type LpSecao = {
   /** Endpoint que recebe o formulario (layout formulario). Vazio = sem envio. */
   destinoForm?: string
 }
+
+/* ------------------------------- Arvore ---------------------------------- */
+
+export type Dispositivo = 'desktop' | 'tablet' | 'celular'
+
+/**
+ * Valor de estilo por dispositivo. `desktop` e a base (sem media query); tablet
+ * e celular so emitem CSS quando presentes. A heranca sai da cascata: sendo
+ * max-width, numa tela de 500px os dois blocos valem e o de 640 vence por vir
+ * depois — celular herda de tablet, que herda de desktop.
+ */
+export type PorDisp<T> = Partial<Record<Dispositivo, T>>
+
+export type Caixa = { topo: number; direita: number; base: number; esquerda: number }
+
+/** Sobreposicoes visuais de um no. Ausente = herda do tema. */
+export type LpEstilo = {
+  cor?: PorDisp<string>
+  fundo?: PorDisp<string>
+  fonte?: PorDisp<string>
+  tamanho?: PorDisp<string>
+  peso?: PorDisp<number>
+  alturaLinha?: PorDisp<string>
+  espacamentoLetras?: PorDisp<string>
+  alinhamento?: PorDisp<'left' | 'center' | 'right'>
+  margem?: PorDisp<Caixa>
+  padding?: PorDisp<Caixa>
+  largura?: PorDisp<string>
+  raio?: PorDisp<number>
+  sombra?: PorDisp<string>
+}
+
+/** Comum a todo no da arvore. */
+type NoBase = {
+  id: string
+  estilo?: LpEstilo
+  /** Esconde o no no dispositivo marcado. */
+  oculto?: PorDisp<boolean>
+}
+
+export type LpContainer = NoBase & {
+  tipo: 'container'
+  direcao: PorDisp<'linha' | 'coluna'>
+  colunas?: PorDisp<number>
+  gap?: PorDisp<number>
+  alinhar?: PorDisp<'inicio' | 'centro' | 'fim' | 'esticar'>
+  justificar?: PorDisp<'inicio' | 'centro' | 'fim' | 'entre'>
+  filhos: LpElemento[]
+}
+
+export type LpWidget = NoBase &
+  (
+    | { tipo: 'titulo'; nivel: 'h1' | 'h2' | 'h3' | 'h4'; texto: string }
+    /** `papel` escolhe a categoria de tipografia do tema (subtitulos/textos). */
+    | { tipo: 'texto'; papel: 'subtitulo' | 'corpo'; texto: string }
+    | { tipo: 'imagem'; midia: LpMidia }
+    | { tipo: 'video'; midia: LpMidia }
+    | { tipo: 'botao'; botao: LpBotao }
+    | { tipo: 'icone'; nome: string }
+    | { tipo: 'numero'; valor: string; rotulo: string }
+    | { tipo: 'lista'; itens: { id: string; icone?: string; texto: string }[] }
+    | { tipo: 'espacador'; altura: PorDisp<number> }
+    | { tipo: 'divisor' }
+    | { tipo: 'faq'; perguntas: { id: string; pergunta: string; resposta: string }[] }
+    | {
+        tipo: 'abas'
+        abas: { id: string; titulo: string; texto: string; imagem?: LpMidia | null }[]
+      }
+    | {
+        tipo: 'carrossel'
+        slides: { id: string; imagem?: LpMidia | null; titulo?: string; texto?: string }[]
+      }
+    | {
+        tipo: 'depoimentos'
+        depoimentos: {
+          id: string
+          texto: string
+          nome: string
+          cargo?: string
+          foto?: LpMidia | null
+        }[]
+      }
+    | {
+        tipo: 'comparacao'
+        rotulos: string[]
+        colunas: { id: string; titulo: string; celulas: string[]; destaque?: boolean }[]
+      }
+    | { tipo: 'formulario'; destino?: string }
+  )
+
+export type LpElemento = LpContainer | LpWidget
 
 export type CategoriaTexto = 'titulos' | 'subtitulos' | 'textos' | 'botoes'
 
@@ -385,6 +481,8 @@ export type PaginaLegal = {
 }
 
 export type LpDocumento = {
+  /** Ausente = formato de secoes tipadas (pre-arvore). */
+  versao?: 2
   seo: { titulo: string; descricao: string }
   tema: LpTema
   header: LpHeader
