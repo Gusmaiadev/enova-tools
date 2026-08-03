@@ -582,7 +582,9 @@ export function EditorLp({
               <PainelEstrutura
                 doc={doc}
                 selecionadoId={secaoId}
+                noSelecionadoId={noId}
                 aoSelecionar={selecionarSecao}
+                aoSelecionarNo={selecionarNo}
                 aoMover={(de, para) =>
                   definirDoc(
                     alterarDoc(docRef.current, (d) => {
