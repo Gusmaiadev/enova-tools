@@ -4,13 +4,25 @@
  * Puro — roda no client (editor ao vivo) e no server (geracao/export).
  */
 
+import { paginasGeradas } from '../documento'
 import { urlGoogleFonts } from '../fontes'
 import { CSS_EDITOR, EDITOR_RUNTIME } from '../editorRuntime'
-import type { LpDocumento } from '../tipos'
+import type { LpDocumento, PaginaLegal } from '../tipos'
+import { infoPagina } from '../tipos'
 import { esc } from '../util'
 import { compilarCss } from './css'
-import { compilarCorpo, type MidiaColetada } from './html'
+import { compilarCorpo, compilarCorpoPagina, type MidiaColetada } from './html'
 import { compilarJs } from './js'
+
+/** Pagina auxiliar compilada (termos.html, privacidade.html). */
+export type PaginaCompilada = {
+  arquivo: string
+  titulo: string
+  /** Versao com <link href="style.css"> — divide a folha com o index. */
+  html: string
+  /** Versao com CSS e JS embutidos, para o export de arquivo unico. */
+  unico: string
+}
 
 export type Compilado = {
   /** index.html com <link href="style.css"> e <script src="script.js">. */
@@ -20,6 +32,8 @@ export type Compilado = {
   /** Pagina completa em um unico arquivo (CSS e JS inline). */
   unico: string
   midias: MidiaColetada[]
+  /** Termos de uso / politica de privacidade, quando o projeto tem. */
+  paginas: PaginaCompilada[]
 }
 
 export type OpcoesCompilar = {
@@ -36,6 +50,11 @@ function fontesUsadas(doc: LpDocumento): string[] {
     for (const a of Object.values(s.ajustes ?? {})) {
       if (a?.fonte) familias.push(a.fonte)
     }
+  }
+  // Fonte propria do menu do header/rodape — sem isso a familia nao e carregada
+  // e a barra cai no fallback generico.
+  for (const estilo of [doc.header.estilo, doc.footer.estilo]) {
+    if (estilo?.menu?.fonte) familias.push(estilo.menu.fonte)
   }
   return [...new Set(familias)]
 }
@@ -55,6 +74,18 @@ function cabecalho(doc: LpDocumento, opcoes: OpcoesCompilar): string {
 <meta property="og:description" content="${esc(doc.seo.descricao)}">
 <meta property="og:type" content="website">
 ${fontes}`
+}
+
+/**
+ * Head de uma pagina auxiliar: titulo proprio ("Termos de Uso — Marca") e
+ * noindex — o que o Google deve ranquear e a landing page, nao os termos.
+ */
+function cabecalhoPagina(doc: LpDocumento, p: PaginaLegal, opcoes: OpcoesCompilar): string {
+  const titulo = `${p.titulo} — ${doc.header.logoTexto || doc.seo.titulo}`
+  return cabecalho(doc, opcoes)
+    .replace(/<title>[^<]*<\/title>/, `<title>${esc(titulo)}</title>`)
+    .replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${esc(titulo)}">`)
+    .replace('<meta name="description"', '<meta name="robots" content="noindex">\n<meta name="description"')
 }
 
 function pagina(head: string, corpo: string): string {
@@ -88,7 +119,26 @@ export function compilar(doc: LpDocumento, opcoes: OpcoesCompilar = {}): Compila
     `${head}\n<style>\n${css}</style>`,
     `${corpo}\n<script>\n${js}</script>`,
   )
-  return { html, css, js, unico, midias }
+
+  // Paginas de texto: mesmo CSS e mesmo script (menu do header), so o corpo muda.
+  const paginas: PaginaCompilada[] = paginasGeradas(doc).map((p) => {
+    const saida = compilarCorpoPagina(doc, p, { modo: 'export', urlLocal: opcoes.urlLocal })
+    for (const m of saida.midias) {
+      if (!midias.some((x) => x.url === m.url)) midias.push(m)
+    }
+    const cabeca = `${cabecalhoPagina(doc, p, opcoes)}`
+    return {
+      arquivo: infoPagina(p.tipo).arquivo,
+      titulo: p.titulo,
+      html: pagina(
+        `${cabeca}\n<link rel="stylesheet" href="style.css">`,
+        `${saida.corpo}\n<script src="script.js"></script>`,
+      ),
+      unico: pagina(`${cabeca}\n<style>\n${css}</style>`, `${saida.corpo}\n<script>\n${js}</script>`),
+    }
+  })
+
+  return { html, css, js, unico, midias, paginas }
 }
 
 /** Compila a pagina do canvas do editor (marcas data-lp + runtime de edicao). */

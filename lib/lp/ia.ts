@@ -18,7 +18,7 @@ import 'server-only'
 
 import { NOMES_ICONES } from './icones'
 import { FONTES_GOOGLE } from './fontes'
-import { infoLayout } from './layouts'
+import { PERIODOS_PRECO, infoLayout } from './layouts'
 import type { LpBriefing, LpDocumento, TipoLayout } from './tipos'
 import { ROTULO_REDE } from './tipos'
 import type { ResumoReferencia } from './referencias'
@@ -99,7 +99,11 @@ const GROQ: Provedor = {
           // O prompt exige JSON e contém a palavra "JSON" (requisito do json_object).
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.85,
-          max_tokens: 8192,
+          // O Groq cobra do limite por minuto o prompt MAIS este teto de saída,
+          // reservado antes de gerar. No plano gratuito são 12.000 TPM: com
+          // 8192 aqui, qualquer briefing acima de ~3.800 tokens levava 413.
+          // 6000 cabe uma página de 6 seções com folga e deixa ~6.000 de prompt.
+          max_tokens: 6000,
           response_format: { type: 'json_object' },
         }),
         signal: AbortSignal.timeout(120000),
@@ -139,6 +143,28 @@ export function temIA(): boolean {
   return GROQ.temChave() || GEMINI.temChave()
 }
 
+/**
+ * O que os campos genéricos do item significam em cada layout — sem isto a IA
+ * tem de adivinhar o que é "extra" num card e escreve qualquer coisa ali.
+ */
+const SENTIDO_ITEM: Partial<
+  Record<TipoLayout, Partial<Record<'titulo' | 'extra' | 'detalhe', string>>>
+> = {
+  cards: { extra: 'subtítulo curto do card' },
+  estatisticas: { extra: 'o número, ex.: "+500"', titulo: 'o que o número significa' },
+  precos: {
+    extra: 'preço',
+    // O campo virou select no assistente e no editor: fora dessa lista, o valor
+    // aparece como "personalizado" e o usuário tem de arrumar na mão.
+    detalhe: `período — use exatamente um destes: ${PERIODOS_PRECO.filter((p) => p.valor !== '')
+      .map((p) => `"${p.valor}"`)
+      .join(', ')}`,
+  },
+  'grid-produtos': { extra: 'preço' },
+  timeline: { extra: 'data' },
+  depoimentos: { extra: 'nome do cliente', detalhe: 'cargo ou empresa' },
+}
+
 /** Guia de campos por layout, derivado do catálogo (nunca sai de sincronia). */
 function guiaLayouts(tipos: TipoLayout[]): string {
   return [...new Set(tipos)]
@@ -150,9 +176,16 @@ function guiaLayouts(tipos: TipoLayout[]): string {
       if (info.campos.botao) campos.push('botao?{texto,url}')
       if (info.campos.midia) campos.push('midia?{busca,tipo,orientacao}')
       if (info.temColunas) campos.push('colunas(2|3|4)')
+      const sentido = SENTIDO_ITEM[tipo] ?? {}
       const itens = info.itens
         ? ` | itens[]: { ${info.itens.campos
-            .map((c) => (c === 'imagem' ? 'imagem{busca,tipo,orientacao}' : c === 'botao' ? 'botao{texto,url}' : c))
+            .map((c) => {
+              if (c === 'imagem') return 'imagem{busca,tipo,orientacao}'
+              if (c === 'botao') return 'botao{texto,url}'
+              const explica =
+                c === 'titulo' || c === 'extra' || c === 'detalhe' ? sentido[c] : undefined
+              return explica ? `${c} (${explica})` : c
+            })
             .join(', ')} }`
         : ' | sem itens'
       return `- ${tipo} (${info.rotulo}): ${campos.join(', ')}${itens}\n  ${info.descricao}`
@@ -194,7 +227,8 @@ function blocoBriefing(briefing: LpBriefing): string {
     f.textoInstitucional && `texto institucional: ${f.textoInstitucional}`,
     f.direitos && `direitos: ${f.direitos}`,
     f.endereco && `endereço: ${f.endereco}`,
-    f.telefones && `telefones: ${f.telefones}`,
+    f.telefones.length > 0 &&
+      `telefones: ${f.telefones.map((t) => (t.whatsapp ? `${t.numero} (WhatsApp)` : t.numero)).join(', ')}`,
     f.email && `e-mail: ${f.email}`,
     f.linksUteis.length > 0 && `links úteis: ${f.linksUteis.map((l) => `${l.rotulo} -> ${l.url}`).join(', ')}`,
     f.menuSecundario && 'repetir o menu principal no rodapé',
@@ -207,14 +241,28 @@ function blocoBriefing(briefing: LpBriefing): string {
 function blocoSecoes(briefing: LpBriefing): string {
   return briefing.secoes
     .map((s, i) => {
+      const itemMenu = briefing.menu.find((m) => m.id === s.itemMenu)?.rotulo
       const partes = [
         `${i + 1}. id="${s.id}" | layout=${s.layout} | nome="${s.nome}"`,
-        s.vincularMenu ? '   aparece no menu (gere uma âncora)' : '   fora do menu (ancora = null)',
-        s.titulo && `   título sugerido: ${s.titulo}`,
+        s.vincularMenu
+          ? `   aparece no menu${itemMenu ? ` como "${itemMenu}"` : ''} (gere uma âncora)`
+          : '   fora do menu (ancora = null)',
+        s.titulo && `   título (escrito pelo usuário, use como está): ${s.titulo}`,
+        s.subtitulo && `   subtítulo (escrito pelo usuário, use como está): ${s.subtitulo}`,
         s.conteudo && `   o que dizer: ${s.conteudo}`,
         s.colunas && `   colunas: ${s.colunas}`,
+        s.botao &&
+          `   botão: o usuário JÁ DEFINIU ("${s.botao.texto}" -> ${s.botao.url}) — não gere o campo "botao" nesta seção`,
+        s.itens &&
+          s.itens.length > 0 &&
+          `   itens escritos pelo usuário (gere EXATAMENTE ${s.itens.length}, nesta ordem, mantendo o que ele escreveu e completando o resto): ${s.itens
+            .map(
+              (it, n) =>
+                `${n + 1}) ${[it.titulo, it.extra, it.detalhe, it.texto].filter(Boolean).join(' | ') || '(em branco — escreva você)'}`,
+            )
+            .join('; ')}`,
         s.midia?.arquivo
-          ? `   mídia: o usuário JÁ ENVIOU o arquivo (${s.midia.tipo}) — não gere o campo "midia" nesta seção`
+          ? `   mídia: o usuário JÁ ESCOLHEU a mídia (${s.midia.tipo}) — não gere o campo "midia" nesta seção`
           : s.midia?.busca &&
             `   mídia pedida: ${s.midia.tipo} ${s.midia.orientacao} — "${s.midia.busca}"`,
       ].filter(Boolean)
@@ -274,7 +322,7 @@ REGRAS DE MÍDIA
 - Descreva o que a CÂMERA vê, não o conceito. "dentist examining patient" acha foto; "excelência em odontologia" não acha nada.
 - "alt": descrição em português do que aparece na imagem.
 - Respeite o tipo e a orientação pedidos no briefing. Se a seção pede mídia e o briefing não descreveu, crie uma busca coerente com o assunto.
-- Seção marcada como "o usuário JÁ ENVIOU o arquivo": omita o campo "midia" dela. O sistema coloca o arquivo enviado no lugar; qualquer busca que você escrever ali seria descartada.
+- Seção marcada como "o usuário JÁ ESCOLHEU a mídia" (arquivo dele ou foto do banco): omita o campo "midia" dela. O sistema coloca a mídia escolhida no lugar; qualquer busca que você escrever ali seria descartada.
 
 FORMATO DA RESPOSTA
 Responda SOMENTE com um objeto JSON válido (sem markdown, sem comentários) neste formato:
@@ -290,14 +338,15 @@ Responda SOMENTE com um objeto JSON válido (sem markdown, sem comentários) nes
     "cores": { "principal": "#2563eb", "secundaria": "#7c3aed", "titulos": "#0f172a", "subtitulos": "#334155", "textos": "#475569", "botoes": "#ffffff", "fundoBotoes": "#2563eb", "header": "#ffffff", "footer": "#0f172a", "fundoPagina": "#ffffff" },
     "raio": 12
   },
-  "header": { "logoTexto": "Nome da marca", "menu": [{ "rotulo": "Home", "alvo": "#topo" }], "fixo": true, "botao": { "texto": "Fale conosco", "url": "#contato" } },
+  "header": { "logoTexto": "Nome da marca", "menu": [{ "rotulo": "Home", "alvo": "#topo" }], "fixo": true, "botoes": [{ "texto": "Fale conosco", "url": "#contato" }] },
   "secoes": [
     { "id": "id-do-briefing", "tipo": "hero", "nome": "Início", "ancora": "inicio", "titulo": "...", "subtitulo": "...", "texto": "...", "botao": { "texto": "...", "url": "#contato" }, "midia": { "busca": "modern office team", "tipo": "imagem", "orientacao": "paisagem", "alt": "Equipe reunida em escritório moderno" }, "itens": [], "largura": "boxed", "espacamento": { "topo": 96, "base": 96 }, "fundo": { "escurecer": 55 } }
   ],
-  "footer": { "textoInstitucional": "...", "direitos": "© 2026 Marca. Todos os direitos reservados.", "endereco": "...", "telefones": "...", "email": "...", "linksUteis": [{ "rotulo": "...", "url": "#..." }], "menuSecundario": false },
+  "footer": { "textoInstitucional": "...", "direitos": "© 2026 Marca. Todos os direitos reservados.", "endereco": "...", "telefones": [{ "numero": "(11) 99999-9999", "whatsapp": true }], "email": "...", "linksUteis": [{ "rotulo": "...", "url": "#..." }], "botoes": [{ "texto": "Fale conosco", "url": "#contato" }], "menuSecundario": false },
   "redes": [{ "rede": "instagram", "url": "https://..." }]
 }
-Todas as seções do briefing devem aparecer em "secoes", com o mesmo "id" e o mesmo "tipo".`
+Todas as seções do briefing devem aparecer em "secoes", com o mesmo "id" e o mesmo "tipo".
+Não escreva links de "Termos de Uso" nem de "Política de Privacidade" em "linksUteis": quando essas páginas existem, o sistema as gera e coloca o link no rodapé sozinho.`
 }
 
 /** Extrai o JSON da resposta tolerando cercas de markdown e texto ao redor. */
@@ -316,9 +365,16 @@ const MAX_TENTATIVAS = 3
 
 const esperar = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-/** Segundos de espera sugeridos pelo Gemini no corpo do 429 (RetryInfo). */
+/**
+ * Segundos de espera que o provedor sugere no corpo do 429: o Gemini manda em
+ * `retryDelay` (RetryInfo), o Groq escreve "try again in 20.5s". Sem ler isso, a
+ * espera exponencial de 2s e 4s cai dentro da mesma janela de um minuto do
+ * limite por minuto do Groq — as três tentativas falham pelo mesmo motivo.
+ */
 function segundosRetry(detalhe: string): number | null {
-  const m = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(detalhe)
+  const m =
+    /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(detalhe) ??
+    /try again in (\d+(?:\.\d+)?)s/i.exec(detalhe)
   return m ? Math.ceil(Number(m[1])) : null
 }
 

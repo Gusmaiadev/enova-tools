@@ -1,17 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import { coergirBriefing, coergirDocumento, coergirDocumentoIA } from './validar'
 import { briefingVazio } from './tipos'
+import type { LpDocumento } from './tipos'
 import { orientacaoDe, recusar } from './formatos'
 import {
   aplicarArquivos,
+  aplicarBotoes,
+  aplicarEstiloBarras,
+  aplicarItens,
+  aplicarLados,
+  aplicarMenu,
+  aplicarPaginas,
+  aplicarTextos,
   aplicarTexto,
   arquivosUsados,
   documentoBase,
+  garantirAncora,
+  mesclarMidiaBriefing,
+  paginasGeradas,
+  TEMA_PADRAO,
   duplicarSecao,
   moverSecao,
   removerSecao,
+  sincronizarLinksPaginas,
 } from './documento'
-import { novaSecao } from './layouts'
+import { novaSecao, novoItem, periodoPreco, rotuloItem } from './layouts'
 import { gerarZip } from './zip'
 
 /** Resposta plausível da IA, com sujeira típica de LLM. */
@@ -129,6 +142,104 @@ describe('coergirDocumento', () => {
     expect(doc?.tema.cores.principal).toBe('#ff00ff')
     expect(doc?.tema.tipografia.titulos.fonte).toBe('Poppins')
   })
+
+  it('os telefones do briefing (com o WhatsApp marcado) vencem os da IA', () => {
+    const base = briefingVazio('Clínica Vida')
+    const briefing = {
+      ...base,
+      footer: {
+        ...base.footer,
+        telefones: [{ id: 't1', numero: '(11) 99999-9999', whatsapp: true }],
+      },
+    }
+    // A IA reescreveu o número e esqueceu o "whatsapp".
+    const bruto = {
+      ...respostaIA,
+      footer: { telefones: [{ numero: '11 99999-9999' }], linksUteis: [] },
+    }
+    const doc = coergirDocumentoIA(bruto, briefing)
+    expect(doc?.footer.telefones).toEqual([
+      { id: 't1', numero: '(11) 99999-9999', whatsapp: true },
+    ])
+  })
+
+  it('limpa os ajustes de header e rodapé', () => {
+    const doc = coergirDocumento({
+      ...respostaIA,
+      header: {
+        logoTexto: 'Clínica',
+        estilo: {
+          menu: { fonte: 'Fonte Inventada', tamanho: '18px', cor: 'javascript:alert(1)' },
+          // Logo gigante empurraria o menu para fora da barra.
+          logo: 900,
+          alinhamento: 'diagonal',
+        },
+      },
+      footer: { linksUteis: [], estilo: { logo: 28, alinhamento: 'centro' } },
+    })
+    expect(doc?.header.estilo?.logo).toBe(160)
+    expect(doc?.header.estilo?.alinhamento).toBeUndefined()
+    expect(doc?.header.estilo?.menu?.fonte).toBeUndefined()
+    expect(doc?.header.estilo?.menu?.tamanho).toBe('18px')
+    expect(doc?.header.estilo?.menu?.cor).not.toContain('javascript')
+    expect(doc?.footer.estilo).toEqual({ logo: 28, alinhamento: 'centro' })
+  })
+
+  it('barra sem ajuste nenhum não guarda objeto vazio', () => {
+    const doc = coergirDocumento({ ...respostaIA, header: { logoTexto: 'X', estilo: {} } })
+    expect(doc?.header.estilo).toBeUndefined()
+  })
+
+  it('aceita o botão único antigo do header e transforma em lista', () => {
+    const doc = coergirDocumento({
+      ...respostaIA,
+      header: { logoTexto: 'Clínica', botao: { texto: 'Agendar', url: '#contato' } },
+    })
+    expect(doc?.header.botoes).toEqual([
+      { id: expect.any(String), texto: 'Agendar', url: '#contato' },
+    ])
+  })
+
+  it('limpa os botões de header e rodapé e limita a quantidade', () => {
+    const doc = coergirDocumento({
+      ...respostaIA,
+      header: {
+        logoTexto: 'Clínica',
+        botoes: [
+          { id: '" onclick=x', texto: 'Agendar', url: '#contato', estilo: 'neon' },
+          { url: '#sem-texto' },
+        ],
+      },
+      footer: {
+        linksUteis: [],
+        botoes: Array.from({ length: 7 }, (_, i) => ({ texto: `B${i}`, url: '#' })),
+      },
+    })
+    // Botão sem texto sai; o id vira data-lp, então só [A-Za-z0-9_-].
+    expect(doc?.header.botoes).toHaveLength(1)
+    expect(doc?.header.botoes[0].id).toBe('onclickx')
+    expect(doc?.header.botoes[0].estilo).toBeUndefined()
+    expect(doc?.footer.botoes).toHaveLength(4)
+  })
+
+  it('aceita telefones em lista e no formato antigo (string única)', () => {
+    const emLista = coergirDocumento({
+      ...respostaIA,
+      footer: { telefones: [{ numero: '(11) 99999-9999', whatsapp: true }], linksUteis: [] },
+    })
+    expect(emLista?.footer.telefones).toEqual([
+      { id: expect.any(String), numero: '(11) 99999-9999', whatsapp: true },
+    ])
+
+    const antigo = coergirDocumento({
+      ...respostaIA,
+      footer: { telefones: '(11) 3333-4444 / (11) 99999-9999', linksUteis: [] },
+    })
+    expect(antigo?.footer.telefones?.map((t) => t.numero)).toEqual([
+      '(11) 3333-4444',
+      '(11) 99999-9999',
+    ])
+  })
 })
 
 describe('coergirBriefing', () => {
@@ -166,7 +277,7 @@ describe('coergirBriefing', () => {
   })
 })
 
-describe('mídia enviada pelo usuário', () => {
+describe('mídia definida pelo usuário (arquivo ou banco)', () => {
   /** Como a mídia volta de POST /api/lp/upload. */
   const enviada = {
     tipo: 'imagem',
@@ -235,6 +346,112 @@ describe('mídia enviada pelo usuário', () => {
     expect(doc.secoes[0].midia?.url).toBe(enviada.url)
   })
 
+  /** Como a mídia volta do seletor quando escolhida no Pexels/Pixabay. */
+  const doBanco = {
+    tipo: 'imagem',
+    url: 'https://images.pexels.com/photos/1/foto.jpg',
+    thumb: 'https://images.pexels.com/photos/1/mini.jpg',
+    alt: 'Team meeting',
+    busca: 'equipe reunida',
+    orientacao: 'paisagem',
+    autor: 'Fulano de Tal',
+    fonte: 'pexels',
+    largura: 1920,
+    altura: 1080,
+  }
+
+  const briefingGaleria = (arquivo: unknown) =>
+    coergirBriefing(
+      {
+        nome: 'P',
+        secoes: [
+          {
+            id: 's1',
+            nome: 'Trabalhos',
+            layout: 'galeria',
+            vincularMenu: true,
+            midia: { busca: 'obras entregues', tipo: 'imagem', orientacao: 'paisagem', arquivo },
+          },
+        ],
+      },
+      'P',
+    )
+
+  it('guarda a mídia escolhida no banco com miniatura e crédito, sem caminho', () => {
+    const midia = briefingCom(doBanco, 'equipe reunida').secoes[0].midia
+    expect(midia?.arquivo?.url).toBe(doBanco.url)
+    expect(midia?.arquivo?.thumb).toBe(doBanco.thumb)
+    expect(midia?.arquivo?.fonte).toBe('pexels')
+    expect(midia?.arquivo?.autor).toBe('Fulano de Tal')
+    expect(midia?.arquivo?.caminho).toBeUndefined()
+  })
+
+  it('mídia do banco vence a busca da IA e não deixa nada no bucket', () => {
+    const briefing = briefingCom(doBanco, 'equipe reunida')
+    const documento = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'hero',
+          nome: 'Início',
+          itens: [],
+          midia: { busca: 'stock photo', tipo: 'imagem', orientacao: 'paisagem' },
+        },
+      ],
+    })!
+    expect(aplicarArquivos(documento, briefing)).toEqual({ aplicadas: 1, perdidas: 0 })
+    expect(documento.secoes[0].midia?.url).toBe(doBanco.url)
+    expect(documento.secoes[0].midia?.alt).toBe('equipe reunida')
+    expect(arquivosUsados({ documento, briefing }).size).toBe(0)
+  })
+
+  it('vai para o fundo quando a IA montou o hero com imagem de fundo', () => {
+    const briefing = briefingCom(doBanco, 'equipe reunida')
+    const doc = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'hero',
+          nome: 'Início',
+          itens: [],
+          fundo: { midia: { busca: 'stock photo', tipo: 'imagem', orientacao: 'paisagem' } },
+        },
+      ],
+    })!
+    aplicarArquivos(doc, briefing)
+    expect(doc.secoes[0].fundo?.midia?.url).toBe(doBanco.url)
+    expect(doc.secoes[0].midia).toBeUndefined()
+  })
+
+  it('em layout só com imagem por item, entra como a imagem do primeiro item', () => {
+    const briefing = briefingGaleria(doBanco)
+    const doc = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'galeria',
+          nome: 'Trabalhos',
+          itens: [
+            { id: 'i1', imagem: { busca: 'gallery photo', tipo: 'imagem', orientacao: 'paisagem' } },
+            { id: 'i2', imagem: { busca: 'outra foto', tipo: 'imagem', orientacao: 'paisagem' } },
+          ],
+        },
+      ],
+    })!
+    expect(aplicarArquivos(doc, briefing)).toEqual({ aplicadas: 1, perdidas: 0 })
+    expect(doc.secoes[0].itens[0].imagem?.url).toBe(doBanco.url)
+    // A seção não ganha mídia solta: o layout de galeria não renderiza isso.
+    expect(doc.secoes[0].midia).toBeUndefined()
+    expect(doc.secoes[0].itens[1].imagem?.url).not.toBe(doBanco.url)
+  })
+
+  it('documentoBase também põe a mídia da galeria no primeiro item', () => {
+    const secao = documentoBase(briefingGaleria(enviada)).secoes[0]
+    expect(secao.itens[0].imagem?.url).toBe(enviada.url)
+    expect(secao.itens[1].imagem?.url).not.toBe(enviada.url)
+    expect(secao.midia).toBeUndefined()
+  })
+
   it('casa pela posição quando a IA trocou o id, e só se o layout confere', () => {
     const briefing = briefingCom(enviada)
     const doc = coergirDocumento({
@@ -292,12 +509,796 @@ describe('mídia enviada pelo usuário', () => {
   })
 })
 
+describe('itens escritos no briefing', () => {
+  const briefingCards = (itens: unknown) =>
+    coergirBriefing(
+      {
+        nome: 'Felix',
+        secoes: [
+          { id: 's1', nome: 'Serviços', layout: 'cards', vincularMenu: false, itens },
+        ],
+      },
+      'Felix',
+    )
+
+  const cards = [
+    {
+      id: 'i1',
+      titulo: 'Reforma completa',
+      extra: 'a partir de 30 dias',
+      texto: 'Do projeto à entrega.',
+      botao: { texto: 'Quero esta', url: '#contato' },
+    },
+    { id: 'i2', titulo: 'Manutenção predial' },
+  ]
+
+  it('guarda o que foi escrito e mantém o item em branco como pedido à IA', () => {
+    // O item vazio é o usuário pedindo mais um card para a IA escrever — a tela
+    // promete isso ("o que deixar em branco a IA preenche"). Descartá-lo aqui
+    // encolhia a seção: o prompt pede o número de itens que o briefing tem.
+    const secao = briefingCards([...cards, { id: 'i3' }, { id: 'i4', titulo: '   ' }]).secoes[0]
+    expect(secao.itens).toHaveLength(4)
+    expect(secao.itens?.[0].extra).toBe('a partir de 30 dias')
+    expect(secao.itens?.[0].botao?.texto).toBe('Quero esta')
+    expect(secao.itens?.[1].titulo).toBe('Manutenção predial')
+    // Em branco é em branco: nada de string vazia herdada do campo do formulário.
+    expect(secao.itens?.[2].titulo).toBeUndefined()
+    expect(secao.itens?.[3].titulo).toBeUndefined()
+  })
+
+  it('item em branco que a IA não escreveu sai da página em vez de virar card vazio', () => {
+    const briefing = briefingCards([...cards, { id: 'i3' }])
+    const doc = coergirDocumento(
+      {
+        secoes: [
+          {
+            id: 's1',
+            tipo: 'cards',
+            nome: 'Serviços',
+            itens: [{ id: 'a' }, { id: 'b' }],
+          },
+        ],
+      },
+      TEMA_PADRAO,
+    ) as LpDocumento
+    const vazios = aplicarItens(doc, briefing)
+    expect(doc.secoes[0].itens).toHaveLength(2)
+    expect(vazios).toBe(1)
+  })
+
+  it('a lista do usuário define quais e quantos; a IA preenche os buracos', () => {
+    const briefing = briefingCards(cards)
+    const doc = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'cards',
+          nome: 'Serviços',
+          itens: [
+            { id: 'a', icone: 'check', titulo: 'Outro título', texto: 'Texto da IA um' },
+            { id: 'b', icone: 'estrela', titulo: 'Mais um', texto: 'Texto da IA dois' },
+            { id: 'c', icone: 'check', titulo: 'Sobrando', texto: 'Texto da IA três' },
+          ],
+        },
+      ],
+    })!
+    aplicarItens(doc, briefing)
+
+    const itens = doc.secoes[0].itens
+    expect(itens).toHaveLength(2)
+    expect(itens[0].titulo).toBe('Reforma completa')
+    expect(itens[0].extra).toBe('a partir de 30 dias')
+    expect(itens[0].botao?.texto).toBe('Quero esta')
+    // Deixou em branco: fica o texto que a IA escreveu para a mesma posição.
+    expect(itens[1].titulo).toBe('Manutenção predial')
+    expect(itens[1].texto).toBe('Texto da IA dois')
+    // Ícone nunca vem do briefing: segue o da IA.
+    expect(itens[1].icone).toBe('estrela')
+  })
+
+  it('documentoBase monta a lista do usuário mesmo sem IA', () => {
+    const secao = documentoBase(briefingCards(cards)).secoes[0]
+    expect(secao.itens).toHaveLength(2)
+    expect(secao.itens[0].titulo).toBe('Reforma completa')
+    expect(secao.itens[0].icone).toBe('check')
+    // Sem itens no briefing continuam os três de exemplo.
+    expect(documentoBase(briefingCards([])).secoes[0].itens).toHaveLength(3)
+  })
+
+  it('big numbers: os números escritos no briefing viram os itens da seção', () => {
+    const briefing = coergirBriefing(
+      {
+        nome: 'Felix',
+        secoes: [
+          {
+            id: 's1',
+            nome: 'Números',
+            layout: 'estatisticas',
+            vincularMenu: false,
+            titulo: 'Nossos números',
+            subtitulo: 'Vinte anos construindo',
+            conteudo: 'Cada número aqui é obra entregue.',
+            itens: [
+              { id: 'n1', extra: '+500', titulo: 'Obras entregues' },
+              { id: 'n2', extra: '20 anos', titulo: 'De mercado' },
+            ],
+          },
+        ],
+      },
+      'Felix',
+    )
+    const secao = documentoBase(briefing).secoes[0]
+    expect(secao.titulo).toBe('Nossos números')
+    expect(secao.subtitulo).toBe('Vinte anos construindo')
+    expect(secao.texto).toBe('Cada número aqui é obra entregue.')
+    expect(secao.itens.map((i) => [i.extra, i.titulo])).toEqual([
+      ['+500', 'Obras entregues'],
+      ['20 anos', 'De mercado'],
+    ])
+  })
+
+  it('encaixa o período do plano no catálogo do select', () => {
+    expect(periodoPreco('/mês')).toBe('/mês')
+    expect(periodoPreco('/mes')).toBe('/mês')
+    expect(periodoPreco('por mês')).toBe('/mês')
+    expect(periodoPreco('Mensal')).toBe('/mês')
+    expect(periodoPreco('/ANO')).toBe('/ano')
+    expect(periodoPreco('semestral')).toBe('/semestre')
+    // "trimestre" e "semestre" contêm "mes": encaixar por pedaço viraria mensal
+    // — trocar o período de um plano é mudar o preço dele.
+    expect(periodoPreco('/trimestre')).toBe('/trimestre')
+    expect(periodoPreco('trimestral')).toBe('/trimestre')
+  })
+
+  it('não chuta período fora do catálogo', () => {
+    expect(periodoPreco('quinzenal')).toBeNull()
+    expect(periodoPreco('por 30 dias')).toBeNull()
+    expect(periodoPreco('')).toBeNull()
+  })
+
+  it('o período que a IA escreveu à mão vira a opção do select', () => {
+    const doc = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'precos',
+          nome: 'Planos',
+          itens: [
+            { id: 'p1', titulo: 'Básico', extra: 'R$ 99', detalhe: 'por mês' },
+            // Fora do catálogo: continua como veio, e o select mostra como
+            // "personalizado" em vez de trocar o período sozinho.
+            { id: 'p2', titulo: 'Sazonal', extra: 'R$ 290', detalhe: 'por 30 dias' },
+          ],
+        },
+        // Fora do Pricing Table, `detalhe` é texto livre (cargo, empresa…).
+        {
+          id: 's2',
+          tipo: 'depoimentos',
+          nome: 'Clientes',
+          itens: [{ id: 'd1', titulo: 'Ótimo', detalhe: 'Diretora, Acme' }],
+        },
+      ],
+    })
+    expect(doc?.secoes[0].itens.map((i) => i.detalhe)).toEqual(['/mês', 'por 30 dias'])
+    expect(doc?.secoes[1].itens[0].detalhe).toBe('Diretora, Acme')
+  })
+
+  it('a aparência das barras escrita no briefing chega ao documento', () => {
+    const briefing = coergirBriefing(
+      {
+        nome: 'Projeto',
+        estiloHeader: { logo: 70, alinhamento: 'centro', menu: { fonte: 'Poppins' } },
+        footer: { estilo: { logo: 28, alinhamento: 'diagonal' } },
+        secoes: [{ id: 's1', nome: 'Início', layout: 'hero' }],
+      },
+      'Antigo',
+    )
+    expect(briefing.estiloHeader).toEqual({
+      menu: { fonte: 'Poppins' },
+      logo: 70,
+      alinhamento: 'centro',
+    })
+    // Alinhamento inválido sai; o resto do estilo fica.
+    expect(briefing.footer.estilo).toEqual({ logo: 28 })
+
+    const doc = documentoBase(briefing)
+    expect(doc.header.estilo?.alinhamento).toBe('centro')
+    expect(doc.footer.estilo?.logo).toBe(28)
+
+    // No caminho da IA (que não escreve esses campos) a escolha é reimposta.
+    const daIA = documentoBase({
+      ...briefing,
+      estiloHeader: undefined,
+      footer: { ...briefing.footer, estilo: undefined },
+    })
+    expect(daIA.header.estilo).toBeUndefined()
+    aplicarEstiloBarras(daIA, briefing)
+    expect(daIA.header.estilo?.logo).toBe(70)
+    expect(daIA.footer.estilo?.logo).toBe(28)
+  })
+
+  it('lado da mídia do briefing só vale no layout que tem lados', () => {
+    const briefing = coergirBriefing(
+      {
+        nome: 'Projeto',
+        secoes: [
+          { id: 's1', nome: 'Início', layout: 'hero', inverter: true },
+          { id: 's2', nome: 'Sobre', layout: 'texto-midia', inverter: true },
+          // Galeria não põe conteúdo e mídia lado a lado: a escolha não existe.
+          { id: 's3', nome: 'Fotos', layout: 'galeria', inverter: true },
+        ],
+      },
+      'Antigo',
+    )
+    expect(briefing.secoes.map((s) => s.inverter)).toEqual([true, true, undefined])
+  })
+
+  it('o lado escolhido no briefing vence o documento da IA', () => {
+    const briefing = coergirBriefing(
+      {
+        nome: 'Projeto',
+        secoes: [
+          { id: 's1', nome: 'Sobre', layout: 'texto-midia', inverter: true },
+          { id: 's2', nome: 'Serviços', layout: 'texto-midia' },
+        ],
+      },
+      'Antigo',
+    )
+    const doc = documentoBase(briefing)
+    // A IA devolveu o contrário do que o usuário marcou nas duas seções.
+    doc.secoes[0].inverter = undefined
+    doc.secoes[1].inverter = true
+    aplicarLados(doc, briefing)
+    expect(doc.secoes.map((s) => s.inverter)).toEqual([true, undefined])
+  })
+
+  it('rótulo do campo do item acompanha o layout', () => {
+    expect(rotuloItem('estatisticas', 'extra')).toBe('Número')
+    expect(rotuloItem('estatisticas', 'titulo')).toBe('Informação')
+    expect(rotuloItem('cards', 'extra')).toBe('Subtítulo')
+    expect(rotuloItem('precos', 'detalhe')).toBe('Período')
+    expect(rotuloItem('faq', 'titulo')).toBe('Título')
+  })
+
+  it('destaque passa a ser escolha da lista do usuário', () => {
+    const briefing = coergirBriefing(
+      {
+        nome: 'Felix',
+        secoes: [
+          {
+            id: 's1',
+            nome: 'Planos',
+            layout: 'precos',
+            vincularMenu: false,
+            itens: [
+              { id: 'p1', titulo: 'Básico' },
+              { id: 'p2', titulo: 'Completo', destaque: true },
+            ],
+          },
+        ],
+      },
+      'Felix',
+    )
+    const doc = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'precos',
+          nome: 'Planos',
+          itens: [
+            { id: 'a', titulo: 'Um', destaque: true },
+            { id: 'b', titulo: 'Dois' },
+          ],
+        },
+      ],
+    })!
+    aplicarItens(doc, briefing)
+    expect(doc.secoes[0].itens[0].destaque).toBeUndefined()
+    expect(doc.secoes[0].itens[1].destaque).toBe(true)
+  })
+})
+
+describe('título e subtítulo escritos no briefing', () => {
+  const briefingTextos = (subtitulo?: string) =>
+    coergirBriefing(
+      {
+        nome: 'Felix',
+        secoes: [
+          {
+            id: 's1',
+            nome: 'Serviços',
+            layout: 'cards',
+            vincularMenu: false,
+            titulo: 'O que fazemos por você',
+            subtitulo,
+          },
+          { id: 's2', nome: 'Números', layout: 'estatisticas', vincularMenu: false },
+        ],
+      },
+      'Felix',
+    )
+
+  it('guarda o subtítulo e ignora o vazio', () => {
+    expect(briefingTextos('Obras entregues no prazo').secoes[0].subtitulo).toBe(
+      'Obras entregues no prazo',
+    )
+    expect(briefingTextos('   ').secoes[0].subtitulo).toBeUndefined()
+    expect(briefingTextos().secoes[0].subtitulo).toBeUndefined()
+  })
+
+  it('documentoBase leva os dois para a seção', () => {
+    const secao = documentoBase(briefingTextos('Obras entregues no prazo')).secoes[0]
+    expect(secao.titulo).toBe('O que fazemos por você')
+    expect(secao.subtitulo).toBe('Obras entregues no prazo')
+  })
+
+  it('vencem o texto da IA, e o que ficou vazio continua sendo dela', () => {
+    const briefing = briefingTextos('Obras entregues no prazo')
+    const doc = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'cards',
+          nome: 'Serviços',
+          titulo: 'Soluções completas',
+          subtitulo: 'Do projeto à entrega',
+          itens: [],
+        },
+        {
+          id: 's2',
+          tipo: 'estatisticas',
+          nome: 'Números',
+          titulo: 'Nossos números',
+          subtitulo: 'Feitos por quem entende',
+          itens: [],
+        },
+      ],
+    })!
+    aplicarTextos(doc, briefing)
+    expect(doc.secoes[0].titulo).toBe('O que fazemos por você')
+    expect(doc.secoes[0].subtitulo).toBe('Obras entregues no prazo')
+    // Seção sem título/subtítulo no briefing fica com o que a IA escreveu.
+    expect(doc.secoes[1].titulo).toBe('Nossos números')
+    expect(doc.secoes[1].subtitulo).toBe('Feitos por quem entende')
+  })
+})
+
+describe('botão da seção definido no briefing', () => {
+  const botao = {
+    texto: 'Peça um orçamento',
+    url: '#contato',
+    posicao: 'direita',
+    hover: 'crescer',
+    animacao: 'pulsar',
+  }
+
+  const comBotao = (b: unknown) =>
+    coergirBriefing(
+      {
+        nome: 'Felix',
+        secoes: [
+          { id: 's1', nome: 'Serviços', layout: 'cards', vincularMenu: false, botao: b },
+          { id: 's2', nome: 'Início', layout: 'hero', vincularMenu: false },
+        ],
+      },
+      'Felix',
+    )
+
+  it('guarda texto, link, posição, hover e animação', () => {
+    expect(comBotao(botao).secoes[0].botao).toEqual(botao)
+  })
+
+  it('descarta valores fora do catálogo e botão sem texto', () => {
+    const b = comBotao({ ...botao, posicao: 'meio', hover: 'explodir', animacao: 'girar' })
+      .secoes[0].botao
+    expect(b?.texto).toBe('Peça um orçamento')
+    expect(b?.posicao).toBeUndefined()
+    expect(b?.hover).toBeUndefined()
+    expect(b?.animacao).toBeUndefined()
+    expect(comBotao({ texto: '   ', url: '#x' }).secoes[0].botao).toBeUndefined()
+  })
+
+  it('entra na página inclusive em layout que a IA não propõe botão', () => {
+    const briefing = comBotao(botao)
+    expect(documentoBase(briefing).secoes[0].botao?.texto).toBe('Peça um orçamento')
+
+    const documento = coergirDocumento({
+      secoes: [
+        // A IA inventou outro botão aqui; o do usuário vence.
+        { id: 's1', tipo: 'cards', nome: 'Serviços', itens: [], botao: { texto: 'Saiba mais', url: '#' } },
+        { id: 's2', tipo: 'hero', nome: 'Início', itens: [] },
+      ],
+    })!
+    aplicarBotoes(documento, briefing)
+    expect(documento.secoes[0].botao?.texto).toBe('Peça um orçamento')
+    expect(documento.secoes[0].botao?.animacao).toBe('pulsar')
+    // Seção sem botão no briefing fica como a IA deixou.
+    expect(documento.secoes[1].botao).toBeUndefined()
+  })
+
+  it('vence o botão padrão que hero e CTA ganham sem IA', () => {
+    const briefing = coergirBriefing(
+      {
+        nome: 'Felix',
+        secoes: [{ id: 's1', nome: 'Início', layout: 'hero', vincularMenu: false, botao }],
+      },
+      'Felix',
+    )
+    expect(documentoBase(briefing).secoes[0].botao?.texto).toBe('Peça um orçamento')
+  })
+})
+
+describe('menu do header ancorado nas seções', () => {
+  /** Menu com nomes que NÃO batem com o nome das seções — o caso que quebrava. */
+  const briefingMenu = () =>
+    coergirBriefing(
+      {
+        nome: 'Felix',
+        menu: [
+          { id: 'm1', rotulo: 'Home', url: '' },
+          { id: 'm2', rotulo: 'Quem Somos', url: '' },
+          { id: 'm3', rotulo: 'Blog', url: 'https://blog.felix.com.br' },
+        ],
+        secoes: [
+          { id: 's1', nome: 'Abertura', layout: 'hero', vincularMenu: true, itemMenu: 'm1' },
+          { id: 's2', nome: 'Sobre nós', layout: 'texto-midia', vincularMenu: true, itemMenu: 'm2' },
+          { id: 's3', nome: 'Contato', layout: 'formulario', vincularMenu: true },
+        ],
+      },
+      'Felix',
+    )
+
+  it('guarda o item escolhido e descarta o que não existe no menu', () => {
+    const b = briefingMenu()
+    expect(b.secoes[0].itemMenu).toBe('m1')
+    expect(b.secoes[2].itemMenu).toBeUndefined()
+
+    const inventado = coergirBriefing(
+      {
+        nome: 'Felix',
+        menu: [{ id: 'm1', rotulo: 'Home', url: '' }],
+        secoes: [
+          { id: 's1', nome: 'Abertura', layout: 'hero', vincularMenu: true, itemMenu: 'm9' },
+          { id: 's2', nome: 'Fora', layout: 'cta', vincularMenu: false, itemMenu: 'm1' },
+        ],
+      },
+      'Felix',
+    )
+    expect(inventado.secoes[0].itemMenu).toBeUndefined()
+    // Seção fora do menu não reserva item nenhum.
+    expect(inventado.secoes[1].itemMenu).toBeUndefined()
+  })
+
+  it('documentoBase leva cada item para a seção escolhida, não para a de nome parecido', () => {
+    const doc = documentoBase(briefingMenu())
+    const alvo = (rotulo: string) => doc.header.menu.find((m) => m.rotulo === rotulo)?.alvo
+    const ancora = (nome: string) => doc.secoes.find((s) => s.nome === nome)?.ancora
+
+    expect(alvo('Home')).toBe(`#${ancora('Abertura')}`)
+    expect(alvo('Quem Somos')).toBe(`#${ancora('Sobre nós')}`)
+    // Item com URL externa continua indo para fora.
+    expect(alvo('Blog')).toBe('https://blog.felix.com.br')
+    // Seção no menu que nenhum item reivindicou entra no fim, pelo nome dela.
+    expect(alvo('Contato')).toBe(`#${ancora('Contato')}`)
+    expect(doc.header.menu.every((m) => m.alvo !== '#topo')).toBe(true)
+  })
+
+  it('reimpõe o menu por cima do que a IA devolveu, criando âncora se faltar', () => {
+    const briefing = briefingMenu()
+    const doc = coergirDocumento({
+      header: { logoTexto: 'Felix', menu: [{ rotulo: 'Início', alvo: '#nao-existe' }] },
+      secoes: [
+        { id: 's1', tipo: 'hero', nome: 'Abertura', ancora: 'abertura', itens: [] },
+        // A IA esqueceu a âncora desta: o menu não teria para onde apontar.
+        { id: 's2', tipo: 'texto-midia', nome: 'Sobre nós', itens: [] },
+        { id: 's3', tipo: 'formulario', nome: 'Contato', ancora: 'contato', itens: [] },
+      ],
+    })!
+    aplicarMenu(doc, briefing)
+
+    expect(doc.header.menu.map((m) => m.rotulo)).toEqual([
+      'Home',
+      'Quem Somos',
+      'Blog',
+      'Contato',
+    ])
+    expect(doc.header.menu[0].alvo).toBe('#abertura')
+    expect(doc.secoes[1].ancora).toBe('sobre-nos')
+    expect(doc.header.menu[1].alvo).toBe('#sobre-nos')
+    expect(doc.header.menu[2].alvo).toBe('https://blog.felix.com.br')
+    expect(doc.header.menu[3].alvo).toBe('#contato')
+  })
+
+  it('sem itens no briefing, o menu da IA fica de pé', () => {
+    const briefing = coergirBriefing(
+      {
+        nome: 'Felix',
+        secoes: [{ id: 's1', nome: 'Abertura', layout: 'hero', vincularMenu: true }],
+      },
+      'Felix',
+    )
+    const doc = coergirDocumento({
+      header: { logoTexto: 'Felix', menu: [{ rotulo: 'Início', alvo: '#abertura' }] },
+      secoes: [{ id: 's1', tipo: 'hero', nome: 'Abertura', ancora: 'abertura', itens: [] }],
+    })!
+    aplicarMenu(doc, briefing)
+    expect(doc.header.menu).toHaveLength(1)
+    expect(doc.header.menu[0].rotulo).toBe('Início')
+  })
+})
+
+describe('logo da Identidade', () => {
+  const logo = {
+    tipo: 'imagem',
+    url: 'https://firebasestorage.googleapis.com/v0/b/e-nova/o/lp%2Ftrinca%2Flp1%2Flogo.png?alt=media',
+    caminho: 'lp/trinca/lp1/logo.png',
+    alt: 'logo.png',
+    busca: '',
+    orientacao: 'quadrado',
+    largura: 500,
+    altura: 320,
+  }
+
+  const comLogo = (l: unknown) =>
+    coergirBriefing(
+      {
+        nome: 'Felix',
+        logo: l,
+        secoes: [{ id: 's1', nome: 'Início', layout: 'hero', vincularMenu: true }],
+      },
+      'Felix',
+    )
+
+  it('guarda a imagem enviada, com o caminho no bucket', () => {
+    const b = comLogo(logo)
+    expect(b.logo?.url).toBe(logo.url)
+    expect(b.logo?.caminho).toBe('lp/trinca/lp1/logo.png')
+  })
+
+  it('recusa vídeo como logo', () => {
+    expect(comLogo({ ...logo, tipo: 'video' }).logo).toBeUndefined()
+    expect(comLogo(null).logo).toBeUndefined()
+  })
+
+  it('vai para o header da página e não é confundida com órfã no bucket', () => {
+    const briefing = comLogo(logo)
+    expect(documentoBase(briefing).header.logo?.url).toBe(logo.url)
+
+    // Documento da IA (que não conhece a logo): o briefing reimpõe.
+    const documento = coergirDocumento({
+      secoes: [{ id: 's1', tipo: 'hero', nome: 'Início', itens: [] }],
+    })!
+    aplicarArquivos(documento, briefing)
+    expect(documento.header.logo?.caminho).toBe('lp/trinca/lp1/logo.png')
+    expect([...arquivosUsados({ documento, briefing })]).toContain('lp/trinca/lp1/logo.png')
+  })
+
+  it('sobrevive à gravação do documento pelo editor', () => {
+    const salvo = coergirDocumento({
+      header: { logoTexto: 'Felix', logo },
+      secoes: [{ id: 's1', tipo: 'hero', nome: 'Início', itens: [] }],
+    })!
+    expect(salvo.header.logo?.url).toBe(logo.url)
+  })
+})
+
+describe('identidade visual do briefing', () => {
+  const briefingIdentidade = () =>
+    coergirBriefing(
+      {
+        nome: 'Felix',
+        tipografia: {
+          titulos: { fonte: 'Poppins', peso: 800, tamanho: '20px' },
+          textos: { fonte: 'Poppins', peso: 400, tamanho: '16px' },
+        },
+        cores: { principal: '#0d9488', titulos: '#134e4a', fundoPagina: '#f8fafc' },
+        secoes: [{ id: 's1', nome: 'Início', layout: 'hero', vincularMenu: true }],
+      },
+      'Felix',
+    )
+
+  it('guarda fontes e cores escolhidas', () => {
+    const b = briefingIdentidade()
+    expect(b.tipografia.titulos).toEqual({ fonte: 'Poppins', peso: 800, tamanho: '20px' })
+    expect(b.cores.principal).toBe('#0d9488')
+  })
+
+  it('vence a escolha da IA no documento gerado', () => {
+    const b = briefingIdentidade()
+    const doc = coergirDocumentoIA(
+      {
+        tema: {
+          tipografia: { titulos: { fonte: 'Sora', peso: 700, tamanho: '42px' } },
+          cores: { principal: '#2563eb', titulos: '#0f172a', fundoPagina: '#ffffff' },
+        },
+        secoes: [{ id: 's1', tipo: 'hero', nome: 'Início', titulo: 'Oi', itens: [] }],
+      },
+      b,
+    )!
+    expect(doc.tema.tipografia.titulos.fonte).toBe('Poppins')
+    expect(doc.tema.tipografia.titulos.peso).toBe(800)
+    expect(doc.tema.tipografia.titulos.tamanho).toBe('20px')
+    expect(doc.tema.cores.principal).toBe('#0d9488')
+    expect(doc.tema.cores.titulos).toBe('#134e4a')
+    expect(doc.tema.cores.fundoPagina).toBe('#f8fafc')
+    // O que o usuário não definiu continua por conta da IA.
+    expect(doc.tema.tipografia.subtitulos.fonte).toBe(TEMA_PADRAO.tipografia.subtitulos.fonte)
+  })
+
+  it('guarda o texto do tema sobre mídia de fundo só quando é `false`', () => {
+    const comFalse = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'hero',
+          nome: 'Início',
+          itens: [],
+          fundo: { midia: { url: 'https://x/a.jpg', busca: 'a' }, textoClaro: false },
+        },
+      ],
+    })!
+    expect(comFalse.secoes[0].fundo?.textoClaro).toBe(false)
+
+    const padrao = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'hero',
+          nome: 'Início',
+          itens: [],
+          fundo: { midia: { url: 'https://x/a.jpg', busca: 'a' }, textoClaro: true },
+        },
+      ],
+    })!
+    expect(padrao.secoes[0].fundo?.textoClaro).toBeUndefined()
+  })
+})
+
+describe('mídia da seção no briefing', () => {
+  it('cada mudança preserva o que já estava escolhido', () => {
+    // Bug real: a etapa remontava a mídia campo a campo e as opções de vídeo
+    // ficavam de fora — marcar loop apagava o autoplay, e só uma parava em pé.
+    let midia = mesclarMidiaBriefing(null, { busca: 'obra em andamento', tipo: 'video' })
+    midia = mesclarMidiaBriefing(midia, { loop: true })
+    midia = mesclarMidiaBriefing(midia, { autoplay: true })
+    midia = mesclarMidiaBriefing(midia, { controles: false })
+    midia = mesclarMidiaBriefing(midia, { orientacao: 'retrato' })
+
+    expect(midia).toEqual({
+      busca: 'obra em andamento',
+      tipo: 'video',
+      orientacao: 'retrato',
+      loop: true,
+      autoplay: true,
+      controles: false,
+    })
+  })
+
+  it('mantém o arquivo escolhido e aceita limpá-lo', () => {
+    const arquivo = {
+      tipo: 'imagem' as const,
+      url: 'https://x/a.jpg',
+      alt: 'a',
+      busca: 'a',
+      orientacao: 'paisagem' as const,
+    }
+    const comArquivo = mesclarMidiaBriefing({ busca: 'a', tipo: 'imagem', orientacao: 'paisagem' }, { arquivo })
+    expect(mesclarMidiaBriefing(comArquivo, { busca: 'outra coisa' }).arquivo).toEqual(arquivo)
+    expect(mesclarMidiaBriefing(comArquivo, { arquivo: null }).arquivo).toBeNull()
+  })
+})
+
+describe('opções de reprodução do vídeo', () => {
+  const secaoIA = (midia: unknown) =>
+    coergirDocumento({
+      secoes: [{ id: 's1', tipo: 'hero', nome: 'Início', itens: [], midia }],
+    })!.secoes[0]
+
+  it('sobrevivem no placeholder que a busca em banco ainda vai preencher', () => {
+    const midia = secaoIA({
+      busca: 'cidade à noite',
+      tipo: 'video',
+      orientacao: 'paisagem',
+      controles: false,
+      loop: true,
+    }).midia
+    expect(midia?.url).toMatch(/^data:image\/svg/)
+    expect(midia?.controles).toBe(false)
+    expect(midia?.loop).toBe(true)
+    expect(midia?.autoplay).toBeUndefined()
+  })
+
+  it('não grudam em mídia de imagem, onde não significam nada', () => {
+    const midia = secaoIA({
+      url: 'https://x/a.jpg',
+      busca: 'fachada',
+      tipo: 'imagem',
+      orientacao: 'paisagem',
+      loop: true,
+    }).midia
+    expect(midia?.loop).toBeUndefined()
+  })
+
+  it('descarta valor que não é booleano', () => {
+    const midia = secaoIA({
+      url: 'https://x/a.mp4',
+      busca: 'filme',
+      tipo: 'video',
+      orientacao: 'paisagem',
+      loop: 'sim',
+      autoplay: 1,
+    }).midia
+    expect(midia?.loop).toBeUndefined()
+    expect(midia?.autoplay).toBeUndefined()
+  })
+
+  it('as do briefing valem para a mídia que a IA descreveu', () => {
+    const briefing = coergirBriefing(
+      {
+        nome: 'P',
+        secoes: [
+          {
+            id: 's1',
+            nome: 'Início',
+            layout: 'hero',
+            vincularMenu: true,
+            midia: {
+              busca: 'cidade à noite',
+              tipo: 'video',
+              orientacao: 'paisagem',
+              autoplay: true,
+              loop: true,
+            },
+          },
+        ],
+      },
+      'P',
+    )
+    expect(briefing.secoes[0].midia?.autoplay).toBe(true)
+
+    const doc = coergirDocumento({
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'hero',
+          nome: 'Início',
+          itens: [],
+          midia: { busca: 'city at night', tipo: 'video', orientacao: 'paisagem' },
+        },
+      ],
+    })!
+    // Nenhum arquivo para reimpor — só as opções de reprodução.
+    expect(aplicarArquivos(doc, briefing)).toEqual({ aplicadas: 0, perdidas: 0 })
+    expect(doc.secoes[0].midia?.autoplay).toBe(true)
+    expect(doc.secoes[0].midia?.loop).toBe(true)
+    expect(doc.secoes[0].midia?.busca).toBe('city at night')
+  })
+})
+
 describe('operações do editor', () => {
   const base = () => {
     const doc = documentoBase(briefingVazio('Teste'))
     doc.secoes = [novaSecao('hero'), novaSecao('cards'), novaSecao('cta')]
     return doc
   }
+
+  it('item novo nasce com exemplo que combina com o layout', () => {
+    // `extra` muda de sentido por layout: antes a timeline nascia com "R$ 99".
+    expect(novoItem('cards').extra).toBe('Subtítulo do card')
+    expect(novoItem('cards').botao?.texto).toBe('Saiba mais')
+    expect(novoItem('timeline').extra).toBe('2020')
+    expect(novoItem('estatisticas').extra).toBe('100+')
+    expect(novoItem('precos').extra).toBe('R$ 99')
+  })
+
+  it('âncora criada no editor não colide com a de outra seção', () => {
+    const doc = documentoBase(briefingVazio('Teste'))
+    doc.secoes = [novaSecao('cards'), novaSecao('cards')]
+    doc.secoes[1].ancora = null
+    // Duas âncoras iguais fariam o item do menu levar sempre à primeira seção.
+    expect(garantirAncora(doc, doc.secoes[1])).toBe('cards-2')
+    expect(garantirAncora(doc, doc.secoes[0])).toBe('cards')
+  })
 
   it('move seção sem alterar o original', () => {
     const doc = base()
@@ -340,6 +1341,100 @@ describe('operações do editor', () => {
     ).toBe('Novo texto')
     expect(aplicarTexto(doc, 'header:logo', 'Marca').header.logoTexto).toBe('Marca')
     expect(aplicarTexto(doc, 'footer:email', 'a@b.com').footer.email).toBe('a@b.com')
+  })
+
+  it('gera a página de texto marcada e põe o link dela no rodapé', () => {
+    const briefing = briefingVazio('Clínica Vida')
+    briefing.paginas = [
+      { tipo: 'termos', titulo: 'Termos de Uso', conteudo: 'Regras de uso.' },
+      // Sem texto: a página não existe (sairia um arquivo em branco no ar).
+      { tipo: 'privacidade', titulo: 'Política de Privacidade', conteudo: '   ' },
+    ]
+    const doc = documentoBase(briefing)
+    // O rascunho sem texto continua no documento (dá para escrever depois)…
+    expect(doc.paginas?.map((p) => p.tipo)).toEqual(['termos', 'privacidade'])
+    // …mas só a página escrita vira arquivo e link no rodapé.
+    expect(paginasGeradas(doc).map((p) => p.tipo)).toEqual(['termos'])
+    expect(doc.footer.linksUteis.map((l) => [l.rotulo, l.url])).toEqual([
+      ['Termos de Uso', 'termos.html'],
+    ])
+  })
+
+  it('substitui o link de privacidade que a IA inventou e preserva os outros', () => {
+    const briefing = briefingVazio('Clínica Vida')
+    briefing.paginas = [
+      { tipo: 'privacidade', titulo: 'Política de Privacidade', conteudo: 'Como tratamos dados.' },
+    ]
+    const doc = documentoBase(briefing)
+    doc.footer.linksUteis = [
+      { id: 'l1', rotulo: 'Trabalhe conosco', url: 'https://vagas.exemplo.com' },
+      { id: 'l2', rotulo: 'Política de privacidade', url: '#' },
+    ]
+    aplicarPaginas(doc, briefing)
+    expect(doc.footer.linksUteis.map((l) => l.url)).toEqual([
+      'https://vagas.exemplo.com',
+      'privacidade.html',
+    ])
+  })
+
+  it('renomear e remover a página no editor acompanham o link do rodapé', () => {
+    const briefing = briefingVazio('Clínica Vida')
+    briefing.paginas = [{ tipo: 'termos', titulo: 'Termos de Uso', conteudo: 'Regras de uso.' }]
+    const doc = documentoBase(briefing)
+    const idOriginal = doc.footer.linksUteis[0].id
+
+    doc.paginas![0].titulo = 'Termos e Condições'
+    sincronizarLinksPaginas(doc)
+    // Mesmo item do rodapé, só o rótulo muda — o id não dança a cada tecla.
+    expect(doc.footer.linksUteis).toEqual([
+      { id: idOriginal, rotulo: 'Termos e Condições', url: 'termos.html' },
+    ])
+
+    doc.paginas = []
+    sincronizarLinksPaginas(doc)
+    expect(doc.footer.linksUteis).toEqual([])
+  })
+
+  it('coerção do documento descarta página de tipo inválido e repetida', () => {
+    const doc = coergirDocumento({
+      ...respostaIA,
+      paginas: [
+        { tipo: 'termos', conteudo: 'Texto.' },
+        { tipo: 'termos', titulo: 'Duplicada', conteudo: 'Outro.' },
+        { tipo: 'cookies', conteudo: 'Texto.' },
+        { tipo: 'privacidade', conteudo: '' },
+      ],
+    })
+    // Título ausente vira o padrão; repetida e desconhecida saem; a que ainda
+    // não tem texto fica guardada como rascunho.
+    expect(doc?.paginas).toEqual([
+      { tipo: 'termos', titulo: 'Termos de Uso', conteudo: 'Texto.' },
+      { tipo: 'privacidade', titulo: 'Política de Privacidade', conteudo: '' },
+    ])
+  })
+
+  it('edita o texto do botão do header e do rodapé pelo id', () => {
+    const doc = base()
+    doc.header.botoes = [{ id: 'b1', texto: 'Fale conosco', url: '#' }]
+    doc.footer.botoes = [{ id: 'f1', texto: 'Orçamento', url: '#' }]
+    expect(aplicarTexto(doc, 'header:botao:b1', 'Contato').header.botoes[0].texto).toBe('Contato')
+    expect(aplicarTexto(doc, 'footer:botao:f1', 'Peça já').footer.botoes?.[0].texto).toBe('Peça já')
+    // Apagar tudo sumiria com o botão e não haveria onde clicar de volta.
+    expect(aplicarTexto(doc, 'header:botao:b1', '  ').header.botoes[0].texto).toBe('Fale conosco')
+    expect(() => aplicarTexto(doc, 'header:botao:nao-existe', 'x')).not.toThrow()
+  })
+
+  it('edita o telefone do rodapé pelo id, sem apagá-lo quando fica vazio', () => {
+    const doc = base()
+    doc.footer.telefones = [{ id: 't1', numero: '(11) 3333-4444', whatsapp: false }]
+    expect(aplicarTexto(doc, 'footer:telefone:t1', '(11) 90000-0000').footer.telefones).toEqual([
+      { id: 't1', numero: '(11) 90000-0000', whatsapp: false },
+    ])
+    // Apagar tudo no canvas sumiria com a linha e não haveria onde clicar de volta.
+    expect(aplicarTexto(doc, 'footer:telefone:t1', '  ').footer.telefones?.[0].numero).toBe(
+      '(11) 3333-4444',
+    )
+    expect(() => aplicarTexto(doc, 'footer:telefone:nao-existe', 'x')).not.toThrow()
   })
 
   it('ignora alvo inexistente sem quebrar', () => {

@@ -3,6 +3,7 @@
  * o CSS dos layouts presentes no documento. Puro (roda no client e no server).
  */
 
+import { paginasGeradas } from '../documento'
 import { familiaCss } from '../fontes'
 import type { AjusteTexto, LpDocumento, LpSecao, TipoLayout } from '../tipos'
 import { corContraste, corSegura, escCss, slugificar } from '../util'
@@ -53,6 +54,13 @@ function varsTema(doc: LpDocumento): string {
   return `:root{\n${linhas.join('\n')}\n}`
 }
 
+/*
+ * Titulos sao fluidos (clamp): o piso e o teto saem os DOIS de --tamanho-titulos,
+ * nunca de um rem fixo. Com piso fixo, quem escolhia um tamanho pequeno na
+ * Identidade (ex.: 20px) via o piso vencer — o clamp devolve o minimo quando o
+ * maximo fica abaixo dele — e a pagina saia com o tamanho padrao, como se a
+ * escolha nao existisse.
+ */
 const BASE = `
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;scroll-padding-top:84px}
@@ -62,14 +70,33 @@ a{color:var(--cor-principal);text-decoration:none}
 .lp-container{max-width:var(--largura);margin-inline:auto;padding-inline:24px}
 .lp-secao.full>.lp-container{max-width:none}
 h1,h2,h3{font-family:var(--fonte-titulos);font-weight:var(--peso-titulos);line-height:var(--altura-titulos);letter-spacing:var(--espaco-titulos);color:var(--cor-titulos)}
-h1{font-size:clamp(2rem,5.2vw,calc(var(--tamanho-titulos) * 1.45))}
-h2{font-size:clamp(1.6rem,3.6vw,var(--tamanho-titulos))}
-h3{font-size:clamp(1.05rem,2vw,calc(var(--tamanho-titulos) * 0.55))}
+h1{font-size:clamp(calc(var(--tamanho-titulos) * 0.78),5.2vw,calc(var(--tamanho-titulos) * 1.45))}
+h2{font-size:clamp(calc(var(--tamanho-titulos) * 0.62),3.6vw,var(--tamanho-titulos))}
+h3{font-size:clamp(calc(var(--tamanho-titulos) * 0.4),2vw,calc(var(--tamanho-titulos) * 0.55))}
 .lp-subtitulo{font-family:var(--fonte-subtitulos);font-weight:var(--peso-subtitulos);font-size:var(--tamanho-subtitulos);line-height:var(--altura-subtitulos);letter-spacing:var(--espaco-subtitulos);color:var(--cor-subtitulos)}
 .lp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--fonte-botoes);font-weight:var(--peso-botoes);font-size:var(--tamanho-botoes);letter-spacing:var(--espaco-botoes);color:var(--cor-botoes);background:var(--cor-fundo-botoes);border:2px solid var(--cor-fundo-botoes);border-radius:var(--raio);padding:12px 28px;cursor:pointer;transition:filter .2s,transform .2s;text-decoration:none}
 .lp-btn:hover{filter:brightness(1.12);transform:translateY(-1px)}
 .lp-btn.contorno{background:transparent;color:var(--cor-fundo-botoes)}
 .lp-btn.contorno:hover{background:var(--cor-fundo-botoes);color:var(--cor-botoes)}
+.lp-acao{display:flex;flex-wrap:wrap;gap:16px;margin-top:28px}
+.lp-acao.pos-esquerda{justify-content:flex-start}
+.lp-acao.pos-centro{justify-content:center}
+.lp-acao.pos-direita{justify-content:flex-end}
+/* Efeitos de hover: só transform/filter/sombra, porque cor de botão personalizada
+   vai inline no HTML e venceria qualquer regra daqui. */
+.lp-btn.hover-nenhum:hover{filter:none;transform:none}
+.lp-btn.hover-brilho:hover{filter:brightness(1.3);transform:none}
+.lp-btn.hover-crescer:hover{filter:none;transform:scale(1.06)}
+.lp-btn.hover-sombra:hover{filter:none;transform:none;box-shadow:0 12px 28px -10px color-mix(in srgb,var(--cor-fundo-botoes) 75%,transparent)}
+@keyframes lp-pulsar{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes lp-flutuar{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes lp-brilhar{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--cor-fundo-botoes) 55%,transparent)}70%{box-shadow:0 0 0 14px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.lp-btn.anim-pulsar{animation:lp-pulsar 2.4s ease-in-out infinite}
+.lp-btn.anim-flutuar{animation:lp-flutuar 3s ease-in-out infinite}
+.lp-btn.anim-brilho{animation:lp-brilhar 2.2s ease-out infinite}
+/* Passar o mouse pausa a animação: senão o keyframe sobrescreve o transform do
+   hover e o botão não responde ao ponteiro. */
+.lp-btn[class*="anim-"]:hover{animation-play-state:paused}
 .lp-secao{position:relative;padding-top:var(--pt,80px);padding-bottom:var(--pb,80px);background:var(--fundo-secao,transparent);overflow:hidden}
 .lp-fundo-midia{position:absolute;inset:0;z-index:0}
 .lp-fundo-midia img,.lp-fundo-midia video{width:100%;height:100%;object-fit:cover}
@@ -77,6 +104,7 @@ h3{font-size:clamp(1.05rem,2vw,calc(var(--tamanho-titulos) * 0.55))}
 .lp-secao>.lp-container{position:relative;z-index:2}
 .lp-cabeca{max-width:720px;margin:0 auto 48px;text-align:center}
 .lp-cabeca .lp-subtitulo{margin-top:12px}
+.lp-cabeca .lp-texto{margin-top:14px}
 .lp-sobre-midia h1,.lp-sobre-midia h2,.lp-sobre-midia h3,.lp-sobre-midia .lp-subtitulo,.lp-sobre-midia p,.lp-sobre-midia .lp-stat-valor,.lp-sobre-midia .lp-stat-rotulo,.lp-sobre-midia .lp-tl-data,.lp-sobre-midia .lp-tl-titulo,.lp-sobre-midia .lp-benef-titulo{color:#fff}
 .lp-midia{border-radius:var(--raio);overflow:hidden}
 .lp-midia img,.lp-midia video{width:100%;height:100%;object-fit:cover}
@@ -84,7 +112,7 @@ h3{font-size:clamp(1.05rem,2vw,calc(var(--tamanho-titulos) * 0.55))}
 .lp-icone svg{width:24px;height:24px}
 .lp-reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
 .lp-vis{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.lp-reveal{opacity:1;transform:none;transition:none}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.lp-reveal{opacity:1;transform:none;transition:none}.lp-btn{animation:none!important}}
 `
 
 const HEADER = `
@@ -92,17 +120,28 @@ const HEADER = `
 .lp-header.rolou{box-shadow:0 6px 24px -12px rgba(0,0,0,.35)}
 .lp-header .lp-container{display:flex;align-items:center;justify-content:space-between;gap:24px;height:72px}
 .lp-logo{font-family:var(--fonte-titulos);font-weight:700;font-size:1.35rem;color:inherit}
+.lp-logo-img{display:flex;align-items:center;flex:none}
+.lp-logo-img img{max-height:44px;max-width:220px;width:auto;height:auto;object-fit:contain}
+.lp-nav{display:flex;align-items:center;gap:28px}
 .lp-nav ul{display:flex;gap:28px;list-style:none}
 .lp-nav a{color:inherit;font-weight:500;font-size:.95rem;opacity:.85;transition:opacity .2s}
 .lp-nav a:hover{opacity:1;color:var(--cor-principal)}
+.lp-header-acoes{display:flex;align-items:center;gap:12px}
+/* Botao de header e menor que o do corpo da pagina: 72px de altura nao comportam
+   o padding padrao. As cores tambem sao reafirmadas: dentro do <nav>, a regra
+   .lp-nav a (mais especifica que .lp-btn) pintaria o botao de cor de menu. */
+.lp-header-acoes .lp-btn{padding:10px 22px;font-size:.9rem;color:var(--cor-botoes);opacity:1}
+.lp-header-acoes .lp-btn:hover{color:var(--cor-botoes)}
+.lp-header-acoes .lp-btn.contorno{color:var(--cor-fundo-botoes)}
+.lp-header-acoes .lp-btn.contorno:hover{color:var(--cor-botoes)}
 .lp-menu-btn{display:none;background:none;border:0;color:inherit;cursor:pointer;padding:8px}
 .lp-menu-btn svg{width:26px;height:26px}
 @media (max-width:900px){
 .lp-menu-btn{display:block}
-.lp-nav{position:fixed;inset:72px 0 auto 0;background:var(--cor-header);padding:16px 24px 24px;transform:translateY(-130%);transition:transform .3s ease;box-shadow:0 20px 40px -20px rgba(0,0,0,.4)}
+.lp-nav{position:fixed;inset:72px 0 auto 0;flex-direction:column;align-items:stretch;gap:16px;background:var(--cor-header);padding:16px 24px 24px;transform:translateY(-130%);transition:transform .3s ease;box-shadow:0 20px 40px -20px rgba(0,0,0,.4)}
 .lp-nav.aberto{transform:none}
 .lp-nav ul{flex-direction:column;gap:16px}
-.lp-header-btn{display:none}
+.lp-header-acoes{flex-direction:column;align-items:stretch}
 }
 `
 
@@ -116,6 +155,12 @@ const FOOTER = `
 .lp-footer p{opacity:.8;line-height:1.7}
 .lp-contato li{display:flex;gap:10px;align-items:flex-start}
 .lp-contato svg{width:18px;height:18px;flex:none;margin-top:3px;color:var(--cor-principal)}
+/* Mesma correcao do header: .lp-footer a venceria as cores do .lp-btn. */
+.lp-footer-acoes{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}
+.lp-footer-acoes .lp-btn{color:var(--cor-botoes);opacity:1}
+.lp-footer-acoes .lp-btn:hover{color:var(--cor-botoes)}
+.lp-footer-acoes .lp-btn.contorno{color:var(--cor-fundo-botoes)}
+.lp-footer-acoes .lp-btn.contorno:hover{color:var(--cor-botoes)}
 .lp-redes{display:flex;gap:12px;margin-top:20px}
 .lp-redes a{display:inline-flex;width:38px;height:38px;align-items:center;justify-content:center;border-radius:50%;border:1px solid color-mix(in srgb,currentColor 25%,transparent);opacity:1}
 .lp-redes a:hover{background:var(--cor-principal);border-color:var(--cor-principal);color:#fff}
@@ -125,20 +170,33 @@ const FOOTER = `
 @media (max-width:900px){.lp-footer-grid{grid-template-columns:1fr;gap:32px}}
 `
 
+/** Paginas de texto corrido (termos de uso, politica de privacidade). */
+const LEGAL = `
+.lp-legal{padding:72px 0 96px}
+.lp-legal .lp-container{max-width:820px}
+.lp-legal h1{margin-bottom:8px}
+.lp-legal h2{font-size:clamp(calc(var(--tamanho-titulos) * 0.4),2vw,calc(var(--tamanho-titulos) * 0.58));margin:36px 0 12px}
+.lp-legal p{margin-top:14px}
+.lp-legal p+p{margin-top:12px}
+`
+
 /** CSS especifico de cada layout — emitido so quando o layout aparece na pagina. */
 const POR_LAYOUT: Record<TipoLayout, string> = {
   hero: `
 .lp-hero{display:flex;align-items:center;min-height:min(88vh,860px)}
 .lp-hero .lp-container{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
 .lp-hero.centrado .lp-container{grid-template-columns:1fr;text-align:center;max-width:860px}
-.lp-hero.centrado .lp-hero-acoes{justify-content:center}
+.lp-hero.inv .lp-hero-texto{order:2}
+.lp-hero.inv .lp-midia{order:1}
 .lp-hero h1{margin-bottom:20px}
 .lp-hero .lp-subtitulo{font-size:calc(var(--tamanho-subtitulos) * 1.1)}
 .lp-hero p.lp-texto{margin-top:18px;max-width:560px}
 .lp-hero.centrado p.lp-texto{margin-inline:auto}
 .lp-hero-acoes{display:flex;gap:16px;margin-top:32px;flex-wrap:wrap}
 .lp-hero .lp-midia{aspect-ratio:4/3}
-@media (max-width:900px){.lp-hero .lp-container{grid-template-columns:1fr;text-align:center}.lp-hero-acoes{justify-content:center}.lp-hero p.lp-texto{margin-inline:auto}}
+/* No celular o hero inteiro centraliza, botão junto — por isso este seletor
+   precisa vencer o .lp-acao.pos-* que o compilador emite. */
+@media (max-width:900px){.lp-hero .lp-container{grid-template-columns:1fr;text-align:center}.lp-hero .lp-acao{justify-content:center}.lp-hero p.lp-texto{margin-inline:auto}.lp-hero.inv .lp-hero-texto{order:1}.lp-hero.inv .lp-midia{order:2}}
 `,
   'texto-midia': `
 .lp-tm{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
@@ -160,9 +218,13 @@ const POR_LAYOUT: Record<TipoLayout, string> = {
 `,
   cards: `
 .lp-cards{display:grid;grid-template-columns:repeat(var(--cols,3),1fr);gap:28px}
-.lp-card{background:color-mix(in srgb,var(--cor-titulos) 4%,transparent);border:1px solid color-mix(in srgb,var(--cor-titulos) 10%,transparent);border-radius:var(--raio);padding:32px 28px;transition:transform .25s,box-shadow .25s}
+.lp-card{display:flex;flex-direction:column;background:color-mix(in srgb,var(--cor-titulos) 4%,transparent);border:1px solid color-mix(in srgb,var(--cor-titulos) 10%,transparent);border-radius:var(--raio);padding:32px 28px;transition:transform .25s,box-shadow .25s}
 .lp-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px -24px color-mix(in srgb,var(--cor-principal) 45%,transparent)}
 .lp-card h3{margin:18px 0 10px}
+.lp-card-subtitulo{font-family:var(--fonte-subtitulos);font-weight:var(--peso-subtitulos);color:var(--cor-subtitulos);font-size:.95rem;margin-bottom:10px}
+/* margin-top:auto encosta o botão na base: cards de alturas diferentes na mesma
+   linha ficam com os botões alinhados. */
+.lp-card-acao{margin-top:auto;padding-top:20px}
 @media (max-width:900px){.lp-cards{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:640px){.lp-cards{grid-template-columns:1fr}}
 `,
@@ -218,7 +280,7 @@ const POR_LAYOUT: Record<TipoLayout, string> = {
 `,
   estatisticas: `
 .lp-stats{display:grid;grid-template-columns:repeat(var(--cols,4),1fr);gap:32px;text-align:center}
-.lp-stat-valor{font-family:var(--fonte-titulos);font-weight:800;font-size:clamp(2rem,4.5vw,3.2rem);color:var(--cor-principal);line-height:1.1}
+.lp-stat-valor{font-family:var(--fonte-titulos);font-weight:800;font-size:clamp(calc(var(--tamanho-titulos) * 0.76),4.5vw,calc(var(--tamanho-titulos) * 1.22));color:var(--cor-principal);line-height:1.1}
 .lp-stat-rotulo{margin-top:8px;font-size:.95rem;opacity:.85}
 @media (max-width:900px){.lp-stats{grid-template-columns:repeat(2,1fr)}}
 `,
@@ -296,10 +358,18 @@ const POR_LAYOUT: Record<TipoLayout, string> = {
 .lp-bloco{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
 .lp-bloco:nth-child(even) .lp-bloco-texto{order:2}
 .lp-bloco:nth-child(even) .lp-midia{order:1}
-.lp-bloco h3{font-size:clamp(1.3rem,2.4vw,calc(var(--tamanho-titulos) * 0.7));margin-bottom:12px}
+/* .inv começa a alternância pelo outro lado: a mídia do 1º bloco à esquerda. */
+.lp-blocos.inv .lp-bloco:nth-child(even) .lp-bloco-texto{order:1}
+.lp-blocos.inv .lp-bloco:nth-child(even) .lp-midia{order:2}
+.lp-blocos.inv .lp-bloco:nth-child(odd) .lp-bloco-texto{order:2}
+.lp-blocos.inv .lp-bloco:nth-child(odd) .lp-midia{order:1}
+.lp-bloco h3{font-size:clamp(calc(var(--tamanho-titulos) * 0.5),2.4vw,calc(var(--tamanho-titulos) * 0.7));margin-bottom:12px}
 .lp-bloco .lp-btn{margin-top:18px}
 .lp-bloco .lp-midia{aspect-ratio:4/3}
-@media (max-width:900px){.lp-bloco{grid-template-columns:1fr;gap:24px}.lp-bloco:nth-child(even) .lp-bloco-texto{order:1}.lp-bloco:nth-child(even) .lp-midia{order:2}}
+/* No celular o texto vem sempre antes da imagem, invertido ou não. O
+   :nth-child(n) não filtra nada — está aí só para empatar a especificidade das
+   regras de .inv acima; empatando, vence a última, que é esta. */
+@media (max-width:900px){.lp-bloco{grid-template-columns:1fr;gap:24px}.lp-bloco:nth-child(even) .lp-bloco-texto{order:1}.lp-bloco:nth-child(even) .lp-midia{order:2}.lp-blocos.inv .lp-bloco:nth-child(n) .lp-bloco-texto{order:1}.lp-blocos.inv .lp-bloco:nth-child(n) .lp-midia{order:2}}
 `,
   tabs: `
 .lp-tabs-nav{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:36px}
@@ -354,6 +424,46 @@ const SELETOR_ELEMENTO = {
 } as const
 
 /**
+ * Regras do header e do rodapé que saem dos ajustes do usuário: fonte do menu,
+ * tamanho da logo e alinhamento. Sem ajuste nenhum não sai regra nenhuma — a
+ * página continua com o visual do tema.
+ */
+function cssBarras(doc: LpDocumento): string {
+  let css = ''
+  const h = doc.header.estilo
+  if (h?.menu) css += ajusteParaCss('.lp-nav a', h.menu)
+  if (h?.logo) {
+    // A logo em imagem cresce pela altura; o nome escrito, pelo corpo da fonte.
+    // O max-width acompanha a altura (mesma proporção do padrão: 44px → 220px),
+    // senão uma logo deitada empacaria no limite de largura de sempre.
+    css += doc.header.logo
+      ? `.lp-logo-img img{max-height:${h.logo}px;max-width:${h.logo * 5}px}\n`
+      : `.lp-logo{font-size:${h.logo}px}\n`
+  }
+  if (h?.alinhamento) {
+    // O <nav> ocupa o espaço entre a logo e os botões; a margem automática do
+    // <ul> decide onde os links caem dentro dele. No celular o nav vira gaveta e
+    // a margem tem de sumir — por isso o reset, que precisa vir depois daqui.
+    const margem = { esquerda: 'margin-right:auto', centro: 'margin-inline:auto', direita: 'margin-left:auto' }
+    css += `.lp-nav{flex:1}\n.lp-nav ul{${margem[h.alinhamento]}}\n@media (max-width:900px){.lp-nav ul{margin:0}}\n`
+  }
+
+  const f = doc.footer.estilo
+  // Menu do rodapé são as colunas de links; a coluna de contato (endereço,
+  // telefone, e-mail) não é menu e fica com a fonte do tema.
+  if (f?.menu) css += ajusteParaCss('.lp-footer ul:not(.lp-contato) a', f.menu)
+  if (f?.logo) css += `.lp-logo-footer{font-size:${f.logo}px}\n`
+  if (f?.alinhamento && f.alinhamento !== 'esquerda') {
+    const texto = f.alinhamento === 'centro' ? 'center' : 'right'
+    const flex = f.alinhamento === 'centro' ? 'center' : 'flex-end'
+    css +=
+      `.lp-footer-grid{text-align:${texto}}\n` +
+      `.lp-footer .lp-contato li,.lp-redes,.lp-footer-acoes{justify-content:${flex}}\n`
+  }
+  return css
+}
+
+/**
  * Regras extras por secao (só ajustes de texto). As cores próprias de botão vão
  * inline no HTML (htmlBotao), porque uma regra por seção pintaria também os
  * botões dos itens da seção.
@@ -376,10 +486,14 @@ function cssDaSecao(secao: LpSecao, idHtml: string): string {
 export function compilarCss(doc: LpDocumento, idsPorSecao: Map<string, string>): string {
   const usados = new Set<TipoLayout>(doc.secoes.map((s) => s.tipo))
   const partes: string[] = [varsTema(doc), BASE, HEADER, FOOTER]
+  // Uma folha de estilo so serve o index e as paginas de texto.
+  if (paginasGeradas(doc).length > 0) partes.push(LEGAL)
   if (usados.has('depoimentos') || usados.has('carrossel')) partes.push(SLIDER)
   for (const layout of LAYOUTS_ORDENADOS) {
     if (usados.has(layout)) partes.push(POR_LAYOUT[layout])
   }
+  const barras = cssBarras(doc)
+  if (barras) partes.push(barras)
   for (const secao of doc.secoes) {
     const idHtml = idsPorSecao.get(secao.id)
     if (idHtml) {

@@ -42,7 +42,24 @@ export const ROTULO_FONTE: Record<FonteMidia, string> = {
   envato: 'Envato',
 }
 
-export type LpMidia = {
+/**
+ * Reproducao do video na pagina. Campo ausente = padrao de hoje: com controles,
+ * parado e sem repetir. Autoplay entra sempre junto com `muted` — navegador
+ * nenhum toca video com som sem um gesto do usuario.
+ *
+ * Video de FUNDO (banner e hero com fundo) e decorativo: nunca ganha controles
+ * nem som, e comeca sozinho em loop a menos que estes campos digam o contrario.
+ */
+export type ReproducaoVideo = {
+  /** false esconde a barra de play/volume/tela cheia. */
+  controles?: boolean
+  /** Comeca sozinho ao abrir a pagina (sempre mudo). */
+  autoplay?: boolean
+  /** Repete sem parar. */
+  loop?: boolean
+}
+
+export type LpMidia = ReproducaoVideo & {
   tipo: TipoMidia
   /**
    * Arquivo que vai para a pagina: imagem grande (~1920px) ou mp4 em Full HD.
@@ -75,13 +92,67 @@ export type LpMidia = {
   fonte?: FonteMidia
 }
 
+/** Alinhamento horizontal: botao da secao, menu do header, coluna do rodape. */
+export type Alinhamento = 'esquerda' | 'centro' | 'direita'
+
+export const ALINHAMENTOS: Alinhamento[] = ['esquerda', 'centro', 'direita']
+
+export const ROTULO_ALINHAMENTO: Record<Alinhamento, string> = {
+  esquerda: 'À esquerda',
+  centro: 'Centralizado',
+  direita: 'À direita',
+}
+
+/** Alinhamento do botao dentro da secao. */
+export type PosicaoBotao = Alinhamento
+
+/**
+ * Efeito ao passar o mouse. Todos mexem so em transform/filter/sombra — cor de
+ * botao personalizada vai inline no HTML e venceria qualquer regra de :hover.
+ */
+export type HoverBotao = 'elevar' | 'brilho' | 'crescer' | 'sombra' | 'nenhum'
+
+/** Animacao continua, para o botao chamar atencao sozinho. */
+export type AnimacaoBotao = 'nenhuma' | 'pulsar' | 'flutuar' | 'brilho'
+
+export const POSICOES_BOTAO: PosicaoBotao[] = ['esquerda', 'centro', 'direita']
+export const HOVERS_BOTAO: HoverBotao[] = ['elevar', 'brilho', 'crescer', 'sombra', 'nenhum']
+export const ANIMACOES_BOTAO: AnimacaoBotao[] = ['nenhuma', 'pulsar', 'flutuar', 'brilho']
+
+export const ROTULO_HOVER: Record<HoverBotao, string> = {
+  elevar: 'Subir um pouco',
+  brilho: 'Clarear',
+  crescer: 'Aumentar',
+  sombra: 'Ganhar sombra',
+  nenhum: 'Sem efeito',
+}
+
+export const ROTULO_ANIMACAO: Record<AnimacaoBotao, string> = {
+  nenhuma: 'Nenhuma',
+  pulsar: 'Pulsar',
+  flutuar: 'Flutuar',
+  brilho: 'Onda de brilho',
+}
+
 export type LpBotao = {
   texto: string
   url: string
   corFundo?: string
   corTexto?: string
   estilo?: 'solido' | 'contorno'
+  /** Ausente = o alinhamento natural do layout. */
+  posicao?: PosicaoBotao
+  /** Ausente = 'elevar', o efeito que a pagina sempre teve. */
+  hover?: HoverBotao
+  /** Ausente = 'nenhuma'. */
+  animacao?: AnimacaoBotao
 }
+
+/**
+ * Botao do header ou do rodape. Igual ao das secoes, so que com id: como sao
+ * varios, o editor precisa saber a qual deles o data-lp se refere.
+ */
+export type BotaoComId = LpBotao & { id: string }
 
 /**
  * Item generico de secao — o significado dos campos depende do layout:
@@ -131,10 +202,20 @@ export type LpSecao = {
   midia?: LpMidia | null
   itens: LpItem[]
   colunas?: 2 | 3 | 4
-  /** Midia antes do texto (imagem+texto em vez de texto+imagem). */
+  /**
+   * Midia antes do texto (imagem+texto em vez de texto+imagem). Vale nos layouts
+   * de LAYOUTS_COM_LADOS; em blocos-alternados diz por qual lado a alternancia
+   * comeca.
+   */
   inverter?: boolean
   largura: 'boxed' | 'full'
-  fundo?: { cor?: string; midia?: LpMidia | null; escurecer?: number }
+  /**
+   * `escurecer` e o veu escuro por cima da midia (0-90%). `textoClaro` false faz
+   * a secao manter as cores do tema em vez do branco automatico — o branco e o
+   * padrao porque texto sobre foto/video precisa de contraste, mas quem escolheu
+   * as cores na Identidade tem de poder recuperar elas.
+   */
+  fundo?: { cor?: string; midia?: LpMidia | null; escurecer?: number; textoClaro?: boolean }
   /** Padding vertical em px. */
   espacamento?: { topo: number; base: number }
   /** Rotulos de linha (layout comparacao). */
@@ -209,22 +290,98 @@ export type RedeSocial = { id: string; rede: Rede; url: string }
 
 export type LpHeader = {
   logoTexto: string
+  /**
+   * Imagem da logo enviada pelo usuario. Quando existe, ela ocupa o lugar do
+   * nome escrito no topo — `logoTexto` continua valendo como texto alternativo,
+   * no rodape e no titulo da aba.
+   */
+  logo?: LpMidia | null
   menu: ItemMenu[]
   fixo: boolean
-  botao?: LpBotao | null
+  /** Botoes de acao ao lado do menu (vazio = nenhum). */
+  botoes: BotaoComId[]
+  estilo?: EstiloBarra
+}
+
+/**
+ * Ajustes visuais de uma barra (header ou rodape), por cima do tema global.
+ * Campo ausente = o padrao do tema, entao pagina antiga nao muda de aparencia.
+ */
+export type EstiloBarra = {
+  /** Fonte, tamanho, peso e cor dos links do menu. */
+  menu?: AjusteTexto
+  /**
+   * Tamanho da logo em px: altura maxima da imagem no header; corpo do nome
+   * escrito quando nao ha imagem (e sempre no rodape, que mostra o nome).
+   */
+  logo?: number
+  /** Onde os links ficam na barra. */
+  alinhamento?: Alinhamento
 }
 
 export type LinkFooter = { id: string; rotulo: string; url: string }
+
+/**
+ * Telefone do rodape. Com `whatsapp` o numero vira link do wa.me (e ganha o
+ * icone da rede); sem, vira link `tel:`. Sao varios porque uma empresa costuma
+ * publicar fixo e celular — ver `normalizarTelefones` (formato antigo: uma
+ * string unica com todos os numeros).
+ */
+export type TelefoneFooter = { id: string; numero: string; whatsapp: boolean }
 
 export type LpFooter = {
   textoInstitucional?: string
   direitos?: string
   endereco?: string
-  telefones?: string
+  telefones?: TelefoneFooter[]
   email?: string
   linksUteis: LinkFooter[]
+  /** Botoes de acao no rodape, abaixo do texto institucional. */
+  botoes?: BotaoComId[]
   /** Repete o menu do header como menu secundario. */
   menuSecundario: boolean
+  estilo?: EstiloBarra
+}
+
+/* --------------------------- Paginas auxiliares -------------------------- */
+
+/** Paginas de texto corrido que acompanham a landing page. */
+export type TipoPaginaLegal = 'termos' | 'privacidade'
+
+export const PAGINAS_LEGAIS: {
+  tipo: TipoPaginaLegal
+  titulo: string
+  /** Nome do arquivo ao lado do index.html — tambem e o link no rodape. */
+  arquivo: string
+  descricao: string
+}[] = [
+  {
+    tipo: 'termos',
+    titulo: 'Termos de Uso',
+    arquivo: 'termos.html',
+    descricao: 'Regras de uso do site e dos serviços.',
+  },
+  {
+    tipo: 'privacidade',
+    titulo: 'Política de Privacidade',
+    arquivo: 'privacidade.html',
+    descricao: 'Como os dados de quem visita são tratados (LGPD).',
+  },
+]
+
+export const infoPagina = (tipo: TipoPaginaLegal) =>
+  PAGINAS_LEGAIS.find((p) => p.tipo === tipo) as (typeof PAGINAS_LEGAIS)[number]
+
+/**
+ * Pagina de texto gerada junto com a landing page (termos.html,
+ * privacidade.html): mesmo header e rodape, o texto no meio. O link dela entra
+ * sozinho nos "Links uteis" do rodape.
+ */
+export type PaginaLegal = {
+  tipo: TipoPaginaLegal
+  titulo: string
+  /** Linha em branco separa paragrafo; "## " no inicio da linha vira subtitulo. */
+  conteudo: string
 }
 
 export type LpDocumento = {
@@ -234,31 +391,77 @@ export type LpDocumento = {
   secoes: LpSecao[]
   footer: LpFooter
   redes: RedeSocial[]
+  /** Termos de uso / politica de privacidade (vazio = so a pagina principal). */
+  paginas?: PaginaLegal[]
 }
 
 /* ------------------------------- Briefing -------------------------------- */
 
-export type MidiaBriefing = {
+export type MidiaBriefing = ReproducaoVideo & {
   tipo: TipoMidia
   busca: string
   orientacao: Orientacao
   /**
-   * Arquivo que o usuario enviou (ja no bucket). Quando existe, ele manda: a IA
-   * nao descreve busca e o banco de imagens nao e consultado para essa secao.
-   * `busca` passa a ser so o texto alternativo da imagem.
+   * Midia que o usuario definiu a mao: arquivo enviado por ele (fica no nosso
+   * bucket, tem `caminho`) ou item escolhido no banco de imagens (tem `fonte`).
+   * Quando existe, ela manda: a IA nao descreve a midia e a busca automatica nao
+   * roda para essa secao. `busca` passa a ser so o texto alternativo da imagem.
+   * O nome do campo vem de quando so havia envio de arquivo — briefings ja
+   * salvos usam essa chave.
    */
   arquivo?: LpMidia | null
+}
+
+/**
+ * Item que o usuario escreveu no briefing (card, plano, depoimento…). Espelha o
+ * LpItem, menos icone e imagem: icone a IA escolhe e imagem se resolve na
+ * geracao ou no editor. Campo em branco = a IA escreve aquele pedaco.
+ */
+export type ItemBriefing = {
+  id: string
+  titulo?: string
+  /** Depende do layout, como no LpItem: subtitulo do card, preco, data, nome… */
+  extra?: string
+  detalhe?: string
+  texto?: string
+  lista?: string[]
+  botao?: LpBotao | null
+  destaque?: boolean
 }
 
 export type SecaoBriefing = {
   id: string
   nome: string
   vincularMenu: boolean
+  /**
+   * Id do ItemMenuBriefing que esta secao representa — e o que faz o clique no
+   * menu do header cair nesta secao. Vazio: a geracao liga pelo nome (item
+   * "Quem Somos" acha a secao "Quem Somos") e, nao achando, cria um item novo
+   * com o nome da secao.
+   */
+  itemMenu?: string | null
   titulo: string
+  /** Linha de apoio abaixo do titulo. Vazio = a IA escreve (ou nao usa). */
+  subtitulo?: string
   conteudo: string
   layout: TipoLayout
   colunas?: 2 | 3 | 4
+  /**
+   * Midia do lado esquerdo e conteudo do direito (ver LpSecao.inverter). So os
+   * layouts de LAYOUTS_COM_LADOS usam; a escolha do usuario vence a da IA.
+   */
+  inverter?: boolean
   midia: MidiaBriefing | null
+  /**
+   * Botao que o usuario definiu para a secao. Quando existe, ele vence o que a
+   * IA escrever — qualquer layout aceita um, nao so os que a IA propoe.
+   */
+  botao?: LpBotao | null
+  /**
+   * Itens escritos pelo usuario. A lista dele define quais e quantos; o que
+   * ficar em branco a IA preenche. Vazia = a IA cria os itens sozinha.
+   */
+  itens?: ItemBriefing[]
 }
 
 export type ItemMenuBriefing = {
@@ -272,22 +475,33 @@ export type FooterBriefing = {
   textoInstitucional: string
   direitos: string
   endereco: string
-  telefones: string
+  telefones: TelefoneFooter[]
   email: string
   linksUteis: { id: string; rotulo: string; url: string }[]
   menuSecundario: boolean
+  /** Aparencia do rodape (fonte do menu, tamanho do nome, alinhamento). */
+  estilo?: EstiloBarra
 }
 
 export type LpBriefing = {
   nome: string
+  /** Logo enviada na etapa Identidade — vai para o header da pagina gerada. */
+  logo?: LpMidia | null
   tipografia: Partial<Record<CategoriaTexto, Partial<EstiloTipografia>>>
   cores: Partial<CoresTema>
   /** Ate 5 URLs de inspiracao (estilo, nunca copia). */
   referencias: string[]
   menu: ItemMenuBriefing[]
+  /** Aparencia do topo (fonte do menu, tamanho da logo, alinhamento). */
+  estiloHeader?: EstiloBarra
   footer: FooterBriefing
   redes: RedeSocial[]
   secoes: SecaoBriefing[]
+  /**
+   * Paginas de termos/privacidade que o projeto vai ter. Estar na lista = a
+   * pagina existe; o texto e escrito na etapa "Páginas" do assistente.
+   */
+  paginas: PaginaLegal[]
 }
 
 export type LpProjeto = {
@@ -322,12 +536,13 @@ export function briefingVazio(nome: string): LpBriefing {
       textoInstitucional: '',
       direitos: '',
       endereco: '',
-      telefones: '',
+      telefones: [],
       email: '',
       linksUteis: [],
       menuSecundario: false,
     },
     redes: [],
     secoes: [],
+    paginas: [],
   }
 }

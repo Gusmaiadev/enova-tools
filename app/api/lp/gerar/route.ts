@@ -1,6 +1,17 @@
 import { lerUsuario } from '@/lib/auth/usuarioAtual'
 import { limparOrfaos } from '@/lib/lp/armazenamento'
-import { aplicarArquivos, arquivosUsados, documentoBase } from '@/lib/lp/documento'
+import {
+  aplicarArquivos,
+  aplicarBotoes,
+  aplicarEstiloBarras,
+  aplicarItens,
+  aplicarLados,
+  aplicarMenu,
+  aplicarPaginas,
+  aplicarTextos,
+  arquivosUsados,
+  documentoBase,
+} from '@/lib/lp/documento'
 import { gerarDocumento } from '@/lib/lp/ia'
 import { preencherMidias } from '@/lib/lp/midias'
 import { atualizarProjeto, obterProjeto } from '@/lib/lp/persistencia'
@@ -81,6 +92,23 @@ export async function POST(req: Request) {
   if (resultado.ok && faltando > 0) {
     avisos.push(
       `${faltando} ${faltando === 1 ? 'seção não pôde ser gerada' : 'seções não puderam ser geradas'} e ficou de fora. Reveja no editor ou gere de novo.`,
+    )
+  }
+
+  // O menu é do briefing: rótulos, ordem e — quando o usuário disse qual seção
+  // cada item representa — a âncora de destino. Sem isso a IA às vezes aponta
+  // para uma âncora que não existe e o clique não sai do lugar.
+  aplicarMenu(documento, briefing)
+  // Termos/privacidade: o texto é do usuário, a IA não escreve nem linka.
+  aplicarPaginas(documento, briefing)
+  aplicarBotoes(documento, briefing)
+  aplicarLados(documento, briefing)
+  aplicarEstiloBarras(documento, briefing)
+  aplicarTextos(documento, briefing)
+  const itensVazios = aplicarItens(documento, briefing)
+  if (itensVazios > 0) {
+    avisos.push(
+      `${itensVazios} ${itensVazios === 1 ? 'item que você deixou em branco não foi escrito' : 'itens que você deixou em branco não foram escritos'} pela IA e ficou de fora. Gere de novo ou escreva no editor.`,
     )
   }
 

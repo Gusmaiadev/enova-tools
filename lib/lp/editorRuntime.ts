@@ -27,7 +27,7 @@ export const EDITOR_RUNTIME = `
     pai.postMessage(msg, '*')
   }
 
-  var EDITAVEIS = /:(titulo|subtitulo|texto|extra|detalhe|botao|logo|institucional|direitos|endereco|telefones|email)$/
+  var EDITAVEIS = /:(titulo|subtitulo|texto|extra|detalhe|botao|logo|institucional|direitos|endereco|email)$|^footer:telefone:|^(header|footer):botao:/
 
   var selecionado = null
   var editando = null

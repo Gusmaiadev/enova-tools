@@ -11,7 +11,7 @@ import 'server-only'
  * a página não quebra, e o aviso volta para a tela.
  */
 
-import { compilar } from './compilador'
+import { compilar, type PaginaCompilada } from './compilador'
 import { urlGoogleFonts } from './fontes'
 import { fetchExternoSeguro } from './rede'
 import type { LpDocumento } from './tipos'
@@ -86,6 +86,11 @@ async function baixarFontes(
     for (const a of Object.values(s.ajustes ?? {})) {
       if (a?.fonte) familias.add(a.fonte)
     }
+  }
+  // Mesma lista de fontesUsadas (compilador): o menu do header/rodapé pode ter
+  // uma família própria, e ela precisa entrar no pacote offline.
+  for (const estilo of [doc.header.estilo, doc.footer.estilo]) {
+    if (estilo?.menu?.fonte) familias.add(estilo.menu.fonte)
   }
   const url = urlGoogleFonts([...familias])
   if (!url) return { arquivos: [], ok: true }
@@ -194,13 +199,21 @@ export async function montarPacote(
       { caminho: 'index.html', dados: codificador.encode(final.html) },
       { caminho: 'style.css', dados: codificador.encode(final.css) },
       { caminho: 'script.js', dados: codificador.encode(final.js) },
-      { caminho: 'README.txt', dados: codificador.encode(leiaMe(nomeProjeto, 'projeto')) },
+      ...final.paginas.map((p) => ({
+        caminho: p.arquivo,
+        dados: codificador.encode(p.html),
+      })),
+      { caminho: 'README.txt', dados: codificador.encode(leiaMe(nomeProjeto, 'projeto', final.paginas)) },
     )
   } else {
     const final = compilar(doc, { urlLocal })
     arquivos.unshift(
       { caminho: 'index.html', dados: codificador.encode(final.unico) },
-      { caminho: 'README.txt', dados: codificador.encode(leiaMe(nomeProjeto, 'unico')) },
+      ...final.paginas.map((p) => ({
+        caminho: p.arquivo,
+        dados: codificador.encode(p.unico),
+      })),
+      { caminho: 'README.txt', dados: codificador.encode(leiaMe(nomeProjeto, 'unico', final.paginas)) },
     )
   }
 
@@ -212,16 +225,19 @@ export async function montarPacote(
   }
 }
 
-function leiaMe(nome: string, formato: FormatoExport): string {
+function leiaMe(nome: string, formato: FormatoExport, paginas: PaginaCompilada[] = []): string {
+  const extras = paginas
+    .map((p) => `- ${p.arquivo}${' '.repeat(Math.max(1, 18 - p.arquivo.length))}${p.titulo}`)
+    .join('\n')
   const estrutura =
     formato === 'unico'
       ? `- index.html ....... a página inteira (HTML + CSS + JavaScript juntos)
-- assets/images .... imagens usadas
+${extras ? `${extras}\n` : ''}- assets/images .... imagens usadas
 - assets/videos .... vídeos usados`
       : `- index.html ....... estrutura da página
 - style.css ........ estilos
 - script.js ........ interações (menu, slider, abas, formulário)
-- assets/images .... imagens usadas
+${extras ? `${extras}\n` : ''}- assets/images .... imagens usadas
 - assets/videos .... vídeos usados
 - assets/fonts ..... fontes + fontes.css`
 

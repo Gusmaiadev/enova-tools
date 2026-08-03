@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { compilar, compilarEditor } from './index'
+import { idHtmlSecao } from './css'
 import { documentoBase } from '../documento'
 import { novaSecao } from '../layouts'
-import type { LpBriefing, LpDocumento, TipoLayout } from '../tipos'
+import type { LpBriefing, LpDocumento, LpMidia, TipoLayout } from '../tipos'
 import { briefingVazio } from '../tipos'
 import { LAYOUTS } from '../layouts'
 import { coergirDocumento } from '../validar'
@@ -32,7 +33,10 @@ function documentoCompleto(): LpDocumento {
         textoInstitucional: 'Empresa de teste',
         direitos: '© 2026 Teste',
         endereco: 'Rua Um, 1',
-        telefones: '(11) 90000-0000',
+        telefones: [
+          { id: 't1', numero: '(11) 90000-0000', whatsapp: true },
+          { id: 't2', numero: '(11) 3000-0000', whatsapp: false },
+        ],
         email: 'oi@teste.com',
         linksUteis: [{ id: 'l1', rotulo: 'Privacidade', url: '#' }],
         menuSecundario: true,
@@ -58,6 +62,31 @@ describe('compilador', () => {
     expect(saida.unico).not.toContain('href="style.css"')
     expect(saida.unico).not.toContain('src="script.js"')
     expect(saida.unico).toContain('<style>')
+  })
+
+  it('executa o script sem erro com todos os módulos juntos', () => {
+    // Regressão: sem ponto e vírgula entre os módulos, a inserção automática do
+    // JS lê `'use strict'\n(function(){…})()` como chamada da string e o script
+    // inteiro morre na primeira linha — a página abre com as seções invisíveis
+    // (.lp-reveal nunca vira .lp-vis) e nenhum slider funcionando.
+    const { js } = compilar(documentoCompleto())
+    const doc = { querySelector: () => null, querySelectorAll: () => [] }
+    const win = { addEventListener: () => {} }
+    expect(() => new Function('document', 'window', js)(doc, win)).not.toThrow()
+  })
+
+  it('a âncora coagida serve como id de seção no HTML', () => {
+    // A IA às vezes devolve o id cru da seção no lugar da âncora. Começando por
+    // dígito, o compilador recusa e emite outro id — enquanto o menu e os botões
+    // já receberam "#ancora" e passam a apontar para um id que não existe.
+    const doc = documentoCompleto()
+    doc.secoes[1].ancora = '9d1aa5d4'
+    const coagido = coergirDocumento(doc, doc.tema) as LpDocumento
+    const usados = new Set<string>()
+    for (const s of coagido.secoes) {
+      const id = idHtmlSecao(s, usados)
+      if (s.ancora) expect(id).toBe(s.ancora)
+    }
   })
 
   it('emite uma tag de abertura por seção do documento', () => {
@@ -170,6 +199,213 @@ describe('compilador', () => {
     expect(css).toContain('--texto-footer: #ffffff')
   })
 
+  it('liga cada telefone do rodapé: wa.me quando é WhatsApp, tel: quando não', () => {
+    const { html } = compilar(documentoCompleto())
+    expect(html).toContain(
+      '<a href="https://wa.me/5511900000000" target="_blank" rel="noopener" title="Conversar no WhatsApp">(11) 90000-0000</a>',
+    )
+    expect(html).toContain('<a href="tel:+551130000000">(11) 3000-0000</a>')
+    // O ícone da linha é o do WhatsApp (nenhuma rede social do teste usa esse path).
+    expect(html).toContain('M12 2a10 10 0 0 0-8.6 15L2 22l5-1.4A10 10 0 1 0 12 2z')
+  })
+
+  it('cada telefone tem seu alvo de edição no modo editor', () => {
+    const html = compilarEditor(documentoCompleto())
+    expect(html).toContain('data-lp="footer:telefone:t1"')
+    expect(html).toContain('data-lp="footer:telefone:t2"')
+    // Na exportação nenhum data-lp sobra.
+    expect(compilar(documentoCompleto()).html).not.toContain('data-lp')
+  })
+
+  it('rodapé de projeto antigo (telefones em uma string só) continua compilando', () => {
+    const doc = documentoCompleto()
+    // Documento salvo antes de os telefones virarem lista.
+    ;(doc.footer as { telefones: unknown }).telefones = '(11) 3000-0000 / (11) 90000-0000'
+    const { html } = compilar(doc)
+    expect(html).toContain('tel:+551130000000')
+    expect(html).toContain('tel:+5511900000000')
+  })
+
+  it('põe os botões do header dentro do nav (para aparecerem na gaveta do celular)', () => {
+    const doc = documentoCompleto()
+    doc.header.botoes = [
+      { id: 'b1', texto: 'Fale conosco', url: '#contato' },
+      { id: 'b2', texto: 'Orçamento', url: 'https://exemplo.com', estilo: 'contorno' },
+    ]
+    const { html } = compilar(doc)
+    const nav = html.slice(html.indexOf('<nav'), html.indexOf('</nav>'))
+    expect(nav).toContain('<div class="lp-header-acoes">')
+    expect(nav).toContain('href="#contato"')
+    expect(nav).toContain('class="lp-btn contorno"')
+  })
+
+  it('sem menu e sem botão o header não emite nav nem hambúrguer', () => {
+    const doc = documentoCompleto()
+    doc.header.menu = []
+    doc.header.botoes = []
+    doc.footer.menuSecundario = false
+    const { html } = compilar(doc)
+    expect(html).not.toContain('<nav')
+    expect(html).not.toContain('lp-menu-btn')
+  })
+
+  it('botões do rodapé saem entre o texto institucional e as redes', () => {
+    const doc = documentoCompleto()
+    doc.footer.botoes = [{ id: 'f1', texto: 'Peça um orçamento', url: '#contato' }]
+    const rodape = compilar(doc).html.slice(compilar(doc).html.indexOf('<footer'))
+    expect(rodape).toContain('<div class="lp-footer-acoes">')
+    expect(rodape.indexOf('lp-footer-acoes')).toBeLessThan(rodape.indexOf('lp-redes'))
+  })
+
+  it('cada botão de header e rodapé tem seu alvo de edição', () => {
+    const doc = documentoCompleto()
+    doc.header.botoes = [{ id: 'b1', texto: 'Fale conosco', url: '#' }]
+    doc.footer.botoes = [{ id: 'f1', texto: 'Orçamento', url: '#' }]
+    const html = compilarEditor(doc)
+    expect(html).toContain('data-lp="header:botao:b1"')
+    expect(html).toContain('data-lp="footer:botao:f1"')
+  })
+
+  it('documento antigo (header.botao, um botão só) continua compilando', () => {
+    const doc = documentoCompleto()
+    delete (doc.header as { botoes?: unknown }).botoes
+    ;(doc.header as { botao?: unknown }).botao = { texto: 'Fale conosco', url: '#contato' }
+    const { html } = compilar(doc)
+    expect(html).toContain('<div class="lp-header-acoes">')
+    expect(html).toContain('>Fale conosco</a>')
+  })
+
+  it('gera a página de texto com o header, o rodapé e o CSS da landing page', () => {
+    const doc = documentoCompleto()
+    doc.paginas = [
+      {
+        tipo: 'termos',
+        titulo: 'Termos de Uso',
+        conteudo: '## 1. Objeto\nO uso do site.\nSegunda linha.\n\nOutro parágrafo.',
+      },
+    ]
+    const { paginas, css } = compilar(doc)
+    expect(paginas.map((p) => p.arquivo)).toEqual(['termos.html'])
+
+    const html = paginas[0].html
+    expect(html).toContain('<title>Termos de Uso — Teste</title>')
+    expect(html).toContain('<meta name="robots" content="noindex">')
+    expect(html).toContain('<h1>Termos de Uso</h1>')
+    expect(html).toContain('<h2>1. Objeto</h2>')
+    expect(html).toContain('<p>O uso do site.<br>Segunda linha.</p>')
+    expect(html).toContain('<p>Outro parágrafo.</p>')
+    expect(html).toContain('<header class="lp-header"')
+    expect(html).toContain('<footer class="lp-footer"')
+    expect(html).toContain('<link rel="stylesheet" href="style.css">')
+    expect(css).toContain('.lp-legal')
+  })
+
+  it('na página de texto as âncoras voltam para o index', () => {
+    const doc = documentoCompleto()
+    doc.header.botoes = [{ id: 'b1', texto: 'Fale conosco', url: '#contato' }]
+    doc.paginas = [{ tipo: 'termos', titulo: 'Termos de Uso', conteudo: 'Texto.' }]
+    const html = compilar(doc).paginas[0].html
+    expect(html).toContain('href="index.html#topo"')
+    expect(html).toContain('href="index.html#contato"')
+    // O index continua com a âncora pura.
+    expect(compilar(doc).html).toContain('href="#contato"')
+  })
+
+  it('o texto da página passa por escape', () => {
+    const doc = documentoCompleto()
+    doc.paginas = [
+      { tipo: 'privacidade', titulo: '<img src=x onerror=1>', conteudo: '<script>alert(1)</script>' },
+    ]
+    const html = compilar(doc).paginas[0].html
+    expect(html).not.toContain('<script>alert(1)</script>')
+    expect(html).not.toContain('<img src=x')
+    expect(html).toContain('&lt;script&gt;')
+  })
+
+  it('sem páginas no documento o pacote não muda', () => {
+    const { paginas, css } = compilar(documentoCompleto())
+    expect(paginas).toEqual([])
+    expect(css).not.toContain('.lp-legal')
+  })
+
+  it('página ainda sem texto (recém-criada no editor) não vira arquivo', () => {
+    const doc = documentoCompleto()
+    doc.paginas = [{ tipo: 'termos', titulo: 'Termos de Uso', conteudo: '   ' }]
+    const { paginas, css } = compilar(doc)
+    expect(paginas).toEqual([])
+    expect(css).not.toContain('.lp-legal')
+  })
+
+  it('troca os lados do conteúdo e da mídia nos layouts que dividem a linha', () => {
+    const doc = documentoBase(briefing())
+    const hero = novaSecao('hero')
+    hero.midia = { tipo: 'imagem', url: 'https://ex.com/a.jpg', alt: 'A', busca: 'a', orientacao: 'paisagem' }
+    hero.inverter = true
+    const tm = novaSecao('texto-midia')
+    tm.inverter = true
+    const blocos = novaSecao('blocos-alternados')
+    blocos.inverter = true
+    doc.secoes = [hero, tm, blocos]
+    const { html } = compilar(doc)
+
+    // Hero com mídia ao lado ganha a classe na seção; os outros, no container.
+    expect(html).toContain('lp-hero inv')
+    expect(html).toContain('<div class="lp-tm inv">')
+    expect(html).toContain('<div class="lp-blocos inv">')
+  })
+
+  it('sem inverter, nada de classe extra (a página de hoje não muda)', () => {
+    const doc = documentoBase(briefing())
+    doc.secoes = [novaSecao('texto-midia'), novaSecao('blocos-alternados')]
+    const { html } = compilar(doc)
+    expect(html).toContain('<div class="lp-tm">')
+    expect(html).toContain('<div class="lp-blocos">')
+    expect(html).not.toContain('inv')
+  })
+
+  it('leva os ajustes de header e rodapé para o CSS (e a fonte para o <head>)', () => {
+    const doc = documentoCompleto()
+    doc.header.estilo = {
+      menu: { fonte: 'Poppins', tamanho: '18px', peso: 700 },
+      logo: 64,
+      alinhamento: 'centro',
+    }
+    doc.footer.estilo = { menu: { fonte: 'Lora' }, logo: 30, alinhamento: 'centro' }
+    const { css, html } = compilar(doc)
+
+    expect(css).toContain("'Poppins'")
+    // A coluna de contato não é menu: fica de fora da fonte escolhida.
+    expect(css).toContain(".lp-footer ul:not(.lp-contato) a{font-family:'Lora'")
+    expect(css).toContain('font-size:18px')
+    expect(css).toContain('.lp-nav ul{margin-inline:auto}')
+    // Sem imagem de logo, o tamanho é o corpo do nome escrito.
+    expect(css).toContain('.lp-logo{font-size:64px}')
+    expect(css).toContain('.lp-logo-footer{font-size:30px}')
+    expect(css).toContain('.lp-footer-grid{text-align:center}')
+    // Fonte só do menu também precisa ser carregada.
+    expect(html).toContain('Poppins')
+  })
+
+  it('logo em imagem cresce pela altura, com a largura acompanhando', () => {
+    const doc = documentoCompleto()
+    doc.header.logo = {
+      tipo: 'imagem',
+      url: 'https://ex.com/logo.png',
+      alt: 'Logo',
+      busca: 'logo',
+      orientacao: 'paisagem',
+    }
+    doc.header.estilo = { logo: 60 }
+    expect(compilar(doc).css).toContain('.lp-logo-img img{max-height:60px;max-width:300px}')
+  })
+
+  it('sem ajuste nenhum nas barras, o CSS continua o de antes', () => {
+    const { css } = compilar(documentoCompleto())
+    expect(css).not.toContain('.lp-nav ul{margin')
+    expect(css).not.toContain('.lp-logo{font-size')
+    expect(css).not.toContain('.lp-logo-footer{font-size')
+  })
+
   it('gera âncoras únicas mesmo com seções de mesmo nome', () => {
     const doc = documentoBase(briefing())
     const a = novaSecao('cards')
@@ -227,6 +463,50 @@ describe('compilador', () => {
     ])
   })
 
+  /** Só a tag do <video>: 'loop'/'controls' soltos no HTML dariam falso positivo. */
+  const tagVideo = (html: string) => /<video[^>]*>/.exec(html)?.[0] ?? ''
+
+  const comVideo = (tipo: 'texto-midia' | 'banner', extra: Partial<LpMidia> = {}) => {
+    const doc = documentoBase(briefing())
+    const secao = novaSecao(tipo)
+    secao.midia = {
+      tipo: 'video',
+      url: 'https://cdn.exemplo.com/filme.mp4',
+      alt: 'Filme',
+      busca: 'filme',
+      orientacao: 'paisagem',
+      ...extra,
+    }
+    doc.secoes = [secao]
+    return tagVideo(compilar(doc).html)
+  }
+
+  it('vídeo sai com controles, parado e sem repetir quando nada foi escolhido', () => {
+    const tag = comVideo('texto-midia')
+    expect(tag).toContain('controls')
+    expect(tag).toContain('preload="metadata"')
+    expect(tag).not.toContain('autoplay')
+    expect(tag).not.toContain('loop')
+  })
+
+  it('respeita controles/loop/autoplay — e autoplay entra sempre mudo', () => {
+    const tag = comVideo('texto-midia', { controles: false, autoplay: true, loop: true })
+    expect(tag).toContain('autoplay')
+    expect(tag).toContain('muted')
+    expect(tag).toContain('loop')
+    expect(tag).not.toContain('controls')
+    // Autoplay e preload="metadata" brigam: quem começa sozinho carrega sozinho.
+    expect(tag).not.toContain('preload')
+  })
+
+  it('vídeo de fundo ignora controles, mas obedece quem desligou o loop', () => {
+    const tag = comVideo('banner', { controles: true, loop: false })
+    expect(tag).toContain('autoplay')
+    expect(tag).toContain('muted')
+    expect(tag).not.toContain('loop')
+    expect(tag).not.toContain('controls')
+  })
+
   it('omite o poster quando a miniatura não passa pelo saneamento de URL', () => {
     const doc = documentoBase(briefing())
     const secao = novaSecao('texto-midia')
@@ -241,6 +521,165 @@ describe('compilador', () => {
     doc.secoes = [secao]
 
     expect(compilar(doc).html).not.toContain('poster=')
+  })
+
+  it('big numbers sai com título, subtítulo, conteúdo e os números escritos', () => {
+    const doc = documentoBase(briefing())
+    const secao = novaSecao('estatisticas')
+    secao.titulo = 'Nossos números'
+    secao.subtitulo = 'Vinte anos construindo'
+    secao.texto = 'Cada número aqui é obra entregue, não promessa.'
+    secao.itens = [
+      { id: 'n1', extra: '+500', titulo: 'Obras entregues' },
+      { id: 'n2', extra: '20 anos', titulo: 'De mercado' },
+    ]
+    doc.secoes = [secao]
+    const { html, js } = compilar(doc)
+
+    expect(html).toContain('>Nossos números<')
+    expect(html).toContain('>Vinte anos construindo<')
+    // O conteúdo da seção some da página se o cabeçalho não o emitir.
+    expect(html).toContain('Cada número aqui é obra entregue')
+    expect(html).toContain('>+500<')
+    expect(html).toContain('>Obras entregues<')
+    // O valor é o que a contagem animada anima.
+    expect(html).toContain('data-contar')
+    expect(js).toContain('data-contar')
+  })
+
+  it('cada card sai com título, subtítulo, texto e botão próprios', () => {
+    const doc = documentoBase(briefing())
+    const secao = novaSecao('cards')
+    secao.itens = [
+      {
+        id: 'c1',
+        icone: 'check',
+        titulo: 'Reforma completa',
+        extra: 'a partir de 30 dias',
+        texto: 'Cuidamos do projeto à entrega.',
+        botao: { texto: 'Quero esta', url: '#contato', hover: 'crescer' },
+      },
+      { id: 'c2', titulo: 'Manutenção', texto: 'Time fixo para o prédio.' },
+    ]
+    doc.secoes = [secao]
+    const { html, css } = compilar(doc)
+
+    expect(html).toContain('class="lp-card-subtitulo"')
+    expect(html).toContain('>a partir de 30 dias<')
+    expect(html).toContain('>Quero esta<')
+    expect(html).toContain('hover-crescer')
+    // Card sem subtítulo/botão não emite os blocos vazios.
+    expect((html.match(/lp-card-subtitulo/g) ?? []).length).toBe(1)
+    expect((html.match(/lp-card-acao/g) ?? []).length).toBe(1)
+    // Botão encostado na base: cards de alturas diferentes alinham os botões.
+    expect(css).toContain('.lp-card-acao{margin-top:auto')
+    expect(css).toMatch(/\.lp-card\{[^}]*flex-direction:column/)
+  })
+
+  it('botão sai em qualquer layout, com posição, hover e animação', () => {
+    const doc = documentoCompleto()
+    for (const s of doc.secoes) {
+      s.botao = {
+        texto: 'Quero saber',
+        url: '#contato',
+        posicao: 'centro',
+        hover: 'crescer',
+        animacao: 'pulsar',
+      }
+    }
+    const { html, css } = compilar(doc)
+
+    expect(doc.secoes.length).toBeGreaterThan(15)
+    expect((html.match(/class="lp-acao/g) ?? []).length).toBe(doc.secoes.length)
+    expect((html.match(/>Quero saber</g) ?? []).length).toBe(doc.secoes.length)
+    expect(html).toContain('hover-crescer')
+    expect(html).toContain('anim-pulsar')
+    expect(css).toContain('.lp-acao.pos-centro')
+    expect(css).toContain('@keyframes lp-pulsar')
+    // Fecha tudo que abre: o bloco do botão entra dentro do container de cada
+    // layout, não solto depois dele.
+    expect((html.match(/<div/g) ?? []).length).toBe((html.match(/<\/div>/g) ?? []).length)
+  })
+
+  it('alinhamento padrão do botão acompanha o layout', () => {
+    const doc = documentoBase(briefing())
+    const tm = novaSecao('texto-midia')
+    const cards = novaSecao('cards')
+    tm.botao = { texto: 'Ver', url: '#' }
+    cards.botao = { texto: 'Ver', url: '#' }
+    doc.secoes = [tm, cards]
+    const { html } = compilar(doc)
+    // Texto+mídia é coluna de texto à esquerda; grade de cards é centralizada.
+    expect(html).toContain('lp-acao pos-esquerda')
+    expect(html).toContain('lp-acao pos-centro')
+
+    tm.botao.posicao = 'direita'
+    expect(compilar(doc).html).toContain('lp-acao pos-direita')
+  })
+
+  it('põe a logo enviada no topo e a coleta para a exportação', () => {
+    const doc = documentoBase(briefing())
+    doc.header.logoTexto = 'Felix Construtora'
+    doc.header.logo = {
+      tipo: 'imagem',
+      url: 'https://cdn.exemplo.com/logo.png',
+      caminho: 'lp/t1/lp1/logo.png',
+      alt: 'Felix',
+      busca: '',
+      orientacao: 'quadrado',
+    }
+
+    const { html, midias } = compilar(doc)
+    expect(html).toContain('class="lp-logo lp-logo-img"')
+    // Alt é o nome da marca, não o nome do arquivo enviado ("Felix", aqui).
+    expect(html).toContain(
+      '<img src="https://cdn.exemplo.com/logo.png" alt="Felix Construtora">',
+    )
+    // Sem entrar na coleta, o ZIP exportado sairia sem o arquivo da logo.
+    expect(midias.map((m) => m.url)).toContain('https://cdn.exemplo.com/logo.png')
+    // No canvas o link com imagem não é texto editável (não dá para digitar num <img>).
+    expect(compilarEditor(doc)).not.toContain('data-lp="header:logo"')
+
+    doc.header.logo = null
+    expect(compilar(doc).html).toContain('>Felix Construtora</a>')
+    expect(compilarEditor(doc)).toContain('data-lp="header:logo"')
+  })
+
+  it('usa o tamanho de título escolhido, sem piso fixo que o anule', () => {
+    const doc = documentoBase(
+      briefing({ tipografia: { titulos: { fonte: 'Poppins', peso: 800, tamanho: '20px' } } }),
+    )
+    doc.secoes = [novaSecao('hero')]
+    const { css } = compilar(doc)
+    expect(css).toContain('--tamanho-titulos: 20px')
+    // Piso fixo (ex.: 2rem) vence o teto quando o usuário escolhe um tamanho
+    // pequeno — clamp devolve o mínimo — e a página sai no tamanho padrão.
+    const pisos = [...css.matchAll(/font-size:clamp\(([^,]+),/g)].map((m) => m[1].trim())
+    expect(pisos.length).toBeGreaterThan(0)
+    expect(pisos.filter((p) => !p.includes('var(--tamanho-titulos)'))).toEqual([])
+  })
+
+  it('mídia de fundo põe texto branco, e dá para voltar às cores do tema', () => {
+    const doc = documentoBase(briefing())
+    const secao = novaSecao('texto-midia')
+    secao.fundo = {
+      midia: {
+        tipo: 'imagem',
+        url: 'https://cdn.exemplo.com/fundo.jpg',
+        alt: 'Fundo',
+        busca: 'fundo',
+        orientacao: 'paisagem',
+      },
+      escurecer: 60,
+    }
+    doc.secoes = [secao]
+    expect(compilar(doc).html).toContain('lp-sobre-midia')
+
+    secao.fundo.textoClaro = false
+    const { html, css } = compilar(doc)
+    expect(html).not.toContain('lp-sobre-midia')
+    // A regra continua no CSS (outras seções podem usar), só não se aplica aqui.
+    expect(css).toContain('.lp-sobre-midia h1')
   })
 
   it('libera o container nas seções de largura total', () => {

@@ -5,19 +5,33 @@
  */
 
 import { pesoValido } from './fontes'
-import { novoItem } from './layouts'
+import { infoLayout, novoItem, temLados } from './layouts'
 import { placeholderMidia } from './placeholder'
 import type {
   CategoriaTexto,
   EstiloTipografia,
+  ItemBriefing,
+  ItemMenu,
   LpBriefing,
+  LpItem,
   LpDocumento,
   LpMidia,
   LpSecao,
   LpTema,
   MidiaBriefing,
+  PaginaLegal,
+  ReproducaoVideo,
+  SecaoBriefing,
 } from './tipos'
-import { corSegura, gerarId, limitar, slugificar } from './util'
+import { PAGINAS_LEGAIS, infoPagina } from './tipos'
+import {
+  ancoraSegura,
+  corSegura,
+  gerarId,
+  limitar,
+  normalizarTelefones,
+  slugificar,
+} from './util'
 
 export const TEMA_PADRAO: LpTema = {
   tipografia: {
@@ -68,41 +82,360 @@ export function clonar<T>(valor: T): T {
 }
 
 /**
- * Midia de uma secao a partir do briefing: o arquivo que o usuario enviou,
- * quando existe, ou um placeholder que a busca em banco de imagens preenche
- * depois. `busca` do briefing e o texto alternativo do arquivo enviado.
+ * Midia de uma secao a partir do briefing: a que o usuario definiu (arquivo
+ * enviado ou escolhida no banco de imagens), quando existe, ou um placeholder
+ * que a busca em banco preenche depois. `busca` do briefing e o texto
+ * alternativo da midia definida.
  */
+/**
+ * Midia da secao do briefing com o patch aplicado por cima do que ja existe.
+ *
+ * Enumerar os campos a preservar (era o que a etapa fazia) quebra em silencio a
+ * cada campo novo: as opcoes de reproducao do video ficaram de fora da lista e
+ * cada clique apagava a escolha anterior, entao so uma delas parava em pe.
+ */
+export function mesclarMidiaBriefing(
+  atual: MidiaBriefing | null | undefined,
+  patch: Partial<MidiaBriefing>,
+): MidiaBriefing {
+  return { busca: '', tipo: 'imagem', orientacao: 'paisagem', ...atual, ...patch }
+}
+
 export function midiaDoBriefing(mb: MidiaBriefing): LpMidia {
-  if (!mb.arquivo) return placeholderMidia(mb.busca, mb.orientacao, mb.tipo)
-  return { ...mb.arquivo, busca: mb.busca, alt: mb.busca || mb.arquivo.alt }
+  const base = mb.arquivo
+    ? { ...mb.arquivo, busca: mb.busca, alt: mb.busca || mb.arquivo.alt }
+    : placeholderMidia(mb.busca, mb.orientacao, mb.tipo)
+  return { ...base, ...opcoesVideo(mb) }
 }
 
 /**
- * Reimpoe no documento as midias que o usuario enviou. A IA descreve a midia de
- * cada secao e a busca em banco preencheria por cima — arquivo do usuario vence
- * sempre. Casa por id (a IA mantem os ids do briefing) e, quando nao acha,
- * pela posicao, so se o layout confere. Muta no lugar, como preencherMidias.
+ * So as opcoes de reproducao que foram definidas — para levar as escolhas do
+ * usuario de um slot para a midia nova sem inventar valor nenhum.
  */
+export function opcoesVideo(m: ReproducaoVideo): ReproducaoVideo {
+  const o: ReproducaoVideo = {}
+  if (m.controles !== undefined) o.controles = m.controles
+  if (m.autoplay !== undefined) o.autoplay = m.autoplay
+  if (m.loop !== undefined) o.loop = m.loop
+  return o
+}
+
+/**
+ * Onde a midia definida pelo usuario entra na secao: no fundo (hero/banner que a
+ * IA montou com imagem de fundo), no campo de midia do layout ou — nos layouts
+ * em que so os itens tem imagem (galeria, carrossel, blocos alternados…) — a
+ * imagem do primeiro item, o unico lugar em que ela apareceria na pagina.
+ *
+ * O alvo e decidido uma vez: escrever muda a secao e mudaria a resposta.
+ */
+function alvoDeMidia(secao: LpSecao): {
+  ler: () => LpMidia | null | undefined
+  escrever: (m: LpMidia) => void
+} {
+  const info = infoLayout(secao.tipo)
+  if (!info.campos.midia && info.itens?.campos.includes('imagem')) {
+    return {
+      ler: () => secao.itens[0]?.imagem,
+      escrever: (m) => {
+        if (secao.itens.length === 0) secao.itens.push(novoItem(secao.tipo))
+        secao.itens[0].imagem = m
+      },
+    }
+  }
+  // Hero/banner em que a IA usou a midia como fundo: a escolha do usuario vai
+  // para o fundo, senao a imagem dele apareceria fora do lugar previsto.
+  if (secao.fundo?.midia && !secao.midia) {
+    return {
+      ler: () => secao.fundo?.midia,
+      escrever: (m) => {
+        if (secao.fundo) secao.fundo.midia = m
+      },
+    }
+  }
+  return { ler: () => secao.midia, escrever: (m) => { secao.midia = m } }
+}
+
+function aplicarMidiaNaSecao(secao: LpSecao, midia: LpMidia): void {
+  alvoDeMidia(secao).escrever(midia)
+}
+
+/**
+ * Reimpoe no documento o que o usuario definiu para a midia de cada secao no
+ * briefing: o arquivo enviado ou a foto escolhida no banco (a IA descreve a
+ * midia e a busca preencheria por cima — a escolha do usuario vence sempre) e as
+ * opcoes de reproducao do video, que valem tambem para a midia que ainda vai ser
+ * buscada. Casa por id (a IA mantem os ids do briefing) e, quando nao acha, pela
+ * posicao, so se o layout confere. Muta no lugar, como preencherMidias.
+ *
+ * `perdidas` conta so midia definida que nao achou secao — e o que vira aviso.
+ */
+/**
+ * Secao do documento que corresponde a uma secao do briefing: casa por id (a IA
+ * mantem os ids que mandamos) e, quando nao acha, pela posicao — so se o layout
+ * confere, senao estariamos escrevendo numa secao que nao e aquela.
+ */
+function secaoCorrespondente(
+  doc: LpDocumento,
+  sb: SecaoBriefing,
+  i: number,
+): LpSecao | undefined {
+  const naPosicao = doc.secoes[i]?.tipo === sb.layout ? doc.secoes[i] : undefined
+  return doc.secoes.find((s) => s.id === sb.id) ?? naPosicao
+}
+
+/**
+ * Ancora da secao, criando uma a partir do nome se ainda nao houver — sempre
+ * unica no documento, senao dois itens do menu levariam ao mesmo lugar.
+ */
+export function garantirAncora(doc: LpDocumento, secao: LpSecao): string {
+  if (secao.ancora) return secao.ancora
+  const usadas = new Set(doc.secoes.map((s) => s.ancora).filter((a): a is string => Boolean(a)))
+  const base = ancoraSegura(secao.nome)
+  let ancora = base
+  let n = 2
+  while (usadas.has(ancora)) ancora = `${base}-${n++}`
+  secao.ancora = ancora
+  return ancora
+}
+
+/**
+ * Menu do header a partir do briefing. Cada item vira uma ancora de verdade:
+ * 1. a secao que o usuario marcou como sendo aquele item (SecaoBriefing.itemMenu);
+ * 2. senao, a secao de nome parecido (era o unico criterio antes);
+ * 3. senao, '#topo' — o item existe, mas nao tem secao para onde levar.
+ * Item com URL externa mantem a URL. Secao marcada para o menu que nenhum item
+ * reivindicou entra no fim, para nao ficar inalcancavel.
+ *
+ * `atual` e o menu ja montado (o que a IA devolveu): so vale quando o briefing
+ * nao definiu item nenhum.
+ */
+export function montarMenu(
+  doc: LpDocumento,
+  briefing: LpBriefing,
+  atual: ItemMenu[] = [],
+): ItemMenu[] {
+  const itens: ItemMenu[] =
+    briefing.menu.length === 0
+      ? [...atual]
+      : briefing.menu.map((m) => {
+          if (m.url.trim() !== '') return { id: m.id, rotulo: m.rotulo, alvo: m.url }
+          let secao: LpSecao | undefined
+          briefing.secoes.forEach((sb, i) => {
+            if (secao || !sb.vincularMenu || sb.itemMenu !== m.id) return
+            secao = secaoCorrespondente(doc, sb, i)
+          })
+          secao ??= doc.secoes.find(
+            (s) =>
+              s.ancora !== null &&
+              (s.nome.toLowerCase() === m.rotulo.toLowerCase() ||
+                s.ancora === slugificar(m.rotulo)),
+          )
+          return {
+            id: m.id,
+            rotulo: m.rotulo,
+            alvo: secao ? `#${garantirAncora(doc, secao)}` : '#topo',
+          }
+        })
+
+  for (const s of doc.secoes) {
+    if (s.ancora && !itens.some((m) => m.alvo === `#${s.ancora}`)) {
+      itens.push({ id: gerarId(), rotulo: s.nome, alvo: `#${s.ancora}` })
+    }
+  }
+  return itens
+}
+
+/**
+ * Reimpoe o menu do briefing no documento da IA: os rotulos e a ordem sao os que
+ * o usuario escreveu, e cada um aponta para a secao que ele escolheu. Sem itens
+ * no briefing, o menu que a IA montou fica (so ganha as secoes que ela ancorou e
+ * deixou de fora).
+ */
+export function aplicarMenu(doc: LpDocumento, briefing: LpBriefing): void {
+  doc.header.menu = montarMenu(doc, briefing, doc.header.menu)
+}
+
+/**
+ * Paginas de termos/privacidade do briefing e os links delas nos "Links uteis"
+ * do rodape. Pagina sem texto escrito nao e gerada — sairia uma pagina em branco
+ * no ar. Idempotente: roda tanto no documento novo quanto no que a IA devolveu
+ * (que costuma inventar um "Política de Privacidade" apontando para "#").
+ */
+export function aplicarPaginas(doc: LpDocumento, briefing: LpBriefing): void {
+  doc.paginas = (briefing.paginas ?? []).map((p) => ({ ...p }))
+  sincronizarLinksPaginas(doc)
+}
+
+/**
+ * Paginas que viram arquivo de verdade. As outras sao rascunho: o assistente e
+ * o editor guardam a pagina marcada antes de o texto existir.
+ */
+export const paginasGeradas = (doc: LpDocumento): PaginaLegal[] =>
+  (doc.paginas ?? []).filter((p) => p.conteudo.trim() !== '')
+
+/**
+ * Acerta os "Links uteis" do rodape conforme as paginas que o documento tem
+ * agora: tira o link de pagina que saiu e recoloca as atuais, com o titulo em
+ * vigor. So mexe no que e desta feature — link escrito pelo usuario fica onde
+ * esta. Chamar sempre que `doc.paginas` mudar (briefing ou editor).
+ */
+export function sincronizarLinksPaginas(doc: LpDocumento): void {
+  // Pagina sem texto ainda nao existe: fica no documento como rascunho, mas nao
+  // vira arquivo nem link para lugar nenhum.
+  const paginas = paginasGeradas(doc)
+  const arquivos = new Set(PAGINAS_LEGAIS.map((p) => p.arquivo))
+  const tipos = new Set(paginas.map((p) => p.tipo))
+  // Reaproveita o id do link que ja existia: renomear a pagina nao precisa
+  // trocar a identidade do item no rodape.
+  const idPorArquivo = new Map(
+    doc.footer.linksUteis.filter((l) => arquivos.has(l.url)).map((l) => [l.url, l.id]),
+  )
+  doc.footer.linksUteis = doc.footer.linksUteis.filter((l) => {
+    if (arquivos.has(l.url)) return false
+    const slug = slugificar(l.rotulo)
+    if (tipos.has('termos') && slug.includes('termo')) return false
+    if (tipos.has('privacidade') && slug.includes('privacidade')) return false
+    return true
+  })
+  for (const p of paginas) {
+    const arquivo = infoPagina(p.tipo).arquivo
+    doc.footer.linksUteis.push({
+      id: idPorArquivo.get(arquivo) ?? gerarId(),
+      rotulo: p.titulo,
+      url: arquivo,
+    })
+  }
+}
+
+/**
+ * Item da pagina a partir do que o usuario escreveu, por cima do que a IA fez
+ * para a mesma posicao (`base`): campo preenchido no briefing manda, campo em
+ * branco fica com o texto da IA. Icone e imagem nunca vem do briefing, entao
+ * seguem os da base — e por isso a galeria nao perde as fotos.
+ */
+function mesclarItem(base: LpItem | undefined, escrito: ItemBriefing): LpItem {
+  const item: LpItem = base ? { ...base } : { id: gerarId() }
+  for (const campo of ['titulo', 'extra', 'detalhe', 'texto'] as const) {
+    const valor = escrito[campo]?.trim()
+    if (valor) item[campo] = valor
+  }
+  if (escrito.lista && escrito.lista.length > 0) item.lista = [...escrito.lista]
+  if (escrito.botao) item.botao = { ...escrito.botao }
+  // Destaque e uma escolha de lista inteira (qual plano se sobressai): com itens
+  // do usuario, quem manda e a marcacao dele, inclusive a ausencia dela.
+  if (escrito.destaque === true) item.destaque = true
+  else delete item.destaque
+  return item
+}
+
+/** Nem o usuario nem a IA escreveram nada: viraria um card em branco na pagina. */
+function itemSemConteudo(it: LpItem): boolean {
+  return (
+    !it.titulo && !it.extra && !it.detalhe && !it.texto && !it.imagem && !it.lista?.length
+  )
+}
+
+/**
+ * Itens escritos no briefing: a lista do usuario define quais e quantos, na
+ * ordem dele. O que a IA escreveu para a mesma posicao preenche os buracos —
+ * inclusive a posicao que ele deixou inteira em branco de proposito.
+ *
+ * Devolve quantos sobraram sem conteudo nenhum (a IA gerou menos itens do que o
+ * briefing pediu), para a rota avisar em vez de a secao encolher em silencio.
+ */
+export function aplicarItens(doc: LpDocumento, briefing: LpBriefing): number {
+  let vazios = 0
+  briefing.secoes.forEach((sb, i) => {
+    const escritos = sb.itens ?? []
+    if (escritos.length === 0) return
+    const secao = secaoCorrespondente(doc, sb, i)
+    if (!secao) return
+    const mesclados = escritos.map((escrito, j) => mesclarItem(secao.itens[j], escrito))
+    secao.itens = mesclados.filter((it) => !itemSemConteudo(it))
+    vazios += mesclados.length - secao.itens.length
+  })
+  return vazios
+}
+
+/**
+ * Titulo e subtitulo escritos no briefing vencem os da IA. O campo diz "a IA
+ * escreve se ficar vazio": preenchido tem de aparecer na pagina como foi escrito.
+ */
+export function aplicarTextos(doc: LpDocumento, briefing: LpBriefing): void {
+  briefing.secoes.forEach((sb, i) => {
+    const titulo = sb.titulo.trim()
+    const subtitulo = (sb.subtitulo ?? '').trim()
+    if (titulo === '' && subtitulo === '') return
+    const secao = secaoCorrespondente(doc, sb, i)
+    if (!secao) return
+    if (titulo !== '') secao.titulo = titulo
+    if (subtitulo !== '') secao.subtitulo = subtitulo
+  })
+}
+
+/**
+ * Botao que o usuario definiu para a secao vence o que a IA escreveu — inclusive
+ * em layout que a IA nem propoe botao (cards, galeria, FAQ…), porque quem monta
+ * a pagina decide onde quer a chamada para acao.
+ */
+export function aplicarBotoes(doc: LpDocumento, briefing: LpBriefing): void {
+  briefing.secoes.forEach((sb, i) => {
+    if (!sb.botao) return
+    const secao = secaoCorrespondente(doc, sb, i)
+    if (secao) secao.botao = { ...sb.botao }
+  })
+}
+
+/**
+ * Aparencia do header e do rodape escolhida no briefing (fonte do menu, tamanho
+ * da logo, alinhamento). A IA nao escreve esses campos — sem reimpor, a escolha
+ * do usuario sumiria no documento gerado por ela.
+ */
+export function aplicarEstiloBarras(doc: LpDocumento, briefing: LpBriefing): void {
+  if (briefing.estiloHeader) doc.header.estilo = { ...briefing.estiloHeader }
+  if (briefing.footer.estilo) doc.footer.estilo = { ...briefing.footer.estilo }
+}
+
+/**
+ * Lado da midia escolhido no briefing. E decisao de layout, nao de conteudo: a
+ * IA nao tem o que opinar, entao o valor do briefing vale sempre (inclusive o
+ * "conteudo a esquerda", que e o padrao).
+ */
+export function aplicarLados(doc: LpDocumento, briefing: LpBriefing): void {
+  briefing.secoes.forEach((sb, i) => {
+    if (!temLados(sb.layout)) return
+    const secao = secaoCorrespondente(doc, sb, i)
+    if (!secao) return
+    if (sb.inverter) secao.inverter = true
+    else delete secao.inverter
+  })
+}
+
 export function aplicarArquivos(
   doc: LpDocumento,
   briefing: LpBriefing,
 ): { aplicadas: number; perdidas: number } {
   let aplicadas = 0
   let perdidas = 0
+  // A IA nao sabe da logo (ela nao entra no prompt): quem manda e o briefing.
+  if (briefing.logo) doc.header.logo = briefing.logo
   briefing.secoes.forEach((sb, i) => {
-    if (!sb.midia?.arquivo) return
-    const naPosicao = doc.secoes[i]?.tipo === sb.layout ? doc.secoes[i] : undefined
-    const secao = doc.secoes.find((s) => s.id === sb.id) ?? naPosicao
+    const mb = sb.midia
+    if (!mb) return
+    const video = opcoesVideo(mb)
+    if (!mb.arquivo && Object.keys(video).length === 0) return
+    const secao = secaoCorrespondente(doc, sb, i)
     if (!secao) {
-      perdidas++
+      if (mb.arquivo) perdidas++
       return
     }
-    const midia = midiaDoBriefing(sb.midia)
-    // Hero/banner em que a IA usou a midia como fundo: o arquivo vai para o
-    // fundo, senao a imagem do usuario apareceria fora do lugar previsto.
-    if (secao.fundo?.midia && !secao.midia) secao.fundo.midia = midia
-    else secao.midia = midia
-    aplicadas++
+    const alvo = alvoDeMidia(secao)
+    if (mb.arquivo) {
+      alvo.escrever(midiaDoBriefing(mb))
+      aplicadas++
+    }
+    const atual = alvo.ler()
+    if (atual?.tipo === 'video') alvo.escrever({ ...atual, ...video })
   })
   return { aplicadas, perdidas }
 }
@@ -120,6 +453,8 @@ export function arquivosUsados(projeto: {
   const anotar = (m: LpMidia | null | undefined) => {
     if (m?.caminho) usados.add(m.caminho)
   }
+  anotar(projeto.documento?.header.logo)
+  anotar(projeto.briefing?.logo)
   for (const secao of projeto.documento?.secoes ?? []) {
     anotar(secao.midia)
     anotar(secao.fundo?.midia)
@@ -153,13 +488,14 @@ export function documentoBase(briefing: LpBriefing): LpDocumento {
       nome: sb.nome || sb.titulo || 'Seção',
       ancora,
       titulo: sb.titulo || sb.nome,
+      subtitulo: sb.subtitulo || undefined,
       texto: sb.conteudo || undefined,
       itens: [],
       largura: sb.layout === 'banner' ? 'full' : 'boxed',
       espacamento: { topo: 88, base: 88 },
     }
     if (sb.colunas) secao.colunas = sb.colunas
-    if (sb.midia?.busca || sb.midia?.arquivo) secao.midia = midiaDoBriefing(sb.midia)
+    if (sb.inverter && temLados(sb.layout)) secao.inverter = true
     const modelo = novoItem(sb.layout)
     if (Object.keys(modelo).length > 1) {
       secao.itens = [novoItem(sb.layout), novoItem(sb.layout), novoItem(sb.layout)]
@@ -167,30 +503,27 @@ export function documentoBase(briefing: LpBriefing): LpDocumento {
         secao.itens = secao.itens.slice(0, 2)
         secao.rotulos = ['Característica um', 'Característica dois', 'Característica três']
       }
+      // Escreveu os itens no briefing: a lista dele é a da página, e o item de
+      // exemplo entra só como base (ícone, imagem de exemplo).
+      if (sb.itens && sb.itens.length > 0) {
+        secao.itens = sb.itens.map((escrito) => mesclarItem(novoItem(sb.layout), escrito))
+      }
+    }
+    // Depois dos itens: em galeria e afins a midia do briefing e a imagem do
+    // primeiro item, que so existe a partir daqui.
+    if (sb.midia?.busca || sb.midia?.arquivo) {
+      aplicarMidiaNaSecao(secao, midiaDoBriefing(sb.midia))
     }
     if (sb.layout === 'hero' || sb.layout === 'cta') {
       secao.botao = { texto: 'Fale conosco', url: '#' }
       secao.subtitulo = secao.subtitulo ?? ''
     }
+    // O botao do briefing manda, inclusive por cima do padrao de hero/cta.
+    if (sb.botao) secao.botao = { ...sb.botao }
     return secao
   })
 
-  // Menu: itens do briefing com URL, senao ligados a secao de nome parecido.
-  const menu = briefing.menu.map((m) => {
-    if (m.url.trim() !== '') return { id: m.id, rotulo: m.rotulo, alvo: m.url }
-    const alvoSecao = secoes.find(
-      (s) => s.ancora && (s.nome.toLowerCase() === m.rotulo.toLowerCase() || s.ancora === slugificar(m.rotulo)),
-    )
-    return { id: m.id, rotulo: m.rotulo, alvo: alvoSecao ? `#${alvoSecao.ancora}` : '#topo' }
-  })
-  // Secoes vinculadas ao menu que o usuario nao listou entram no fim.
-  for (const s of secoes) {
-    if (s.ancora && !menu.some((m) => m.alvo === `#${s.ancora}`)) {
-      menu.push({ id: gerarId(), rotulo: s.nome, alvo: `#${s.ancora}` })
-    }
-  }
-
-  return {
+  const doc: LpDocumento = {
     seo: {
       titulo: briefing.nome,
       descricao: briefing.secoes[0]?.conteudo?.slice(0, 155) ?? briefing.nome,
@@ -198,22 +531,30 @@ export function documentoBase(briefing: LpBriefing): LpDocumento {
     tema,
     header: {
       logoTexto: briefing.nome,
-      menu,
+      ...(briefing.logo ? { logo: briefing.logo } : {}),
+      menu: [],
       fixo: true,
-      botao: { texto: 'Fale conosco', url: '#' },
+      botoes: [{ id: gerarId(), texto: 'Fale conosco', url: '#' }],
+      ...(briefing.estiloHeader ? { estilo: { ...briefing.estiloHeader } } : {}),
     },
     secoes,
     footer: {
       textoInstitucional: briefing.footer.textoInstitucional || undefined,
       direitos: briefing.footer.direitos || undefined,
       endereco: briefing.footer.endereco || undefined,
-      telefones: briefing.footer.telefones || undefined,
+      telefones: normalizarTelefones(briefing.footer.telefones),
       email: briefing.footer.email || undefined,
       linksUteis: briefing.footer.linksUteis.map((l) => ({ ...l })),
       menuSecundario: briefing.footer.menuSecundario,
+      ...(briefing.footer.estilo ? { estilo: { ...briefing.footer.estilo } } : {}),
     },
     redes: briefing.redes.map((r) => ({ ...r })),
   }
+
+  // Depois das seções: o menu precisa das âncoras delas para apontar.
+  doc.header.menu = montarMenu(doc, briefing)
+  aplicarPaginas(doc, briefing)
+  return doc
 }
 
 /* --------------------- mutacoes imutaveis do editor ---------------------- */
@@ -231,7 +572,8 @@ function secaoPorId(doc: LpDocumento, id: string): LpSecao | undefined {
 
 /**
  * Atualiza o texto apontado por um alvo do editor (data-lp). Alvos:
- * header:logo | footer:institucional|direitos|endereco|telefones|email |
+ * header:logo | footer:institucional|direitos|endereco|email |
+ * footer:telefone:TID | header:botao:BID | footer:botao:BID |
  * sec:ID:titulo|subtitulo|texto|botao | sec:ID:item:IID:titulo|texto|extra|detalhe|botao
  */
 export function aplicarTexto(doc: LpDocumento, alvo: string, valor: string): LpDocumento {
@@ -241,16 +583,26 @@ export function aplicarTexto(doc: LpDocumento, alvo: string, valor: string): LpD
       d.header.logoTexto = texto
       return
     }
-    if (alvo === 'header:botao') {
-      if (d.header.botao) d.header.botao.texto = texto
+    const botao = /^(header|footer):botao:(.+)$/.exec(alvo)
+    if (botao) {
+      const lista = botao[1] === 'header' ? d.header.botoes : d.footer.botoes
+      const alvoBotao = lista?.find((b) => b.id === botao[2])
+      // Texto vazio apagaria o botao da pagina sem jeito de clicar nele de volta.
+      if (alvoBotao && texto !== '') alvoBotao.texto = texto
       return
     }
     if (alvo.startsWith('footer:')) {
       const campo = alvo.slice('footer:'.length)
+      const tel = /^telefone:(.+)$/.exec(campo)
+      if (tel) {
+        const telefone = d.footer.telefones?.find((t) => t.id === tel[1])
+        // Numero em branco sairia do rodape sem jeito de voltar: mantem o antigo.
+        if (telefone && texto !== '') telefone.numero = texto
+        return
+      }
       if (campo === 'institucional') d.footer.textoInstitucional = texto
       if (campo === 'direitos') d.footer.direitos = texto
       if (campo === 'endereco') d.footer.endereco = texto
-      if (campo === 'telefones') d.footer.telefones = texto
       if (campo === 'email') d.footer.email = texto
       return
     }

@@ -1,5 +1,7 @@
 /** Utilitarios puros do Criador de Landing Pages (server e client). */
 
+import type { BotaoComId, TelefoneFooter } from './tipos'
+
 /** Id curto e aleatorio para secoes/itens (nao precisa ser global-unique). */
 export function gerarId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -20,6 +22,18 @@ export function slugificar(texto: string): string {
   )
 }
 
+/**
+ * Slug que serve como id de elemento — sempre comecando por letra. `slugificar`
+ * aceita comecar por digito ("2024", ou o id cru da secao, que a IA as vezes
+ * devolve no lugar da ancora), e o compilador recusa esse id e emite outro. O
+ * menu, que ja recebeu o "#ancora", passa a apontar para um id inexistente e o
+ * clique nao sai do lugar.
+ */
+export function ancoraSegura(texto: string): string {
+  const slug = slugificar(texto)
+  return /^[a-z]/.test(slug) ? slug : `sec-${slug}`
+}
+
 /** Escapa texto para HTML (conteudo vem do usuario e da IA — nunca confiar). */
 export function esc(texto: string): string {
   return texto
@@ -37,13 +51,16 @@ export function escCss(valor: string): string {
 
 /**
  * Sanitiza URL de link/midia: aceita http(s), mailto, tel, ancora, caminho
- * relativo e data:image (placeholders SVG). Resto (javascript: etc.) vira '#'.
+ * relativo, pagina do proprio pacote (termos.html) e data:image (placeholders
+ * SVG). Resto (javascript: etc.) vira '#'.
  */
 export function urlSegura(url: string): string {
   const limpa = url.trim()
   if (limpa === '') return '#'
   if (/^#/.test(limpa)) return limpa
   if (/^(https?:|mailto:|tel:)/i.test(limpa)) return limpa
+  // Arquivo .html ao lado do index (as paginas de termos/privacidade).
+  if (/^[a-z0-9][a-z0-9._-]*\.html(#[a-z0-9_-]*)?$/i.test(limpa)) return limpa
   if (/^data:image\/(svg\+xml|png|jpe?g|webp|gif);/i.test(limpa)) return limpa
   if (/^(\.\/|\.\.\/|\/[^/])/.test(limpa)) return limpa
   if (/^assets\//.test(limpa)) return limpa
@@ -67,6 +84,94 @@ export function corSegura(cor: string | undefined, fallback: string): string {
   if (/^(rgb|hsl)a?\(\s*[\d.,%\s/]+\)$/i.test(limpa)) return limpa
   if (/^[a-z]{3,20}$/i.test(limpa)) return limpa
   return fallback
+}
+
+/** Quantidade maxima de telefones no rodape. */
+export const MAX_TELEFONES = 6
+
+/** Quantidade maxima de botoes no header e no rodape. */
+export const MAX_BOTOES = 4
+
+/** Id de secao/item/telefone/botao: so [A-Za-z0-9_-], senao vira um novo. */
+const idOuNovo = (v: unknown): string => {
+  const limpo = typeof v === 'string' ? v.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) : ''
+  return limpo === '' ? gerarId() : limpo
+}
+
+/**
+ * Botoes de header/rodape sempre como lista, cada um com id (o editor aponta
+ * para o id no data-lp). Aceita o formato antigo — um botao so, sem id, que os
+ * documentos salvos antes disso guardam em `header.botao`, e que a IA as vezes
+ * ainda responde. Botao sem texto e descartado: sairia um retangulo vazio.
+ */
+export function normalizarBotoes(valor: unknown): BotaoComId[] {
+  const bruta: unknown[] = Array.isArray(valor)
+    ? valor
+    : valor !== null && typeof valor === 'object'
+      ? [valor]
+      : []
+  const botoes: BotaoComId[] = []
+  for (const bruto of bruta) {
+    if (bruto === null || typeof bruto !== 'object') continue
+    const b = bruto as Record<string, unknown>
+    const texto = typeof b.texto === 'string' ? b.texto.slice(0, 80).trim() : ''
+    if (texto === '') continue
+    botoes.push({
+      ...(b as unknown as BotaoComId),
+      id: idOuNovo(b.id),
+      texto,
+      url: typeof b.url === 'string' ? b.url.trim() : '#',
+    })
+    if (botoes.length === MAX_BOTOES) break
+  }
+  return botoes
+}
+
+/**
+ * Link de um telefone do rodape: wa.me quando o numero e WhatsApp, tel: nos
+ * outros. Numero brasileiro escrito do jeito de casa ("(11) 99999-9999") ganha
+ * o DDI 55; o que ja veio com "+" e o que tem cara de 0800 ou de numero local
+ * (sem DDD) fica como esta. Sem digito nenhum devolve '' — ai o numero sai como
+ * texto, sem link.
+ */
+export function linkTelefone(numero: string, whatsapp: boolean): string {
+  const digitos = numero.replace(/\D/g, '')
+  if (digitos === '') return ''
+  const comDdi = numero.trim().startsWith('+') || digitos.length > 11
+  const local = digitos.startsWith('0') || digitos.length < 10
+  const internacional = comDdi ? digitos : local ? '' : `55${digitos}`
+  // No WhatsApp o link sempre sai: quem marcou a caixa quer o link, e o wa.me
+  // avisa se o numero nao existe.
+  if (whatsapp) return `https://wa.me/${internacional || digitos}`
+  return internacional === '' ? `tel:${digitos}` : `tel:+${internacional}`
+}
+
+/**
+ * Telefones do rodape sempre como lista. Aceita o formato antigo — uma string
+ * unica com todos os numeros ("(11) 3333-4444 / (11) 99999-9999") — porque
+ * briefings e documentos salvos antes da lista ainda chegam assim, e a IA as
+ * vezes responde no formato velho.
+ */
+export function normalizarTelefones(valor: unknown): TelefoneFooter[] {
+  const bruta: unknown[] = Array.isArray(valor)
+    ? valor
+    : typeof valor === 'string'
+      ? valor.split(/[\n/|;,]+/)
+      : []
+  const telefones: TelefoneFooter[] = []
+  for (const bruto of bruta) {
+    const t: Record<string, unknown> =
+      typeof bruto === 'string'
+        ? { numero: bruto }
+        : bruto !== null && typeof bruto === 'object'
+          ? (bruto as Record<string, unknown>)
+          : {}
+    const numero = typeof t.numero === 'string' ? t.numero.slice(0, 40).trim() : ''
+    if (numero === '') continue
+    telefones.push({ id: idOuNovo(t.id), numero, whatsapp: t.whatsapp === true })
+    if (telefones.length === MAX_TELEFONES) break
+  }
+  return telefones
 }
 
 /** Prefixa https:// quando o usuário digita só o domínio (www.exemplo.com.br). */

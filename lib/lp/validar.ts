@@ -7,11 +7,17 @@
 import { TEMA_PADRAO, temaDoBriefing } from './documento'
 import { fontePorNome, pesoValido } from './fontes'
 import { ICONES } from './icones'
-import { LAYOUTS } from './layouts'
+import { LAYOUTS, periodoPreco, temLados } from './layouts'
 import { placeholderMidia } from './placeholder'
 import type {
   AjusteTexto,
+  Alinhamento,
+  AnimacaoBotao,
+  BotaoComId,
+  EstiloBarra,
   FonteMidia,
+  HoverBotao,
+  ItemBriefing,
   LpBotao,
   LpBriefing,
   LpDocumento,
@@ -20,17 +26,42 @@ import type {
   LpSecao,
   LpTema,
   Orientacao,
+  PaginaLegal,
+  TipoPaginaLegal,
+  PosicaoBotao,
   Rede,
+  ReproducaoVideo,
   TipoLayout,
+  TipoMidia,
 } from './tipos'
-import { ROTULO_REDE } from './tipos'
+import {
+  ALINHAMENTOS,
+  ANIMACOES_BOTAO,
+  HOVERS_BOTAO,
+  PAGINAS_LEGAIS,
+  POSICOES_BOTAO,
+  ROTULO_REDE,
+  infoPagina,
+} from './tipos'
 import { clonar } from './documento'
-import { corSegura, gerarId, limitar, normalizarUrl, slugificar } from './util'
+import {
+  ancoraSegura,
+  corSegura,
+  gerarId,
+  limitar,
+  normalizarBotoes,
+  normalizarTelefones,
+  normalizarUrl,
+} from './util'
 
 const TIPOS_LAYOUT = new Set<string>(LAYOUTS.map((l) => l.tipo))
 const ORIENTACOES = new Set<string>(['paisagem', 'retrato', 'quadrado'])
+const POSICOES = new Set<string>(POSICOES_BOTAO)
+const HOVERS = new Set<string>(HOVERS_BOTAO)
+const ANIMACOES = new Set<string>(ANIMACOES_BOTAO)
 const FONTES_MIDIA = new Set<string>(['pexels', 'pixabay', 'envato'])
 const REDES = new Set<string>(Object.keys(ROTULO_REDE))
+const TIPOS_PAGINA = new Set<string>(PAGINAS_LEGAIS.map((p) => p.tipo))
 
 const str = (v: unknown, max = 4000): string =>
   typeof v === 'string' ? v.slice(0, max).trim() : ''
@@ -70,7 +101,63 @@ function coergirBotao(v: unknown): LpBotao | null {
   const corTexto = opcional(b.corTexto, 40)
   if (corFundo) botao.corFundo = corSegura(corFundo, '#2563eb')
   if (corTexto) botao.corTexto = corSegura(corTexto, '#ffffff')
+  if (POSICOES.has(String(b.posicao))) botao.posicao = b.posicao as PosicaoBotao
+  if (HOVERS.has(String(b.hover))) botao.hover = b.hover as HoverBotao
+  if (ANIMACOES.has(String(b.animacao))) botao.animacao = b.animacao as AnimacaoBotao
   return botao
+}
+
+/**
+ * Ajustes do header/rodape. O tamanho da logo tem teto: uma logo de 400px
+ * empurraria o menu para fora da barra.
+ */
+function coergirEstiloBarra(v: unknown): EstiloBarra | undefined {
+  const e = obj(v)
+  const estilo: EstiloBarra = {}
+  const menu = coergirAjuste(e.menu)
+  if (menu) estilo.menu = menu
+  if (typeof e.logo === 'number') estilo.logo = Math.round(limitar(e.logo, 12, 160, 44))
+  if (ALINHAMENTOS.includes(e.alinhamento as Alinhamento)) {
+    estilo.alinhamento = e.alinhamento as Alinhamento
+  }
+  return Object.keys(estilo).length > 0 ? estilo : undefined
+}
+
+/**
+ * Paginas de termos/privacidade: uma de cada, no maximo, com o titulo padrao
+ * quando o usuario apagou o campo. O texto e longo de proposito (documento
+ * juridico inteiro), so limitado para nao estourar o registro no banco.
+ */
+function coergirPaginas(v: unknown): PaginaLegal[] {
+  const vistos = new Set<string>()
+  return lista(v)
+    .map((p) => {
+      const pagina = obj(p)
+      const tipo = String(pagina.tipo ?? '')
+      if (!TIPOS_PAGINA.has(tipo) || vistos.has(tipo)) return null
+      vistos.add(tipo)
+      const padrao = infoPagina(tipo as TipoPaginaLegal)
+      return {
+        tipo: tipo as TipoPaginaLegal,
+        titulo: strOu(pagina.titulo, padrao.titulo, 80),
+        conteudo: str(pagina.conteudo, 60000),
+      }
+    })
+    .filter((p): p is PaginaLegal => p !== null)
+}
+
+/**
+ * Botoes do header/rodape: mesma coercao dos botoes de secao, mais o id e o
+ * limite de quantos cabem. `normalizarBotoes` ja aceita o formato antigo (um
+ * botao so, em `header.botao`).
+ */
+function coergirBotoes(v: unknown): BotaoComId[] {
+  return normalizarBotoes(v)
+    .map((b) => {
+      const limpo = coergirBotao(b)
+      return limpo === null ? null : { ...limpo, id: idSeguro(b.id) }
+    })
+    .filter((b): b is BotaoComId => b !== null)
 }
 
 /**
@@ -94,6 +181,19 @@ function caminhoDeBucket(v: unknown): string | undefined {
   return s && /^lp\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/.test(s) ? s : undefined
 }
 
+/**
+ * Opcoes de reproducao, so para video: num slot de imagem elas nao significam
+ * nada e sumiriam do documento na primeira gravacao de qualquer jeito.
+ */
+function coergirReproducao(m: Record<string, unknown>, tipo: TipoMidia): ReproducaoVideo {
+  if (tipo !== 'video') return {}
+  const r: ReproducaoVideo = {}
+  for (const campo of ['controles', 'autoplay', 'loop'] as const) {
+    if (typeof m[campo] === 'boolean') r[campo] = m[campo]
+  }
+  return r
+}
+
 function coergirMidia(v: unknown): LpMidia | null {
   const m = obj(v)
   const busca = str(m.busca, 200)
@@ -101,11 +201,13 @@ function coergirMidia(v: unknown): LpMidia | null {
   if (busca === '' && url === '') return null
   const tipo = m.tipo === 'video' ? 'video' : 'imagem'
   const orientacao = (ORIENTACOES.has(String(m.orientacao)) ? m.orientacao : 'paisagem') as Orientacao
+  const reproducao = coergirReproducao(m, tipo)
   if (url === '') {
-    // Placeholder, mas preserva o alt em português que a IA escreveu.
+    // Placeholder, mas preserva o alt em português que a IA escreveu e as opções
+    // de vídeo do slot (a busca em banco preenche a URL depois, sem mexer nelas).
     const ph = placeholderMidia(busca, orientacao, tipo)
     const alt = opcional(m.alt, 300)
-    return alt ? { ...ph, alt } : ph
+    return { ...ph, ...(alt ? { alt } : {}), ...reproducao }
   }
   // Campos que vêm do banco de mídia (thumb/crédito/dimensões). A IA não os
   // inventa, mas o documento salvo passa por aqui de novo a cada gravação — sem
@@ -135,10 +237,11 @@ function coergirMidia(v: unknown): LpMidia | null {
     orientacao,
     ...(opcional(m.origem, 600) ? { origem: opcional(m.origem, 600) } : {}),
     ...extras,
+    ...reproducao,
   }
 }
 
-function coergirItem(v: unknown): LpItem {
+function coergirItem(v: unknown, tipo?: TipoLayout): LpItem {
   const i = obj(v)
   const item: LpItem = { id: idSeguro(i.id) }
   const icone = str(i.icone, 40)
@@ -149,6 +252,11 @@ function coergirItem(v: unknown): LpItem {
   for (const campo of campos) {
     const valor = opcional(i[campo], campo === 'texto' ? 2000 : 300)
     if (valor) item[campo] = valor
+  }
+  // Periodo do plano vem de um select: "por mês", "/mes" e afins viram a opcao
+  // do catalogo. O que nao for reconhecido fica como o usuario (ou a IA) escreveu.
+  if (tipo === 'precos' && item.detalhe) {
+    item.detalhe = periodoPreco(item.detalhe) ?? item.detalhe
   }
   const linhas = lista(i.lista)
     .map((l) => str(l, 200))
@@ -190,7 +298,7 @@ function coergirSecao(v: unknown, ancoras: Set<string>): LpSecao | null {
   let ancora: string | null = null
   const ancoraBruta = str(s.ancora, 60)
   if (ancoraBruta !== '') {
-    const base = slugificar(ancoraBruta)
+    const base = ancoraSegura(ancoraBruta)
     let candidata = base
     let n = 2
     while (ancoras.has(candidata)) candidata = `${base}-${n++}`
@@ -203,7 +311,9 @@ function coergirSecao(v: unknown, ancoras: Set<string>): LpSecao | null {
     tipo: tipo as TipoLayout,
     nome,
     ancora,
-    itens: lista(s.itens).map(coergirItem).slice(0, 24),
+    itens: lista(s.itens)
+      .map((i) => coergirItem(i, tipo as TipoLayout))
+      .slice(0, 24),
     largura: s.largura === 'full' ? 'full' : 'boxed',
   }
   const titulo = opcional(s.titulo, 300)
@@ -222,13 +332,15 @@ function coergirSecao(v: unknown, ancoras: Set<string>): LpSecao | null {
   const fundo = obj(s.fundo)
   const fundoCor = opcional(fundo.cor, 40)
   const fundoMidia = coergirMidia(fundo.midia)
-  if (fundoCor || fundoMidia || typeof fundo.escurecer === 'number') {
+  if (fundoCor || fundoMidia || typeof fundo.escurecer === 'number' || fundo.textoClaro === false) {
     secao.fundo = {}
     if (fundoCor) secao.fundo.cor = corSegura(fundoCor, '#f1f5f9')
     if (fundoMidia) secao.fundo.midia = fundoMidia
     if (typeof fundo.escurecer === 'number') {
       secao.fundo.escurecer = limitar(fundo.escurecer, 0, 90, 55)
     }
+    // So o `false` e guardado: ausente = branco automatico, o padrao.
+    if (fundo.textoClaro === false) secao.fundo.textoClaro = false
   }
 
   const esp = obj(s.espacamento)
@@ -315,28 +427,37 @@ export function coergirBriefing(bruto: unknown, nomeAtual: string): LpBriefing {
 
   const footerBruto = obj(b.footer)
 
+  const logo = coergirMidia(b.logo)
+
+  const menu = lista(b.menu)
+    .map((m) => {
+      const item = obj(m)
+      const rotulo = str(item.rotulo, 40)
+      if (rotulo === '') return null
+      return { id: strOu(item.id, gerarId(), 24), rotulo, url: str(item.url, 600) }
+    })
+    .filter((m): m is { id: string; rotulo: string; url: string } => m !== null)
+    .slice(0, 12)
+  const idsMenu = new Set(menu.map((m) => m.id))
+  const estiloHeader = coergirEstiloBarra(b.estiloHeader)
+  const estiloFooter = coergirEstiloBarra(footerBruto.estilo)
+
   return {
     nome: strOu(b.nome, nomeAtual, 80),
+    // Logo e sempre imagem: video no topo da pagina nao e logo nenhuma.
+    ...(logo && logo.tipo === 'imagem' ? { logo } : {}),
     tipografia,
     cores,
     referencias: lista(b.referencias)
       .map((r) => normalizarUrl(str(r, 300)))
       .filter((r) => /^https?:\/\//i.test(r))
       .slice(0, 5),
-    menu: lista(b.menu)
-      .map((m) => {
-        const item = obj(m)
-        const rotulo = str(item.rotulo, 40)
-        if (rotulo === '') return null
-        return { id: strOu(item.id, gerarId(), 24), rotulo, url: str(item.url, 600) }
-      })
-      .filter((m): m is { id: string; rotulo: string; url: string } => m !== null)
-      .slice(0, 12),
+    menu,
     footer: {
       textoInstitucional: str(footerBruto.textoInstitucional, 600),
       direitos: str(footerBruto.direitos, 200),
       endereco: str(footerBruto.endereco, 300),
-      telefones: str(footerBruto.telefones, 120),
+      telefones: normalizarTelefones(footerBruto.telefones),
       email: str(footerBruto.email, 120),
       linksUteis: lista(footerBruto.linksUteis)
         .map((l) => {
@@ -348,7 +469,10 @@ export function coergirBriefing(bruto: unknown, nomeAtual: string): LpBriefing {
         .filter((l): l is { id: string; rotulo: string; url: string } => l !== null)
         .slice(0, 12),
       menuSecundario: footerBruto.menuSecundario === true,
+      ...(estiloFooter ? { estilo: estiloFooter } : {}),
     },
+    ...(estiloHeader ? { estiloHeader } : {}),
+    paginas: coergirPaginas(b.paginas),
     redes: lista(b.redes)
       .map((r) => {
         const rede = obj(r)
@@ -373,28 +497,67 @@ export function coergirBriefing(bruto: unknown, nomeAtual: string): LpBriefing {
           secao.colunas === 2 || secao.colunas === 3 || secao.colunas === 4
             ? secao.colunas
             : undefined
+        // Com arquivo enviado, tipo e formato são os do arquivo real.
+        const tipoMidia: TipoMidia =
+          arquivo?.tipo ?? (midiaBruta.tipo === 'video' ? 'video' : 'imagem')
+        // So vale apontar para um item que existe no menu deste briefing.
+        const itemMenu = str(secao.itemMenu, 24)
+        const botao = coergirBotao(secao.botao)
+        const itens = lista(secao.itens)
+          .map((it) => {
+            const item = obj(it)
+            const escrito: ItemBriefing = { id: strOu(item.id, gerarId(), 24) }
+            for (const campo of ['titulo', 'extra', 'detalhe'] as const) {
+              const valor = str(item[campo], 300)
+              if (valor !== '') escrito[campo] = valor
+            }
+            const texto = str(item.texto, 2000)
+            if (texto !== '') escrito.texto = texto
+            const linhas = lista(item.lista)
+              .map((l) => str(l, 200))
+              .filter((l) => l !== '')
+              .slice(0, 12)
+            if (linhas.length > 0) escrito.lista = linhas
+            const botaoItem = coergirBotao(item.botao)
+            if (botaoItem) escrito.botao = botaoItem
+            if (item.destaque === true) escrito.destaque = true
+            return escrito
+          })
+          // Item em branco NAO e lixo: e o usuario pedindo mais um daquele tipo
+          // para a IA escrever — "o que deixar em branco a IA preenche", como diz
+          // a tela. Descartar aqui encolhia a secao, porque o prompt pede
+          // exatamente o numero de itens do briefing: o card vazio nunca nascia.
+          .slice(0, 12)
         return {
           id: strOu(secao.id, gerarId(), 24),
           nome: strOu(secao.nome, 'Seção', 80),
           vincularMenu: secao.vincularMenu === true,
+          ...(secao.vincularMenu === true && idsMenu.has(itemMenu) ? { itemMenu } : {}),
           titulo: str(secao.titulo, 300),
+          ...(str(secao.subtitulo, 500) !== '' ? { subtitulo: str(secao.subtitulo, 500) } : {}),
           conteudo: str(secao.conteudo, 3000),
           layout: layout as TipoLayout,
           ...(colunas ? { colunas } : {}),
+          // Lado da mídia: só onde o layout põe conteúdo e mídia lado a lado.
+          ...(secao.inverter === true && temLados(layout as TipoLayout)
+            ? { inverter: true }
+            : {}),
+          ...(botao ? { botao } : {}),
+          ...(itens.length > 0 ? { itens } : {}),
           midia:
             busca === '' && !arquivo
               ? null
               : {
                   busca,
-                  // Com arquivo enviado, tipo e formato são os do arquivo real.
-                  tipo:
-                    arquivo?.tipo ??
-                    (midiaBruta.tipo === 'video' ? ('video' as const) : ('imagem' as const)),
+                  tipo: tipoMidia,
                   orientacao: (arquivo?.orientacao ??
                     (ORIENTACOES.has(String(midiaBruta.orientacao))
                       ? midiaBruta.orientacao
                       : 'paisagem')) as Orientacao,
                   ...(arquivo ? { arquivo } : {}),
+                  // Reprodução é do lugar na página, não do arquivo: vale também
+                  // para a mídia que a busca em banco ainda vai trazer.
+                  ...coergirReproducao(midiaBruta, tipoMidia),
                 },
         }
       })
@@ -460,6 +623,9 @@ export function coergirDocumento(bruto: unknown, temaBase: LpTema = TEMA_PADRAO)
     .slice(0, 12)
 
   const logoTexto = strOu(header.logoTexto, 'Minha marca', 60)
+  const logo = coergirMidia(header.logo)
+  const estiloHeader = coergirEstiloBarra(header.estilo)
+  const estiloFooter = coergirEstiloBarra(footer.estilo)
 
   return {
     seo: {
@@ -469,21 +635,29 @@ export function coergirDocumento(bruto: unknown, temaBase: LpTema = TEMA_PADRAO)
     tema: coergirTema(d.tema, temaBase),
     header: {
       logoTexto,
+      ...(logo && logo.tipo === 'imagem' ? { logo } : {}),
       menu,
       fixo: header.fixo !== false,
-      botao: coergirBotao(header.botao),
+      // `header.botao` (um botao so) e o formato antigo, ainda vindo da IA.
+      botoes: coergirBotoes(header.botoes ?? header.botao),
+      ...(estiloHeader ? { estilo: estiloHeader } : {}),
     },
     secoes,
     footer: {
       textoInstitucional: opcional(footer.textoInstitucional, 600),
       direitos: opcional(footer.direitos, 200),
       endereco: opcional(footer.endereco, 300),
-      telefones: opcional(footer.telefones, 120),
+      telefones: normalizarTelefones(footer.telefones),
       email: opcional(footer.email, 120),
       linksUteis,
+      botoes: coergirBotoes(footer.botoes),
       menuSecundario: footer.menuSecundario === true,
+      ...(estiloFooter ? { estilo: estiloFooter } : {}),
     },
     redes,
+    // Pagina sem texto continua guardada (o editor acabou de cria-la); quem
+    // decide o que vira arquivo e link e `paginasGeradas`.
+    paginas: coergirPaginas(d.paginas),
   }
 }
 
@@ -509,5 +683,10 @@ export function coergirDocumentoIA(bruto: unknown, briefing: LpBriefing): LpDocu
     if (pref.alturaLinha) alvo.alturaLinha = escolhido.alturaLinha
     if (pref.espacamentoLetras) alvo.espacamentoLetras = escolhido.espacamentoLetras
   }
+  // Telefone nao e escolha criativa: o rodape leva exatamente os numeros do
+  // briefing, com as marcacoes de WhatsApp (a IA costuma reescrever a formatacao
+  // e esquecer o "whatsapp": true).
+  const telefones = normalizarTelefones(briefing.footer.telefones)
+  if (telefones.length > 0) doc.footer.telefones = telefones
   return doc
 }
