@@ -131,7 +131,30 @@
       "PowerShell(\\(Get-Content .env.local | Select-String '^\\(PEXELS_API_KEY|PIXABAY_API_KEY|ENVATO|IA_PROVIDER|FIREBASE_STORAGE_BUCKET\\)=' | ForEach-Object { $p = \\($_ -split '=',2\\); $p[0] + '=' + $\\(if \\($p[1].Trim\\(\\).Length -gt 0\\) { '<preenchido, ' + $p[1].Trim\\(\\).Length + ' chars>' } else { '<vazio>' }\\) }\\))",
       "PowerShell(git log *)",
       "PowerShell(node \"C:\\\\Users\\\\gusma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--E-nova-tools\\\\0b869ee5-63ba-4708-b121-37225de910e2\\\\scratchpad\\\\testar-bancos.mjs\")",
-      "PowerShell(Remove-Item *)"
+      "PowerShell(Remove-Item *)",
+      "Bash(node -e \"const p=require\\('C:/E-nova tools/package.json'\\);console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
+      "Bash(node -e \"const l=require\\('lucide-react'\\);['Images','LibraryBig','Library','ImageIcon','Search','Upload','Video','FolderOpen'].forEach\\(n=>console.log\\(n, typeof l[n]\\)\\)\")",
+      "Bash(node -e \"console.log\\(require\\('C:/E-nova tools/package.json'\\).dependencies\\)\")",
+      "Bash(npx vitest *)",
+      "Bash(npx next *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\\\\n\" -m 60 http://localhost:3000/app/lp)",
+      "PowerShell($pids = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; if \\($pids\\) { $pids | ForEach-Object { Write-Output \"parando $_\"; Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } } else { Write-Output \"nada na 3000\" })",
+      "Bash(node \"C:/Users/gusma/AppData/Local/Temp/claude/C--E-nova-tools/b7036078-203e-4dfb-863e-041aa876260c/scratchpad/ler-lp.mjs\")",
+      "Bash(cp \"C:/Users/gusma/AppData/Local/Temp/claude/C--E-nova-tools/b7036078-203e-4dfb-863e-041aa876260c/scratchpad/ler-lp.mjs\" ./ler-lp.temp.mjs)",
+      "Bash(node ./ler-lp.temp.mjs)",
+      "Bash(node ./dump-lp.temp.mjs)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/131.0 Safari/537.36\" \"https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap\")",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/131.0 Safari/537.36\" \"https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap\")",
+      "Bash(node -e ' *)",
+      "Bash(grep -n \"return \\\\`<div class=\\\\\"lp-container\\\\\">\" lib/lp/compilador/html.ts)",
+      "Bash(python -)",
+      "Read(//c/Users/gusma/Downloads/raizes-cafe-arquivo-unico/**)",
+      "Read(//c/Users/gusma/Downloads//**)",
+      "Bash(perl -0pi -e 's/^\\\\}\\\\\\)\\\\\\(\\\\\\)$/}\\)\\(\\);/mg' lib/lp/compilador/js.ts)",
+      "PowerShell(git *)",
+      "PowerShell(npx vitest run lib/lp/_scratch.test.ts 2>&1 | Select-Object -First 60)",
+      "PowerShell(Set-Content *)",
+      "Bash(grep -o '<section class=\"lp-legal\">.\\\\{0,700\\\\}' termos.html)"
     ]
   }
 }
