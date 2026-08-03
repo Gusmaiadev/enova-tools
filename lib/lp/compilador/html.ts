@@ -7,6 +7,7 @@
  * inline; o modo export nao emite nada disso.
  */
 
+import { renderElemento } from './arvore'
 import { svgIcone, svgRede } from '../icones'
 import type {
   LpBotao,
@@ -488,7 +489,12 @@ function htmlSecao(ctx: Ctx, s: LpSecao, idHtml: string): string {
 
   const estilo = estilos.length > 0 ? ` style="${estilos.join(';')}"` : ''
   const nomeEditor = ctx.modo === 'editor' ? ` data-lp-nome="${esc(s.nome)}"` : ''
-  return `<section id="${esc(idHtml)}" class="${classes.join(' ')}"${estilo}${alvo(ctx, `sec:${s.id}`)}${nomeEditor}>${fundo}${corpo[s.tipo]?.() ?? ''}</section>`
+  // Secao migrada renderiza a arvore; a sem `raiz` segue no layout tipado, que
+  // e o que todo documento salvo ainda e.
+  const interno = s.raiz
+    ? `<div class="lp-container">${renderElemento(ctx, s.raiz)}</div>`
+    : (corpo[s.tipo]?.() ?? '')
+  return `<section id="${esc(idHtml)}" class="${classes.join(' ')}"${estilo}${alvo(ctx, `sec:${s.id}`)}${nomeEditor}>${fundo}${interno}</section>`
 }
 
 function htmlHeader(ctx: Ctx, doc: LpDocumento): string {

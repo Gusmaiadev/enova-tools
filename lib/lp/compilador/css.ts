@@ -5,6 +5,7 @@
 
 import { paginasGeradas } from '../documento'
 import { familiaCss } from '../fontes'
+import { cssDaArvore } from './estilo'
 import type { AjusteTexto, LpDocumento, LpSecao, TipoLayout } from '../tipos'
 import { corContraste, corSegura, escCss, slugificar } from '../util'
 
@@ -389,6 +390,37 @@ const POR_LAYOUT: Record<TipoLayout, string> = {
 `,
 }
 
+/**
+ * Identidade visual dos containers da arvore (ver Aparencia em tipos.ts). As
+ * regras vem do CSS por layout, re-ancoradas em classes proprias para nao
+ * dependerem dos layouts, que somem quando a migracao terminar.
+ */
+const APARENCIAS = `
+.lp-c{min-width:0}
+.lp-ap-card{display:flex;flex-direction:column;background:color-mix(in srgb,var(--cor-titulos) 4%,transparent);border:1px solid color-mix(in srgb,var(--cor-titulos) 10%,transparent);border-radius:var(--raio);padding:32px 28px;transition:transform .25s,box-shadow .25s}
+.lp-ap-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px -24px color-mix(in srgb,var(--cor-principal) 45%,transparent)}
+.lp-ap-plano{display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--cor-titulos) 12%,transparent);border-radius:var(--raio);padding:36px 30px;background:color-mix(in srgb,var(--cor-titulos) 3%,transparent)}
+.lp-ap-destaque{border-color:var(--cor-principal);box-shadow:0 24px 60px -28px color-mix(in srgb,var(--cor-principal) 55%,transparent);position:relative}
+.lp-ap-destaque::before{content:'Mais popular';position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--cor-principal);color:#fff;font-size:.75rem;font-weight:700;padding:4px 14px;border-radius:999px;letter-spacing:.04em}
+.lp-ap-produto{border:1px solid color-mix(in srgb,var(--cor-titulos) 10%,transparent);border-radius:var(--raio);overflow:hidden;background:color-mix(in srgb,var(--cor-titulos) 3%,transparent);display:flex;flex-direction:column}
+.lp-ap-produto .lp-midia{border-radius:0;aspect-ratio:1}
+.lp-ap-figura{position:relative;border-radius:var(--raio);overflow:hidden}
+.lp-ap-figura .lp-midia{border-radius:0;aspect-ratio:4/3}
+.lp-ap-figura img{transition:transform .4s}
+.lp-ap-figura:hover img{transform:scale(1.05)}
+.lp-ap-bloco .lp-midia{aspect-ratio:4/3}
+.lp-ap-beneficio{align-items:flex-start}
+.lp-ap-marco{position:relative}
+.lp-ap-caixa-cta{background:linear-gradient(135deg,var(--cor-principal),var(--cor-secundaria));border-radius:calc(var(--raio) * 1.5);padding:64px 48px;text-align:center;color:#fff}
+.lp-ap-caixa-cta h1,.lp-ap-caixa-cta h2,.lp-ap-caixa-cta h3,.lp-ap-caixa-cta p{color:#fff}
+.lp-ap-caixa-cta .lp-btn{background:#fff;border-color:#fff;color:var(--cor-principal)}
+.lp-lista{list-style:none;display:grid;gap:12px}
+.lp-lista li{display:flex;gap:10px;align-items:flex-start}
+.lp-lista li svg{width:18px;height:18px;flex:none;margin-top:3px;color:var(--cor-principal)}
+.lp-divisor{border:0;border-top:1px solid color-mix(in srgb,var(--cor-titulos) 15%,transparent)}
+@media (max-width:640px){.lp-ap-caixa-cta{padding:48px 24px}}
+`
+
 /** CSS do mecanismo de slider (compartilhado por depoimentos e carrossel). */
 const SLIDER = `
 .lp-slider{position:relative}
@@ -485,7 +517,7 @@ function cssDaSecao(secao: LpSecao, idHtml: string): string {
  */
 export function compilarCss(doc: LpDocumento, idsPorSecao: Map<string, string>): string {
   const usados = new Set<TipoLayout>(doc.secoes.map((s) => s.tipo))
-  const partes: string[] = [varsTema(doc), BASE, HEADER, FOOTER]
+  const partes: string[] = [varsTema(doc), BASE, HEADER, FOOTER, APARENCIAS]
   // Uma folha de estilo so serve o index e as paginas de texto.
   if (paginasGeradas(doc).length > 0) partes.push(LEGAL)
   if (usados.has('depoimentos') || usados.has('carrossel')) partes.push(SLIDER)
@@ -501,6 +533,30 @@ export function compilarCss(doc: LpDocumento, idsPorSecao: Map<string, string>):
       if (extra) partes.push(extra)
     }
   }
+
+  // CSS dos elementos por ultimo e agrupado por breakpoint: um bloco de media
+  // query com todos os nos, em vez de tres por no. Vindo depois do CSS base
+  // (que nunca passa de uma classe), o ajuste do usuario vence por ordem.
+  const porDisp: Record<'desktop' | 'tablet' | 'celular', string[]> = {
+    desktop: [],
+    tablet: [],
+    celular: [],
+  }
+  for (const secao of doc.secoes) {
+    if (!secao.raiz) continue
+    const css = cssDaArvore(secao.raiz)
+    if (css.desktop) porDisp.desktop.push(css.desktop)
+    if (css.tablet) porDisp.tablet.push(css.tablet)
+    if (css.celular) porDisp.celular.push(css.celular)
+  }
+  if (porDisp.desktop.length > 0) partes.push(porDisp.desktop.join('\n'))
+  if (porDisp.tablet.length > 0) {
+    partes.push(`@media (max-width:900px){\n${porDisp.tablet.join('\n')}\n}`)
+  }
+  if (porDisp.celular.length > 0) {
+    partes.push(`@media (max-width:640px){\n${porDisp.celular.join('\n')}\n}`)
+  }
+
   return partes.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'
 }
 

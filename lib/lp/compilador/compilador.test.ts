@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { compilar, compilarEditor } from './index'
-import { idHtmlSecao } from './css'
+import { compilarCorpo } from './html'
+import { compilarJs } from './js'
+import { compilarCss, idHtmlSecao } from './css'
 import { documentoBase } from '../documento'
 import { novaSecao } from '../layouts'
-import type { LpBriefing, LpDocumento, LpMidia, TipoLayout } from '../tipos'
+import type { LpBriefing, LpDocumento, LpMidia, LpSecao, TipoLayout } from '../tipos'
 import { briefingVazio } from '../tipos'
 import { LAYOUTS } from '../layouts'
 import { coergirDocumento } from '../validar'
@@ -783,5 +785,78 @@ describe('catálogo de layouts', () => {
       if (layout.itens) expect(secao.itens.length).toBeGreaterThan(0)
       else expect(secao.itens).toHaveLength(0)
     }
+  })
+})
+
+/** Documento com as seções dadas, para isolar o caso no teste. */
+function docCom(secoes: LpSecao[]): LpDocumento {
+  return { ...documentoBase(briefingVazio('Teste')), secoes }
+}
+
+describe('compilador com árvore', () => {
+  it('seção com raiz usa a árvore e ignora os campos tipados', () => {
+    const doc = docCom([
+      {
+        ...novaSecao('cta'),
+        titulo: 'IGNORADO',
+        raiz: {
+          id: 'r',
+          tipo: 'container',
+          direcao: { desktop: 'coluna' },
+          filhos: [{ id: 't', tipo: 'titulo', nivel: 'h2', texto: 'DA ARVORE' }],
+        },
+      },
+    ])
+    const { corpo } = compilarCorpo(doc, { modo: 'export' })
+    expect(corpo).toContain('DA ARVORE')
+    expect(corpo).not.toContain('IGNORADO')
+  })
+
+  it('seção sem raiz continua no layout tipado', () => {
+    const doc = docCom([{ ...novaSecao('cta'), titulo: 'TIPADO' }])
+    const { corpo } = compilarCorpo(doc, { modo: 'export' })
+    expect(corpo).toContain('TIPADO')
+    expect(corpo).toContain('lp-cta-caixa')
+  })
+
+  it('CSS traz as regras geradas dos elementos da árvore', () => {
+    const doc = docCom([
+      {
+        ...novaSecao('cta'),
+        raiz: {
+          id: 'r',
+          tipo: 'container',
+          direcao: { desktop: 'coluna' },
+          filhos: [
+            {
+              id: 'w',
+              tipo: 'titulo',
+              nivel: 'h2',
+              texto: 'T',
+              estilo: { cor: { celular: '#123456' } },
+            },
+          ],
+        },
+      },
+    ])
+    const css = compilarCss(doc, new Map([[doc.secoes[0].id, 'cta']]))
+    expect(css).toContain('.lp-e-r{display:flex')
+    expect(css).toContain('@media (max-width:640px)')
+    expect(css).toContain('#123456')
+  })
+
+  it('JS do slider entra quando há widget de carrossel na árvore', () => {
+    const doc = docCom([
+      {
+        ...novaSecao('cta'),
+        raiz: {
+          id: 'r',
+          tipo: 'container',
+          direcao: { desktop: 'coluna' },
+          filhos: [{ id: 'k', tipo: 'carrossel', slides: [{ id: '1' }, { id: '2' }] }],
+        },
+      },
+    ])
+    expect(compilarJs(doc, 'export')).toContain('lp-slider-trilho')
   })
 })

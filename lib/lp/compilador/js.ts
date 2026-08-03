@@ -3,6 +3,7 @@
  * apenas quando o layout que os usa existe no documento. Puro.
  */
 
+import { caminharElementos } from '../arvore'
 import type { LpDocumento } from '../tipos'
 
 const NAV = `
@@ -179,19 +180,36 @@ const FORM = `
 `
 
 /** Compila o script.js — so os modulos usados pelos layouts do documento. */
+/**
+ * Tipos presentes na pagina: o layout, nas secoes tipadas, ou os widgets, nas
+ * migradas. Os dois convivem enquanto houver documento pre-arvore salvo.
+ */
+function tiposUsados(doc: LpDocumento): Set<string> {
+  const usados = new Set<string>()
+  for (const s of doc.secoes) {
+    if (s.raiz) {
+      for (const el of caminharElementos(s.raiz)) usados.add(el.tipo)
+    } else {
+      usados.add(s.tipo)
+    }
+  }
+  return usados
+}
+
 export function compilarJs(doc: LpDocumento, modo: 'editor' | 'export' = 'export'): string {
-  const tipos = new Set(doc.secoes.map((s) => s.tipo))
+  const tipos = tiposUsados(doc)
   // Os ponto e vírgula aqui e no fim de cada módulo não são estilo: sem eles a
   // inserção automática do JS lê `'use strict'\n(function(){…})()` como chamada
   // da string ("use strict" is not a function) e o script inteiro morre na
   // primeira linha — sem revelar as seções, sem slider, sem menu no celular.
   const partes = ["'use strict';", NAV]
   if (tipos.has('depoimentos') || tipos.has('carrossel')) partes.push(SLIDER)
-  if (tipos.has('tabs')) partes.push(TABS)
+  // 'tabs' e o layout; 'abas' e o widget da arvore.
+  if (tipos.has('tabs') || tipos.has('abas')) partes.push(TABS)
   // No editor o contador reescreveria o número (editável inline) e o form daria
   // reset/submit — esses só entram na página final.
   if (modo === 'export') {
-    if (tipos.has('estatisticas')) partes.push(CONTADOR)
+    if (tipos.has('estatisticas') || tipos.has('numero')) partes.push(CONTADOR)
     if (tipos.has('formulario')) partes.push(FORM)
   }
   return partes.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'
