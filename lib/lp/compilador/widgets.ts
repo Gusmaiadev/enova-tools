@@ -16,7 +16,7 @@ import {
   quebras,
   slider,
   urlMidia,
-} from './html'
+} from './comum'
 
 /** Classe de um no: a fixa do widget mais a do id, para o CSS gerado alcancar. */
 const cls = (fixa: string, id: string) => `${fixa} lp-e-${id}`.trim()

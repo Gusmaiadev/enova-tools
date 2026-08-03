@@ -4,7 +4,7 @@
  */
 
 import type { Aparencia, LpElemento } from '../tipos'
-import { type Ctx, alvo } from './html'
+import { type Ctx, alvo } from './comum'
 import { renderWidget } from './widgets'
 
 /** Classe CSS da aparencia do container (ver o bloco APARENCIAS em css.ts). */
