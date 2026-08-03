@@ -1,0 +1,121 @@
+/**
+ * CSS derivado da arvore: layout do container e sobreposicoes de LpEstilo, um
+ * seletor .lp-e-<id> por no.
+ *
+ * A saida vem separada por dispositivo para o chamador emitir UM bloco de media
+ * query com todos os elementos, em vez de tres por elemento. A heranca sai da
+ * cascata: sendo max-width, numa tela de 500px os dois blocos valem e o de 640
+ * vence por vir depois.
+ */
+
+import { caminharElementos } from '../arvore'
+import { familiaCss } from '../fontes'
+import type { Caixa, Dispositivo, LpContainer, LpElemento, LpEstilo, PorDisp } from '../tipos'
+import { corSegura, escCss } from '../util'
+
+const DISPOSITIVOS: Dispositivo[] = ['desktop', 'tablet', 'celular']
+
+const ALINHAR: Record<string, string> = {
+  inicio: 'flex-start',
+  centro: 'center',
+  fim: 'flex-end',
+  esticar: 'stretch',
+}
+
+const JUSTIFICAR: Record<string, string> = {
+  inicio: 'flex-start',
+  centro: 'center',
+  fim: 'flex-end',
+  entre: 'space-between',
+}
+
+const caixaCss = (c: Caixa) =>
+  `${num(c.topo)}px ${num(c.direita)}px ${num(c.base)}px ${num(c.esquerda)}px`
+
+/** Numero seguro: valor vindo do documento nunca entra cru no CSS. */
+function num(n: unknown): string {
+  return typeof n === 'number' && Number.isFinite(n) ? String(n) : '0'
+}
+
+/** Regras de layout do container num dispositivo. */
+function regrasContainer(c: LpContainer, d: Dispositivo): string[] {
+  const r: string[] = []
+  const direcao = c.direcao[d]
+  const colunas = c.colunas?.[d]
+  if (direcao === 'linha' && colunas !== undefined) {
+    r.push('display:grid', `grid-template-columns:repeat(${num(colunas)},1fr)`)
+  } else if (direcao === 'linha') {
+    r.push('display:flex', 'flex-direction:row', 'flex-wrap:wrap')
+  } else if (direcao === 'coluna') {
+    r.push('display:flex', 'flex-direction:column')
+  } else if (colunas !== undefined) {
+    // Colunas mudam de valor num breakpoint em que a direcao nao muda.
+    r.push(`grid-template-columns:repeat(${num(colunas)},1fr)`)
+  }
+  if (c.gap?.[d] !== undefined) r.push(`gap:${num(c.gap[d])}px`)
+  const al = c.alinhar?.[d]
+  if (al) r.push(`align-items:${ALINHAR[al]}`)
+  const ju = c.justificar?.[d]
+  if (ju) r.push(`justify-content:${JUSTIFICAR[ju]}`)
+  return r
+}
+
+/** Regras de LpEstilo num dispositivo. */
+function regrasEstilo(e: LpEstilo, d: Dispositivo): string[] {
+  const r: string[] = []
+  const em = <T>(p: PorDisp<T> | undefined): T | undefined => p?.[d]
+  const cor = em(e.cor)
+  if (cor) r.push(`color:${escCss(corSegura(cor, 'inherit'))}`)
+  const fundo = em(e.fundo)
+  if (fundo) r.push(`background:${escCss(corSegura(fundo, 'transparent'))}`)
+  const fonte = em(e.fonte)
+  if (fonte) r.push(`font-family:${familiaCss(fonte)}`)
+  const tamanho = em(e.tamanho)
+  if (tamanho) r.push(`font-size:${escCss(tamanho)}`)
+  const peso = em(e.peso)
+  if (peso !== undefined) r.push(`font-weight:${num(peso)}`)
+  const altura = em(e.alturaLinha)
+  if (altura) r.push(`line-height:${escCss(altura)}`)
+  const espaco = em(e.espacamentoLetras)
+  if (espaco) r.push(`letter-spacing:${escCss(espaco)}`)
+  const alinhamento = em(e.alinhamento)
+  if (alinhamento) r.push(`text-align:${escCss(alinhamento)}`)
+  const margem = em(e.margem)
+  if (margem) r.push(`margin:${caixaCss(margem)}`)
+  const padding = em(e.padding)
+  if (padding) r.push(`padding:${caixaCss(padding)}`)
+  const largura = em(e.largura)
+  if (largura) r.push(`width:${escCss(largura)}`)
+  const raio = em(e.raio)
+  if (raio !== undefined) r.push(`border-radius:${num(raio)}px`)
+  const sombra = em(e.sombra)
+  if (sombra) r.push(`box-shadow:${escCss(sombra)}`)
+  return r
+}
+
+function regrasDoNo(el: LpElemento, d: Dispositivo): string {
+  const r: string[] = []
+  if (el.tipo === 'container') r.push(...regrasContainer(el, d))
+  if (el.estilo) r.push(...regrasEstilo(el.estilo, d))
+  // A checagem de tipo vem antes do acesso: `altura` so existe no espacador, e
+  // o TypeScript so libera o campo depois de estreitar a uniao.
+  if (el.tipo === 'espacador' && el.altura[d] !== undefined) {
+    r.push(`height:${num(el.altura[d])}px`)
+  }
+  // `oculto` por ultimo: esconder vence qualquer display que o layout pos.
+  if (el.oculto?.[d]) r.push('display:none')
+  return r.length > 0 ? `.lp-e-${el.id}{${r.join(';')}}` : ''
+}
+
+/** CSS de todos os nos da arvore, separado por dispositivo. */
+export function cssDaArvore(raiz: LpContainer): Record<Dispositivo, string> {
+  const nos = caminharElementos(raiz)
+  const fora: Record<Dispositivo, string> = { desktop: '', tablet: '', celular: '' }
+  for (const d of DISPOSITIVOS) {
+    fora[d] = nos
+      .map((el) => regrasDoNo(el, d))
+      .filter(Boolean)
+      .join('\n')
+  }
+  return fora
+}
