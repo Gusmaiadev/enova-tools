@@ -4,6 +4,7 @@
  * mutacoes imutaveis usadas pelo reducer do editor.
  */
 
+import { caminharElementos, midiasDoElemento } from './arvore'
 import { pesoValido } from './fontes'
 import { infoLayout, novoItem, temLados } from './layouts'
 import { placeholderMidia } from './placeholder'
@@ -464,9 +465,16 @@ export function arquivosUsados(projeto: {
   anotar(projeto.documento?.header.logo)
   anotar(projeto.briefing?.logo)
   for (const secao of projeto.documento?.secoes ?? []) {
+    // Campos tipados: valem enquanto houver documento pre-arvore salvo.
     anotar(secao.midia)
     anotar(secao.fundo?.midia)
-    for (const item of secao.itens) anotar(item.imagem)
+    for (const item of secao.itens ?? []) anotar(item.imagem)
+    // Arvore: o que a Entrega 2 em diante produz. Os dois formatos convivem de
+    // proposito — na transicao um mesmo projeto pode ter secao migrada e nao
+    // migrada, e apagar arquivo do bucket e irreversivel.
+    if (secao.raiz) {
+      for (const el of caminharElementos(secao.raiz)) midiasDoElemento(el).forEach(anotar)
+    }
   }
   for (const secao of projeto.briefing?.secoes ?? []) anotar(secao.midia?.arquivo)
   return usados
