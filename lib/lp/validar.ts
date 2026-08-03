@@ -56,6 +56,8 @@ import {
   normalizarUrl,
 } from './util'
 
+import { coergirRaiz } from './validarArvore'
+
 const TIPOS_LAYOUT = new Set<string>(LAYOUTS.map((l) => l.tipo))
 const ORIENTACOES = new Set<string>(['paisagem', 'retrato', 'quadrado'])
 const POSICOES = new Set<string>(POSICOES_BOTAO)
@@ -318,6 +320,12 @@ function coergirSecao(v: unknown, ancoras: Set<string>): LpSecao | null {
       .slice(0, 24),
     largura: s.largura === 'full' ? 'full' : 'boxed',
   }
+  // Secao migrada traz a arvore. Sem isto, o PUT que salva o documento do
+  // editor devolveria a secao sem `raiz` — e cada gravacao desfaria a migracao
+  // em silencio, porque a pagina continuaria saindo pelos campos tipados.
+  const raiz = coergirRaiz(s.raiz, coergirMidia, coergirBotao)
+  if (raiz) secao.raiz = raiz
+  if (TIPOS_LAYOUT.has(String(s.preset))) secao.preset = s.preset as TipoLayout
   const titulo = opcional(s.titulo, 300)
   if (titulo) secao.titulo = titulo
   const subtitulo = opcional(s.subtitulo, 500)
@@ -642,6 +650,11 @@ export function coergirDocumento(bruto: unknown, temaBase: LpTema = TEMA_PADRAO)
   const estiloFooter = coergirEstiloBarra(footer.estilo)
 
   return {
+    // `versao` e DERIVADA, nao copiada do payload: migrado e o documento cujas
+    // secoes todas tem arvore. Confiar na alegacao do cliente deixaria um
+    // documento sem `raiz` marcado como migrado — e ele nunca mais seria
+    // convertido, ficando preso fora do editor novo.
+    ...(secoes.length > 0 && secoes.every((s) => s.raiz) ? { versao: 2 as const } : {}),
     seo: {
       titulo: strOu(seo.titulo, logoTexto, 90),
       descricao: strOu(seo.descricao, logoTexto, 200),

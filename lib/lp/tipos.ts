@@ -192,10 +192,15 @@ export type LpSecao = {
   id: string
   tipo: TipoLayout
   /**
-   * Conteudo da secao em arvore. Opcional enquanto o compilador nao renderiza
-   * arvore (Entrega 2): documento salvo hoje nao tem, e o expansor produz.
+   * Conteudo da secao em arvore. Opcional enquanto houver documento pre-arvore
+   * salvo: o expansor produz na migracao e na geracao.
    */
   raiz?: LpContainer
+  /**
+   * Preset que semeou a arvore. Vira rotulo no painel e continua sendo o que a
+   * IA escolhe — mas nao manda mais no render.
+   */
+  preset?: TipoLayout
   /** Nome interno (aparece no painel de estrutura e vira ancora). */
   nome: string
   /** Slug da ancora para navegacao pelo menu (null = fora do menu). */
