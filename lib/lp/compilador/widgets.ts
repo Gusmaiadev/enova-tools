@@ -21,8 +21,20 @@ import {
 /** Classe de um no: a fixa do widget mais a do id, para o CSS gerado alcancar. */
 const cls = (fixa: string, id: string) => `${fixa} lp-e-${id}`.trim()
 
+/**
+ * Widgets cujo texto pode ser digitado direto no canvas. O runtime do editor
+ * pergunta por este atributo em vez de deduzir pelo alvo — sem ele, o duplo
+ * clique abriria contenteditable numa imagem ou num formulario.
+ *
+ * `numero` fica de fora de proposito: o widget e valor + rotulo no mesmo no, e
+ * editar inline apagaria o rotulo junto. Ele se edita pelo painel.
+ */
+const TEXTO_EDITAVEL = new Set(['titulo', 'texto', 'botao'])
+
 export function renderWidget(ctx: Ctx, w: LpWidget): string {
-  const marca = alvo(ctx, `el:${w.id}`)
+  const editavel =
+    ctx.modo === 'editor' && TEXTO_EDITAVEL.has(w.tipo) ? ' data-lp-editavel' : ''
+  const marca = alvo(ctx, `el:${w.id}`) + editavel
   switch (w.tipo) {
     case 'titulo':
       return `<${w.nivel} class="${cls('lp-el-titulo', w.id)}"${marca}>${quebras(w.texto)}</${w.nivel}>`
@@ -35,7 +47,7 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
       // htmlMidia ja emite .lp-midia e trata img/video, poster e autoplay.
       return htmlMidia(ctx, w.midia, `el:${w.id}`)
     case 'botao':
-      return htmlBotao(ctx, w.botao, `el:${w.id}`, `lp-e-${w.id}`)
+      return htmlBotao(ctx, w.botao, `el:${w.id}`, `lp-e-${w.id}`, editavel)
     case 'icone':
       return `<span class="${cls('lp-icone', w.id)}"${marca}>${svgIcone(w.nome)}</span>`
     case 'numero':

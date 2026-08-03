@@ -71,13 +71,23 @@ const ABAS: { chave: Aba; rotulo: string; icone: typeof LayoutList }[] = [
   { chave: 'tema', rotulo: 'Tema', icone: Palette },
 ]
 
-/** 'sec:ID:item:IID:campo' -> { secaoId, itemId, campo } */
-function lerAlvo(alvo: string | null): { secaoId: string | null; itemId: string | null } {
-  if (!alvo || !alvo.startsWith('sec:')) return { secaoId: null, itemId: null }
+/**
+ * Dois formatos de alvo convivem enquanto houver seção não migrada:
+ * 'el:ID' é um nó da árvore; 'sec:ID:item:IID:campo' é o formato tipado.
+ */
+function lerAlvo(alvo: string | null): {
+  secaoId: string | null
+  itemId: string | null
+  noId: string | null
+} {
+  if (alvo?.startsWith('el:')) return { secaoId: null, itemId: null, noId: alvo.slice(3) }
+  if (!alvo || !alvo.startsWith('sec:')) return { secaoId: null, itemId: null, noId: null }
   const partes = alvo.split(':')
-  const secaoId = partes[1] ?? null
-  const itemId = partes[2] === 'item' ? (partes[3] ?? null) : null
-  return { secaoId, itemId }
+  return {
+    secaoId: partes[1] ?? null,
+    itemId: partes[2] === 'item' ? (partes[3] ?? null) : null,
+    noId: null,
+  }
 }
 
 export function EditorLp({
@@ -93,6 +103,8 @@ export function EditorLp({
   const [dispositivo, setDispositivo] = useState<Dispositivo>('desktop')
   const [secaoId, setSecaoId] = useState<string | null>(null)
   const [itemId, setItemId] = useState<string | null>(null)
+  // Nó da árvore selecionado no canvas (formato novo).
+  const [noId, setNoId] = useState<string | null>(null)
   // O rodapé não é seção: o painel precisa do alvo cru para editá-lo.
   const [alvo, setAlvo] = useState<string | null>(null)
   const [mostrarCodigo, setMostrarCodigo] = useState(false)
@@ -282,11 +294,12 @@ export function EditorLp({
         const selecionado = typeof m.alvo === 'string' ? m.alvo : null
         alvoSelecionado.current = selecionado
         setAlvo(selecionado)
-        const { secaoId: sid, itemId: iid } = lerAlvo(selecionado)
+        const { secaoId: sid, itemId: iid, noId: nid } = lerAlvo(selecionado)
         setSecaoId(sid)
         setItemId(iid)
+        setNoId(nid)
         // Header e rodapé também têm painel próprio (botões, telefones).
-        if (sid || /^(header|footer)/.test(selecionado ?? '')) setAba('editar')
+        if (sid || nid || /^(header|footer)/.test(selecionado ?? '')) setAba('editar')
         return
       }
       if ((m.tipo === 'texto' || m.tipo === 'texto-fim') && typeof m.alvo === 'string') {
@@ -343,6 +356,7 @@ export function EditorLp({
     (id: string) => {
       setSecaoId(id)
       setItemId(null)
+      setNoId(null)
       setAba('editar')
       setAlvo(`sec:${id}`)
       alvoSelecionado.current = `sec:${id}`

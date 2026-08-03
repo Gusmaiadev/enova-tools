@@ -105,7 +105,14 @@ export function htmlMidia(ctx: Ctx, midia: LpMidia, caminho: string): string {
   return `<div class="lp-midia"${marca}><img src="${esc(url)}" alt="${esc(midia.alt)}" loading="lazy"></div>`
 }
 
-export function htmlBotao(ctx: Ctx, botao: LpBotao, caminho: string, extra = ''): string {
+export function htmlBotao(
+  ctx: Ctx,
+  botao: LpBotao,
+  caminho: string,
+  extra = '',
+  /** Atributos avulsos no <a> (o editor usa para marcar o texto editavel). */
+  atributos = '',
+): string {
   const classes = ['lp-btn']
   if (botao.estilo === 'contorno') classes.push('contorno')
   // Ausente = o comportamento de sempre (subir um pouco, sem animacao).
@@ -121,7 +128,7 @@ export function htmlBotao(ctx: Ctx, botao: LpBotao, caminho: string, extra = '')
   }
   if (botao.corTexto) estilos.push(`color:${escCss(corSegura(botao.corTexto, 'inherit'))}`)
   const estilo = estilos.length > 0 ? ` style="${estilos.join(';')}"` : ''
-  return `<a class="${classes.join(' ')}" href="${esc(href(ctx, botao.url))}"${estilo}${alvo(ctx, caminho)}>${esc(botao.texto)}</a>`
+  return `<a class="${classes.join(' ')}" href="${esc(href(ctx, botao.url))}"${estilo}${alvo(ctx, caminho)}${atributos}>${esc(botao.texto)}</a>`
 }
 
 export const quebras = (texto: string) => esc(texto).replace(/\n/g, '<br>')

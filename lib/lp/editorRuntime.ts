@@ -77,7 +77,13 @@ export const EDITOR_RUNTIME = `
     var el = e.target.closest('[data-lp]')
     if (!el) return
     var alvo = el.getAttribute('data-lp')
-    if (!EDITAVEIS.test(alvo) && alvo !== 'header:logo') return
+    // No formato de arvore quem decide e o compilador, que marca o no; no
+    // formato antigo, o proprio alvo diz qual campo e.
+    var podeEditar =
+      alvo.indexOf('el:') === 0
+        ? el.hasAttribute('data-lp-editavel')
+        : EDITAVEIS.test(alvo) || alvo === 'header:logo'
+    if (!podeEditar) return
     e.preventDefault()
     iniciarEdicao(el)
   })
