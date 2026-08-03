@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { arquivosUsados } from './documento'
-import type { LpDocumento, LpMidia, LpSecao } from './tipos'
+import { acharNo } from './arvore'
+import { aplicarTexto, arquivosUsados } from './documento'
+import type { LpContainer, LpDocumento, LpMidia, LpSecao } from './tipos'
 
 const enviada = (caminho: string): LpMidia => ({
   tipo: 'imagem',
@@ -100,5 +101,59 @@ describe('arquivosUsados', () => {
       }),
     ])
     expect(arquivosUsados({ documento: doc }).size).toBe(0)
+  })
+})
+
+describe('aplicarTexto na árvore', () => {
+  const docArvore = () =>
+    docBase([
+      secao({
+        raiz: {
+          id: 'r',
+          tipo: 'container',
+          direcao: { desktop: 'coluna' },
+          filhos: [
+            { id: 'w1', tipo: 'titulo', nivel: 'h2', texto: 'antes' },
+            { id: 'w2', tipo: 'botao', botao: { texto: 'antes', url: '#' } },
+            { id: 'w3', tipo: 'numero', valor: '10', rotulo: 'Anos' },
+          ],
+        },
+      }),
+    ])
+
+  const noDe = (d: LpDocumento, id: string) => acharNo(d.secoes[0].raiz as LpContainer, id)
+
+  it('escreve no título pelo id do nó', () => {
+    const no = noDe(aplicarTexto(docArvore(), 'el:w1', 'depois'), 'w1')
+    expect(no?.tipo === 'titulo' && no.texto).toBe('depois')
+  })
+
+  it('escreve no texto do botão', () => {
+    const no = noDe(aplicarTexto(docArvore(), 'el:w2', 'clique'), 'w2')
+    expect(no?.tipo === 'botao' && no.botao.texto).toBe('clique')
+  })
+
+  it('escreve no valor do número', () => {
+    const no = noDe(aplicarTexto(docArvore(), 'el:w3', '25'), 'w3')
+    expect(no?.tipo === 'numero' && no.valor).toBe('25')
+  })
+
+  it('botão não fica sem texto — senão sumiria da página', () => {
+    const no = noDe(aplicarTexto(docArvore(), 'el:w2', '   '), 'w2')
+    expect(no?.tipo === 'botao' && no.botao.texto).toBe('antes')
+  })
+
+  it('alvo inexistente não quebra nem altera nada', () => {
+    const antes = docArvore()
+    const d = aplicarTexto(antes, 'el:nada', 'x')
+    expect(JSON.stringify(d.secoes)).toBe(JSON.stringify(antes.secoes))
+  })
+
+  it('não toca no documento recebido', () => {
+    const antes = docArvore()
+    aplicarTexto(antes, 'el:w1', 'depois')
+    expect(noDe(antes, 'w1')?.tipo === 'titulo' && noDe(antes, 'w1')).toMatchObject({
+      texto: 'antes',
+    })
   })
 })

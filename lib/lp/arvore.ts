@@ -5,6 +5,7 @@
  */
 
 import type { LpContainer, LpElemento, LpMidia } from './tipos'
+import { gerarId } from './util'
 
 /** Todos os nos em profundidade, a raiz primeiro. */
 export function caminharElementos(raiz: LpContainer): LpElemento[] {
@@ -36,4 +37,64 @@ export function midiasDoElemento(el: LpElemento): LpMidia[] {
     default:
       return []
   }
+}
+
+/* --------------------------- operacoes de arvore -------------------------- */
+
+/** No pelo id, em qualquer profundidade. */
+export function acharNo(raiz: LpContainer, id: string): LpElemento | null {
+  return caminharElementos(raiz).find((el) => el.id === id) ?? null
+}
+
+/** Copia profunda (a arvore e JSON puro, sem funcao nem data). */
+const clonarArvore = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
+
+/**
+ * Arvore nova com o no alterado pela funcao. A entrada nao e tocada: o editor
+ * guarda snapshots no historico, e mutar quebraria o Ctrl+Z.
+ */
+export function atualizarNo(
+  raiz: LpContainer,
+  id: string,
+  mut: (el: LpElemento) => void,
+): LpContainer {
+  const copia = clonarArvore(raiz)
+  const alvo = acharNo(copia, id)
+  if (alvo) mut(alvo)
+  return copia
+}
+
+/** Arvore nova sem o no. A raiz nao pode ser removida. */
+export function removerNo(raiz: LpContainer, id: string): LpContainer {
+  if (raiz.id === id) return raiz
+  const copia = clonarArvore(raiz)
+  const podar = (c: LpContainer) => {
+    c.filhos = c.filhos.filter((f) => f.id !== id)
+    for (const f of c.filhos) if (f.tipo === 'container') podar(f)
+  }
+  podar(copia)
+  return copia
+}
+
+/** Ids novos em toda a subarvore — copia nao pode repetir id de ninguem. */
+export function regerarIds<T extends LpElemento>(el: T): T {
+  const copia = clonarArvore(el)
+  const nos = copia.tipo === 'container' ? caminharElementos(copia) : [copia as LpElemento]
+  for (const no of nos) no.id = gerarId()
+  return copia
+}
+
+/** Copia do no logo depois dele, com ids novos. */
+export function duplicarNo(raiz: LpContainer, id: string): LpContainer {
+  const copia = clonarArvore(raiz)
+  const inserir = (c: LpContainer): boolean => {
+    const i = c.filhos.findIndex((f) => f.id === id)
+    if (i >= 0) {
+      c.filhos.splice(i + 1, 0, regerarIds(c.filhos[i]))
+      return true
+    }
+    return c.filhos.some((f) => f.tipo === 'container' && inserir(f))
+  }
+  inserir(copia)
+  return copia
 }

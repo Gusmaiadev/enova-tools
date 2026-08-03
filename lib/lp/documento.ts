@@ -4,7 +4,7 @@
  * mutacoes imutaveis usadas pelo reducer do editor.
  */
 
-import { caminharElementos, midiasDoElemento } from './arvore'
+import { acharNo, caminharElementos, midiasDoElemento } from './arvore'
 import { pesoValido } from './fontes'
 import { infoLayout, novoItem, temLados } from './layouts'
 import { placeholderMidia } from './placeholder'
@@ -597,6 +597,22 @@ function secaoPorId(doc: LpDocumento, id: string): LpSecao | undefined {
 export function aplicarTexto(doc: LpDocumento, alvo: string, valor: string): LpDocumento {
   return alterarDoc(doc, (d) => {
     const texto = valor.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim()
+    // Formato novo: o alvo e o id do no, e a arvore diz o que ele e. `d` ja e
+    // uma copia (alterarDoc clona), entao mutar aqui dentro e seguro.
+    if (alvo.startsWith('el:')) {
+      const id = alvo.slice(3)
+      for (const secao of d.secoes) {
+        if (!secao.raiz) continue
+        const no = acharNo(secao.raiz, id)
+        if (!no) continue
+        if (no.tipo === 'titulo' || no.tipo === 'texto') no.texto = texto
+        // Botao sem texto sumiria da pagina sem jeito de clicar nele de volta.
+        else if (no.tipo === 'botao' && texto !== '') no.botao.texto = texto
+        else if (no.tipo === 'numero') no.valor = texto
+        return
+      }
+      return
+    }
     if (alvo === 'header:logo') {
       d.header.logoTexto = texto
       return
