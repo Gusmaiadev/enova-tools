@@ -106,7 +106,8 @@ um container `linha` com `colunas: 3` cujos filhos são containers.
 export type LpWidget = Base & (
   // --- simples: livres para compor ---
   | { tipo: 'titulo'; nivel: 'h1'|'h2'|'h3'|'h4'; texto: string }
-  | { tipo: 'texto'; texto: string }
+  /** `papel` escolhe a categoria de tipografia do tema (subtitulos ou textos). */
+  | { tipo: 'texto'; papel: 'subtitulo' | 'corpo'; texto: string }
   | { tipo: 'imagem' | 'video'; midia: LpMidia }
   | { tipo: 'botao'; botao: LpBotao }
   | { tipo: 'icone'; nome: string }
@@ -142,6 +143,11 @@ type Caixa = { topo: number; direita: number; base: number; esquerda: number }
 
 `LpTema` continua existindo e mandando no padrão; `estilo` só sobrepõe o que o usuário
 mexeu. Página sem ajustes gera CSS praticamente do tamanho de hoje.
+
+O tema tem quatro categorias de tipografia (`titulos`, `subtitulos`, `textos`,
+`botoes`) e cada widget diz a qual pertence: `titulo` → `titulos`, `botao` → `botoes`,
+e `texto` → `subtitulos` ou `textos` conforme o `papel`. Sem esse campo, todo
+subtítulo perderia a tipografia própria na migração.
 
 ### A seção
 
