@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { expandirPreset } from './expandir'
+import { LAYOUTS } from '../layouts'
 import type { LpElemento, LpMidia, LpSecao, TipoLayout } from '../tipos'
 
 /** So a raiz: quase todo teste ignora a secao ajustada (so o banner mexe nela). */
@@ -245,5 +246,88 @@ describe('expandirPreset — composicao livre', () => {
     expect(forma(raiz)).toEqual({
       container: [{ container: [{ container: ['imagem', 'titulo', 'texto', 'botao'] }] }],
     })
+  })
+})
+
+describe('expandirPreset — widgets compostos', () => {
+  it('faq vira um widget so, com as perguntas dentro', () => {
+    const raiz = expandir(
+      secao('faq', {
+        titulo: 'Dúvidas',
+        itens: [
+          { id: 'i1', titulo: 'Pergunta?', texto: 'Resposta.' },
+          { id: 'i2', titulo: 'Outra?' },
+        ],
+      }),
+    )
+    expect(forma(raiz)).toEqual({ container: ['titulo', 'faq'] })
+    const faq = raiz.filhos[1]
+    if (faq.tipo !== 'faq') throw new Error('esperava faq')
+    expect(faq.perguntas).toEqual([
+      { id: 'i1', pergunta: 'Pergunta?', resposta: 'Resposta.' },
+      { id: 'i2', pergunta: 'Outra?', resposta: '' },
+    ])
+  })
+
+  it('tabs vira widget de abas preservando titulo, texto e imagem', () => {
+    const raiz = expandir(
+      secao('tabs', { itens: [{ id: 'a1', titulo: 'Aba', texto: 'Txt', imagem: midia }] }),
+    )
+    const abas = raiz.filhos[0]
+    if (abas.tipo !== 'abas') throw new Error('esperava abas')
+    expect(abas.abas).toEqual([{ id: 'a1', titulo: 'Aba', texto: 'Txt', imagem: midia }])
+  })
+
+  it('carrossel preserva a ordem dos slides', () => {
+    const raiz = expandir(
+      secao('carrossel', {
+        itens: [
+          { id: 's1', imagem: midia, titulo: 'Um' },
+          { id: 's2', titulo: 'Dois' },
+        ],
+      }),
+    )
+    const car = raiz.filhos[0]
+    if (car.tipo !== 'carrossel') throw new Error('esperava carrossel')
+    expect(car.slides.map((s) => s.id)).toEqual(['s1', 's2'])
+  })
+
+  it('depoimentos mapeia extra para nome e detalhe para cargo', () => {
+    const raiz = expandir(
+      secao('depoimentos', {
+        itens: [{ id: 'd1', texto: 'Ótimo', extra: 'Ana', detalhe: 'CEO', imagem: midia }],
+      }),
+    )
+    const dep = raiz.filhos[0]
+    if (dep.tipo !== 'depoimentos') throw new Error('esperava depoimentos')
+    expect(dep.depoimentos).toEqual([
+      { id: 'd1', texto: 'Ótimo', nome: 'Ana', cargo: 'CEO', foto: midia },
+    ])
+  })
+
+  it('comparacao leva rotulos da secao e celulas de cada coluna', () => {
+    const raiz = expandir(
+      secao('comparacao', {
+        rotulos: ['Preço', 'Suporte'],
+        itens: [
+          { id: 'c1', titulo: 'Básico', lista: ['R$ 9', 'Não'], destaque: false },
+          { id: 'c2', titulo: 'Pro', lista: ['R$ 99', 'Sim'], destaque: true },
+        ],
+      }),
+    )
+    const comp = raiz.filhos[0]
+    if (comp.tipo !== 'comparacao') throw new Error('esperava comparacao')
+    expect(comp.rotulos).toEqual(['Preço', 'Suporte'])
+    expect(comp.colunas).toEqual([
+      { id: 'c1', titulo: 'Básico', celulas: ['R$ 9', 'Não'], destaque: false },
+      { id: 'c2', titulo: 'Pro', celulas: ['R$ 99', 'Sim'], destaque: true },
+    ])
+  })
+
+  it('todo preset do catalogo tem expansor', () => {
+    for (const info of LAYOUTS) {
+      const raiz = expandir(secao(info.tipo, { titulo: 'T' }))
+      expect(raiz.filhos.length, `preset ${info.tipo} sem expansor`).toBeGreaterThan(0)
+    }
   })
 })

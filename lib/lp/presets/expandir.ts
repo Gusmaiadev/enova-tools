@@ -6,6 +6,7 @@
 
 import type { LpContainer, LpSecao, TipoLayout } from '../tipos'
 import { container } from './comum'
+import { pAbas, pCarrossel, pComparacao, pDepoimentos, pFaq } from './compostos'
 import {
   pBlocosAlternados,
   pCards,
@@ -22,7 +23,7 @@ import { pBanner, pCta, pFormulario, pHero, pTextoCentralizado, pTextoMidia } fr
 
 type Expansor = (s: LpSecao) => LpContainer
 
-const EXPANSORES: Partial<Record<TipoLayout, Expansor>> = {
+const EXPANSORES: Record<TipoLayout, Expansor> = {
   hero: pHero,
   'texto-midia': pTextoMidia,
   'texto-centralizado': pTextoCentralizado,
@@ -39,6 +40,11 @@ const EXPANSORES: Partial<Record<TipoLayout, Expansor>> = {
   timeline: pTimeline,
   'blocos-alternados': pBlocosAlternados,
   estatisticas: pEstatisticas,
+  faq: pFaq,
+  tabs: pAbas,
+  carrossel: pCarrossel,
+  depoimentos: pDepoimentos,
+  comparacao: pComparacao,
 }
 
 /**
@@ -61,8 +67,12 @@ function ajustarSecao(s: LpSecao): LpSecao {
  */
 export function expandirPreset(s: LpSecao): { raiz: LpContainer; secao: LpSecao } {
   const secao = ajustarSecao(s)
-  const expansor = EXPANSORES[secao.tipo]
-  // Preset ainda sem expansor cai num container vazio em vez de lancar: melhor
-  // uma secao vazia para o usuario preencher do que um projeto que nao abre.
+  // O cast e proposital: `tipo` vem do Firestore e da IA, entao em tempo de
+  // execucao pode ser um valor fora do catalogo, por mais que o tipo estatico
+  // diga que nao. Ja o Record completo faz o build recusar um preset novo em
+  // TipoLayout que ninguem tenha ensinado a expandir.
+  const expansor = EXPANSORES[secao.tipo] as Expansor | undefined
+  // Tipo fora do catalogo cai num container vazio: melhor uma secao para o
+  // usuario preencher do que um projeto que nao abre.
   return { raiz: expansor ? expansor(secao) : container([]), secao }
 }
