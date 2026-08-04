@@ -2,7 +2,7 @@
 
 import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 import { PorDispositivo, definir } from './PorDispositivo'
-import { CLASSE_CONTROLE, Cor, Faixa, Fonte, Opcoes } from './campos'
+import { CLASSE_CONTROLE, Cor, Faixa, Fonte, Opcoes, Selecao } from './campos'
 import { estiloHerdado } from '@/lib/lp/heranca'
 import type { Dispositivo, LpElemento, LpEstilo, LpTema } from '@/lib/lp/tipos'
 
@@ -25,9 +25,20 @@ type Props = {
  * campo, senão cada elemento congelaria uma cópia e pararia de acompanhar o
  * tema quando a Identidade mudasse.
  */
+const PROPORCOES: { valor: string; rotulo: string }[] = [
+  { valor: '', rotulo: 'Original' },
+  { valor: '16/9', rotulo: '16:9 — vídeo panorâmico' },
+  { valor: '4/3', rotulo: '4:3 — foto clássica' },
+  { valor: '1/1', rotulo: '1:1 — quadrado' },
+  { valor: '3/4', rotulo: '3:4 — retrato' },
+  { valor: '9/16', rotulo: '9:16 — story' },
+  { valor: '21/9', rotulo: '21:9 — cinema' },
+]
+
 export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositivo }: Props) {
   const e: LpEstilo = no.estilo ?? {}
   const herdado = estiloHerdado(no, tema)
+  const ehMidia = no.tipo === 'imagem' || no.tipo === 'video'
 
   const mudar = (patch: (est: LpEstilo) => void, agrupar?: string) =>
     mutarNo((el) => {
@@ -49,6 +60,142 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         delete est[chave]
       }
     })
+
+  // Imagem e vídeo não têm fonte, peso nem entrelinha: o que importa neles é o
+  // tamanho do quadro, a proporção e como a mídia se encaixa dentro dele.
+  if (ehMidia) {
+    return (
+      <div className="space-y-3">
+        <PorDispositivo
+          rotulo="Largura"
+          valor={e.largura}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('largura')}
+          rotuloHerdado="automática"
+        >
+          <input
+            className={CLASSE_CONTROLE}
+            placeholder="100% da coluna"
+            value={e.largura?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              mudar((est) => {
+                est.largura = definir(est.largura, dispositivo, ev.target.value)
+              }, 'midia-largura')
+            }
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Proporção"
+          valor={e.proporcao}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('proporcao')}
+          rotuloHerdado="original"
+        >
+          <Selecao
+            rotulo=""
+            value={e.proporcao?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              mudar((est) => {
+                est.proporcao = definir(est.proporcao, dispositivo, ev.target.value)
+              })
+            }
+          >
+            {PROPORCOES.map((p) => (
+              <option key={p.valor} value={p.valor}>
+                {p.rotulo}
+              </option>
+            ))}
+          </Selecao>
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Altura"
+          valor={e.altura}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('altura')}
+          rotuloHerdado="pela proporção"
+        >
+          <input
+            className={CLASSE_CONTROLE}
+            placeholder="ex.: 320px"
+            value={e.altura?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              mudar((est) => {
+                est.altura = definir(est.altura, dispositivo, ev.target.value)
+              }, 'midia-altura')
+            }
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Encaixe"
+          valor={e.ajuste}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('ajuste')}
+          rotuloHerdado="cobrir"
+        >
+          <Opcoes<'cobrir' | 'conter' | 'preencher'>
+            aria="Como a mídia se encaixa no quadro"
+            valor={e.ajuste?.[dispositivo] ?? 'cobrir'}
+            aoMudar={(v) => mudar((est) => { est.ajuste = definir(est.ajuste, dispositivo, v) })}
+            opcoes={[
+              { valor: 'cobrir', rotulo: 'Cobrir' },
+              { valor: 'conter', rotulo: 'Conter' },
+              { valor: 'preencher', rotulo: 'Esticar' },
+            ]}
+          />
+        </PorDispositivo>
+        <p className="text-xs text-text-dim">
+          <strong className="text-text">Cobrir</strong> preenche o quadro e corta o que sobra —
+          é o padrão. <strong className="text-text">Conter</strong> mostra a mídia inteira e deixa
+          sobrar espaço. <strong className="text-text">Esticar</strong> deforma para caber.
+        </p>
+
+        <PorDispositivo
+          rotulo="Alinhamento"
+          valor={e.alinhamento}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('alinhamento')}
+          rotuloHerdado="ocupa a largura"
+        >
+          <Opcoes<'left' | 'center' | 'right'>
+            aria="Alinhamento da mídia"
+            valor={e.alinhamento?.[dispositivo] ?? 'center'}
+            aoMudar={(v) =>
+              mudar((est) => { est.alinhamento = definir(est.alinhamento, dispositivo, v) })
+            }
+            opcoes={[
+              { valor: 'left', rotulo: '', aria: 'À esquerda', icone: <AlignLeft className="h-3.5 w-3.5" /> },
+              { valor: 'center', rotulo: '', aria: 'Centralizada', icone: <AlignCenter className="h-3.5 w-3.5" /> },
+              { valor: 'right', rotulo: '', aria: 'À direita', icone: <AlignRight className="h-3.5 w-3.5" /> },
+            ]}
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Cantos"
+          valor={e.raio}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('raio')}
+        >
+          <Faixa
+            rotulo=""
+            min={0}
+            max={64}
+            valor={e.raio?.[dispositivo] ?? tema.raio}
+            aoMudar={(v) => mudar((est) => { est.raio = definir(est.raio, dispositivo, v) }, 'midia-raio')}
+          />
+        </PorDispositivo>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">

@@ -44,8 +44,9 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
     }
     case 'imagem':
     case 'video':
-      // htmlMidia ja emite .lp-midia e trata img/video, poster e autoplay.
-      return htmlMidia(ctx, w.midia, `el:${w.id}`)
+      // htmlMidia ja emite .lp-midia e trata img/video, poster e autoplay; a
+      // classe do no vai junto para o CSS gerado alcancar a midia.
+      return htmlMidia(ctx, w.midia, `el:${w.id}`, `lp-e-${w.id}`)
     case 'botao':
       return htmlBotao(ctx, w.botao, `el:${w.id}`, `lp-e-${w.id}`, editavel)
     case 'icone':

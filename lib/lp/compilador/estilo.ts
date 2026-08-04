@@ -60,8 +60,14 @@ function regrasContainer(c: LpContainer, d: Dispositivo): string[] {
   return r
 }
 
+const OBJECT_FIT: Record<string, string> = {
+  cobrir: 'cover',
+  conter: 'contain',
+  preencher: 'fill',
+}
+
 /** Regras de LpEstilo num dispositivo. */
-function regrasEstilo(e: LpEstilo, d: Dispositivo): string[] {
+function regrasEstilo(e: LpEstilo, d: Dispositivo, ehMidia: boolean): string[] {
   const r: string[] = []
   const em = <T>(p: PorDisp<T> | undefined): T | undefined => p?.[d]
   const cor = em(e.cor)
@@ -79,7 +85,15 @@ function regrasEstilo(e: LpEstilo, d: Dispositivo): string[] {
   const espaco = em(e.espacamentoLetras)
   if (espaco) r.push(`letter-spacing:${escCss(espaco)}`)
   const alinhamento = em(e.alinhamento)
-  if (alinhamento) r.push(`text-align:${escCss(alinhamento)}`)
+  // Em midia o no e um bloco dentro do container flex: `text-align` nao moveria
+  // o quadro. `align-self` move — e e o que o painel oferece la.
+  if (alinhamento) {
+    r.push(
+      ehMidia
+        ? `align-self:${{ left: 'flex-start', center: 'center', right: 'flex-end' }[alinhamento]}`
+        : `text-align:${escCss(alinhamento)}`,
+    )
+  }
   const margem = em(e.margem)
   if (margem) r.push(`margin:${caixaCss(margem)}`)
   const padding = em(e.padding)
@@ -90,13 +104,18 @@ function regrasEstilo(e: LpEstilo, d: Dispositivo): string[] {
   if (raio !== undefined) r.push(`border-radius:${num(raio)}px`)
   const sombra = em(e.sombra)
   if (sombra) r.push(`box-shadow:${escCss(sombra)}`)
+  const alturaCaixa = em(e.altura)
+  if (alturaCaixa) r.push(`height:${escCss(alturaCaixa)}`)
+  const proporcao = em(e.proporcao)
+  if (proporcao) r.push(`aspect-ratio:${escCss(proporcao)}`)
   return r
 }
 
 function regrasDoNo(el: LpElemento, d: Dispositivo): string {
+  const ehMidia = el.tipo === 'imagem' || el.tipo === 'video'
   const r: string[] = []
   if (el.tipo === 'container') r.push(...regrasContainer(el, d))
-  if (el.estilo) r.push(...regrasEstilo(el.estilo, d))
+  if (el.estilo) r.push(...regrasEstilo(el.estilo, d, ehMidia))
   // A checagem de tipo vem antes do acesso: `altura` so existe no espacador, e
   // o TypeScript so libera o campo depois de estreitar a uniao.
   if (el.tipo === 'espacador' && el.altura[d] !== undefined) {
@@ -104,7 +123,16 @@ function regrasDoNo(el: LpElemento, d: Dispositivo): string {
   }
   // `oculto` por ultimo: esconder vence qualquer display que o layout pos.
   if (el.oculto?.[d]) r.push('display:none')
-  return r.length > 0 ? `.lp-e-${el.id}{${r.join(';')}}` : ''
+
+  const regras = r.length > 0 ? [`.lp-e-${el.id}{${r.join(';')}}`] : []
+
+  // `object-fit` mora no <img>/<video>, nao no quadro que os envolve — por isso
+  // sai como regra descendente em vez de entrar na regra do no.
+  const ajuste = ehMidia ? el.estilo?.ajuste?.[d] : undefined
+  if (ajuste && OBJECT_FIT[ajuste]) {
+    regras.push(`.lp-e-${el.id} img,.lp-e-${el.id} video{object-fit:${OBJECT_FIT[ajuste]}}`)
+  }
+  return regras.join('\n')
 }
 
 /** CSS de todos os nos da arvore, separado por dispositivo. */

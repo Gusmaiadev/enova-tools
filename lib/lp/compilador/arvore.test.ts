@@ -199,3 +199,19 @@ describe('renderElemento — modo editor', () => {
     expect(renderElemento(ctx(), el)).not.toContain('data-lp')
   })
 })
+
+describe('midia recebe a classe do nó', () => {
+  it('sem ela, todo ajuste de estilo numa imagem era descartado em silêncio', () => {
+    const html = renderElemento(ctx(), { id: 'foto1', tipo: 'imagem', midia })
+    expect(html).toContain('class="lp-midia lp-e-foto1"')
+  })
+
+  it('vale também para vídeo', () => {
+    const html = renderElemento(ctx(), {
+      id: 'v1',
+      tipo: 'video',
+      midia: { ...midia, tipo: 'video', url: 'https://x/a.mp4' },
+    })
+    expect(html).toContain('lp-e-v1')
+  })
+})

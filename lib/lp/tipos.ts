@@ -265,6 +265,12 @@ export type LpEstilo = {
   largura?: PorDisp<string>
   raio?: PorDisp<number>
   sombra?: PorDisp<string>
+  /* --- so fazem sentido em midia (imagem/video) --- */
+  altura?: PorDisp<string>
+  /** `aspect-ratio` do quadro: '16/9', '4/3', '1/1'… */
+  proporcao?: PorDisp<string>
+  /** `object-fit` do <img>/<video> dentro do quadro. */
+  ajuste?: PorDisp<'cobrir' | 'conter' | 'preencher'>
 }
 
 /** Comum a todo no da arvore. */

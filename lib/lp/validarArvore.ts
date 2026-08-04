@@ -110,6 +110,9 @@ function coergirEstilo(v: unknown): LpEstilo | undefined {
   por('largura', o.largura, textoAte(20))
   por('raio', o.raio, numeroEntre(0, 400))
   por('sombra', o.sombra, textoAte(120))
+  por('altura', o.altura, textoAte(20))
+  por('proporcao', o.proporcao, textoAte(12))
+  por('ajuste', o.ajuste, umDe(['cobrir', 'conter', 'preencher'] as const))
   return Object.keys(e).length > 0 ? e : undefined
 }
 

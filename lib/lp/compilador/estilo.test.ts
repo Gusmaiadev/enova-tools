@@ -192,3 +192,57 @@ describe('espaçamento padrão da árvore', () => {
     expect(css.indexOf('.lp-c{min-width:0;gap:15px}')).toBeLessThan(css.indexOf('gap:40px'))
   })
 })
+
+describe('estilo de mídia', () => {
+  const midia = { tipo: 'imagem' as const, url: 'x.jpg', alt: '', busca: '', orientacao: 'paisagem' as const }
+
+  it('proporção e altura viram aspect-ratio e height no quadro', () => {
+    const { desktop } = cssDaArvore(
+      raiz([
+        {
+          id: 'm',
+          tipo: 'imagem',
+          midia,
+          estilo: { proporcao: { desktop: '16/9' }, altura: { desktop: '320px' } },
+        },
+      ]),
+    )
+    expect(desktop).toContain('aspect-ratio:16/9')
+    expect(desktop).toContain('height:320px')
+  })
+
+  it('encaixe vira object-fit no <img>/<video>, não no quadro', () => {
+    const { desktop } = cssDaArvore(
+      raiz([{ id: 'm', tipo: 'imagem', midia, estilo: { ajuste: { desktop: 'conter' } } }]),
+    )
+    expect(desktop).toContain('.lp-e-m img,.lp-e-m video{object-fit:contain}')
+  })
+
+  it('alinhamento em mídia é align-self; em texto é text-align', () => {
+    const daMidia = cssDaArvore(
+      raiz([{ id: 'm', tipo: 'imagem', midia, estilo: { alinhamento: { desktop: 'right' } } }]),
+    ).desktop
+    const doTexto = cssDaArvore(
+      raiz([
+        { id: 't', tipo: 'titulo', nivel: 'h2', texto: 'T', estilo: { alinhamento: { desktop: 'right' } } },
+      ]),
+    ).desktop
+    expect(daMidia).toContain('align-self:flex-end')
+    expect(daMidia).not.toContain('text-align')
+    expect(doTexto).toContain('text-align:right')
+  })
+
+  it('encaixe fora do conjunto não vira CSS', () => {
+    const { desktop } = cssDaArvore(
+      raiz([
+        {
+          id: 'm',
+          tipo: 'imagem',
+          midia,
+          estilo: { ajuste: { desktop: 'sei-la' as unknown as 'cobrir' } },
+        },
+      ]),
+    )
+    expect(desktop).not.toContain('object-fit')
+  })
+})

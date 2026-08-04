@@ -94,15 +94,27 @@ export function atributosVideoFundo(m: LpMidia): string {
   return atrs.join(' ')
 }
 
-/** <img> ou <video> dentro de .lp-midia. */
-export function htmlMidia(ctx: Ctx, midia: LpMidia, caminho: string): string {
+/**
+ * <img> ou <video> dentro de .lp-midia.
+ *
+ * `extraClasse` e o que liga o no ao CSS gerado (.lp-e-<id>): sem ela, todo
+ * ajuste de estilo feito numa imagem pelo painel nao casava com nenhum seletor
+ * e era descartado em silencio.
+ */
+export function htmlMidia(
+  ctx: Ctx,
+  midia: LpMidia,
+  caminho: string,
+  extraClasse = '',
+): string {
   const url = urlMidia(ctx, midia)
   const marca = alvo(ctx, caminho)
+  const classes = extraClasse ? `lp-midia ${extraClasse}` : 'lp-midia'
   // Placeholder de video e um SVG (data:image) — rende como imagem.
   if (midia.tipo === 'video' && !url.startsWith('data:image')) {
-    return `<div class="lp-midia"${marca}><video src="${esc(url)}"${posterDe(ctx, midia)} ${atributosVideo(midia)}></video></div>`
+    return `<div class="${classes}"${marca}><video src="${esc(url)}"${posterDe(ctx, midia)} ${atributosVideo(midia)}></video></div>`
   }
-  return `<div class="lp-midia"${marca}><img src="${esc(url)}" alt="${esc(midia.alt)}" loading="lazy"></div>`
+  return `<div class="${classes}"${marca}><img src="${esc(url)}" alt="${esc(midia.alt)}" loading="lazy"></div>`
 }
 
 export function htmlBotao(
