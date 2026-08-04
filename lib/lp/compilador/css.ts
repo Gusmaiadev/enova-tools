@@ -5,11 +5,11 @@
 
 import { tiposNaPagina } from '../arvore'
 import { paginasGeradas } from '../documento'
-import { GAP_PADRAO, MARGEM_PADRAO } from '../padroes'
+import { GAP_PADRAO, LARGURA_PADRAO, MARGEM_PADRAO } from '../padroes'
 import { familiaCss } from '../fontes'
 import { cssDaArvore } from './estilo'
 import type { AjusteTexto, LpDocumento, LpSecao } from '../tipos'
-import { corContraste, corSegura, escCss, slugificar } from '../util'
+import { corContraste, corSegura, escCss, limitar, slugificar } from '../util'
 
 /** Id de HTML/CSS de uma secao (ancora do menu ou fallback estavel). */
 export function idHtmlSecao(secao: LpSecao, usados: Set<string>): string {
@@ -23,8 +23,11 @@ export function idHtmlSecao(secao: LpSecao, usados: Set<string>): string {
   return id
 }
 
+/** Largura em px, com guarda: o valor vem do documento e vira CSS. */
+const larguraSegura = (n: unknown) => limitar(n, 280, 2560, LARGURA_PADRAO)
+
 function varsTema(doc: LpDocumento): string {
-  const { tipografia: t, cores: c, raio } = doc.tema
+  const { tipografia: t, cores: c, raio, largura } = doc.tema
   const linhas: string[] = []
   const cats = ['titulos', 'subtitulos', 'textos', 'botoes'] as const
   for (const cat of cats) {
@@ -50,11 +53,24 @@ function varsTema(doc: LpDocumento): string {
     ['fundo', c.fundoPagina],
   ]
   for (const [nome, cor] of pares) linhas.push(`  --cor-${nome}: ${escCss(cor)};`)
-  linhas.push(`  --raio: ${raio}px;`, '  --largura: 1140px;')
+  linhas.push(`  --raio: ${raio}px;`)
+  linhas.push(`  --largura: ${larguraSegura(largura?.desktop)}px;`)
   // Footer padrão é escuro (texto claro); header padrão é claro (texto escuro).
   linhas.push(`  --texto-footer: ${corContraste(corSegura(c.footer, '#111318'), '#ffffff')};`)
   linhas.push(`  --texto-header: ${corContraste(corSegura(c.header, '#ffffff'), '#111318')};`)
-  return `:root{\n${linhas.join('\n')}\n}`
+
+  // Largura por dispositivo: redefinir a variável em :root basta, porque header,
+  // rodapé e seções leem a MESMA variável pelo .lp-container. Só sai quando o
+  // usuário definiu — sem isso a página mantém a largura do desktop, que é o
+  // comportamento de sempre.
+  const blocos = [`:root{\n${linhas.join('\n')}\n}`]
+  if (largura?.tablet !== undefined) {
+    blocos.push(`@media (max-width:900px){:root{--largura:${larguraSegura(largura.tablet)}px}}`)
+  }
+  if (largura?.celular !== undefined) {
+    blocos.push(`@media (max-width:640px){:root{--largura:${larguraSegura(largura.celular)}px}}`)
+  }
+  return blocos.join('\n')
 }
 
 /*

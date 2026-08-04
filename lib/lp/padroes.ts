@@ -13,6 +13,20 @@ import type { Caixa } from './tipos'
 export const GAP_PADRAO = 15
 
 /**
+ * Largura maxima do conteudo, em px — a de sempre, antes de o tema poder
+ * defini-la. Vale para header, rodape e todas as secoes: os tres usam
+ * .lp-container, que le --largura.
+ */
+export const LARGURA_PADRAO = 1140
+
+/** Limites do controle de largura, por dispositivo. */
+export const FAIXA_LARGURA: Record<'desktop' | 'tablet' | 'celular', [number, number]> = {
+  desktop: [720, 1920],
+  tablet: [480, 1280],
+  celular: [320, 900],
+}
+
+/**
  * Margem vertical dos widgets de TEXTO, em px. Horizontal fica em zero: quem
  * precisa de recuo lateral usa a largura ou o padding do container.
  */

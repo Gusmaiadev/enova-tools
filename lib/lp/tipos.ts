@@ -383,6 +383,12 @@ export type LpTema = {
   cores: CoresTema
   /** Raio de borda base em px (cards, botoes, imagens). */
   raio: number
+  /**
+   * Largura maxima do conteudo em px, por dispositivo. Vale para o header, o
+   * rodape e todas as secoes — os tres usam .lp-container, que le --largura.
+   * Ausente = LARGURA_PADRAO, a largura que a pagina sempre teve.
+   */
+  largura?: PorDisp<number>
 }
 
 export type ItemMenu = {

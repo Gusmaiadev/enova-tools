@@ -404,6 +404,16 @@ function coergirTema(v: unknown, base: LpTema): LpTema {
     if (cor !== '') tema.cores[chave] = corSegura(cor, tema.cores[chave])
   }
   if (typeof t.raio === 'number') tema.raio = limitar(t.raio, 0, 32, tema.raio)
+
+  // Largura por dispositivo: so as tres chaves conhecidas, so numero, e dentro
+  // de limites — o valor vira `max-width` no CSS da pagina inteira.
+  const largura = obj(t.largura)
+  const fora: NonNullable<LpTema['largura']> = {}
+  for (const d of ['desktop', 'tablet', 'celular'] as const) {
+    const n = largura[d]
+    if (typeof n === 'number' && Number.isFinite(n)) fora[d] = limitar(n, 280, 2560, 1140)
+  }
+  if (Object.keys(fora).length > 0) tema.largura = fora
   return tema
 }
 

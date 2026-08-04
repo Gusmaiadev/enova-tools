@@ -6,7 +6,21 @@ import { Cor, Faixa, Fonte, Selecao, Texto } from './campos'
 import { EnviarMidia } from './EnviarMidia'
 import { fontePorNome } from '@/lib/lp/fontes'
 import { LOGO_MAX_LADO } from '@/lib/lp/formatos'
-import type { CategoriaTexto, CoresTema, LpDocumento, LpMidia, LpTema } from '@/lib/lp/tipos'
+import { FAIXA_LARGURA, LARGURA_PADRAO } from '@/lib/lp/padroes'
+import type {
+  CategoriaTexto,
+  CoresTema,
+  Dispositivo,
+  LpDocumento,
+  LpMidia,
+  LpTema,
+} from '@/lib/lp/tipos'
+
+const DISPOSITIVOS: { chave: Dispositivo; rotulo: string }[] = [
+  { chave: 'desktop', rotulo: 'Computador' },
+  { chave: 'tablet', rotulo: 'Tablet' },
+  { chave: 'celular', rotulo: 'Celular' },
+]
 
 const CATEGORIAS: { chave: CategoriaTexto; rotulo: string }[] = [
   { chave: 'titulos', rotulo: 'Títulos' },
@@ -160,6 +174,52 @@ export function PainelTema({
             )
           })}
         </div>
+      </div>
+
+      <div>
+        <p className="mb-3 font-mono text-xs uppercase tracking-[0.28em] text-text-dim">
+          Largura do conteúdo
+        </p>
+        <div className="space-y-3">
+          {DISPOSITIVOS.map((d) => {
+            const [min, max] = FAIXA_LARGURA[d.chave]
+            return (
+              <Faixa
+                key={d.chave}
+                rotulo={d.rotulo}
+                min={min}
+                max={max}
+                valor={doc.tema.largura?.[d.chave] ?? LARGURA_PADRAO}
+                aoMudar={(v) =>
+                  aoMudar({
+                    ...doc.tema,
+                    largura: { ...doc.tema.largura, [d.chave]: v },
+                  })
+                }
+              />
+            )
+          })}
+        </div>
+        <p className="mt-2 text-xs text-text-dim">
+          É a largura <strong className="text-text">máxima</strong> do conteúdo: o header, o rodapé
+          e todas as seções seguem esse limite e ficam centralizados. Em telas mais estreitas que o
+          valor, vale a largura da tela.
+        </p>
+        {doc.tema.largura && (
+          <button
+            type="button"
+            onClick={() => {
+              // Apagar a chave (em vez de gravar 1140) mantém o documento
+              // seguindo o padrão se ele mudar um dia.
+              const semLargura = { ...doc.tema }
+              delete semLargura.largura
+              aoMudar(semLargura)
+            }}
+            className="mt-2 text-xs text-text-dim underline-offset-2 transition-colors hover:text-text hover:underline"
+          >
+            Voltar à largura padrão ({LARGURA_PADRAO}px)
+          </button>
+        )}
       </div>
 
       <div>

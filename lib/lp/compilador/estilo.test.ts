@@ -294,3 +294,44 @@ describe('estilo de mídia', () => {
     expect(desktop).not.toContain('object-fit')
   })
 })
+
+describe('largura do projeto', () => {
+  const docCom = async (largura?: Record<string, number>) => {
+    const { documentoBase } = await import('../documento')
+    const { briefingVazio } = await import('../tipos')
+    const base = documentoBase(briefingVazio('Teste'))
+    return { ...base, tema: { ...base.tema, ...(largura ? { largura } : {}) } }
+  }
+
+  it('sem definir, mantém a largura de sempre', async () => {
+    const { compilarCss } = await import('./css')
+    const { LARGURA_PADRAO } = await import('../padroes')
+    const css = compilarCss(await docCom(), new Map())
+    expect(css).toContain(`--largura: ${LARGURA_PADRAO}px`)
+    // Nada de media query redefinindo a variável enquanto o usuário não pedir.
+    expect(css).not.toContain('{:root{--largura')
+  })
+
+  it('cada dispositivo redefine a variável que header, rodapé e seções leem', async () => {
+    const { compilarCss } = await import('./css')
+    const css = compilarCss(await docCom({ desktop: 1440, tablet: 820, celular: 380 }), new Map())
+    expect(css).toContain('--largura: 1440px')
+    expect(css).toContain('@media (max-width:900px){:root{--largura:820px}}')
+    expect(css).toContain('@media (max-width:640px){:root{--largura:380px}}')
+  })
+
+  it('dispositivo não definido não emite media query', async () => {
+    const { compilarCss } = await import('./css')
+    const css = compilarCss(await docCom({ desktop: 1440 }), new Map())
+    expect(css).toContain('--largura: 1440px')
+    expect(css).not.toContain('--largura:820px')
+    expect(css).not.toContain('@media (max-width:640px){:root')
+  })
+
+  it('valor absurdo é limitado antes de virar CSS', async () => {
+    const { compilarCss } = await import('./css')
+    const css = compilarCss(await docCom({ desktop: 999999, celular: -50 }), new Map())
+    expect(css).toContain('--largura: 2560px')
+    expect(css).toContain('--largura:280px')
+  })
+})
