@@ -6,6 +6,7 @@ import { PorDispositivo, definir } from './PorDispositivo'
 import { SeletorIcone } from './SeletorIcone'
 import type { MutarNo } from './CamposEstilo'
 import { Area, Faixa, Opcoes, Selecao, Texto, Vazio } from './campos'
+import { GAP_PADRAO } from '@/lib/lp/padroes'
 import type { Aparencia, Dispositivo, LpElemento } from '@/lib/lp/tipos'
 
 type Props = {
@@ -244,12 +245,20 @@ export function CamposConteudo({ no, lpId, mutarNo, dispositivo, aoTrocarDisposi
             valor={no.gap}
             ativo={dispositivo}
             aoTrocar={aoTrocarDispositivo}
+            rotuloHerdado="padrão"
+            aoLimpar={() =>
+              mutarNo((el) => {
+                if (el.tipo === 'container') el.gap = definir(el.gap, dispositivo, undefined)
+              })
+            }
           >
             <Faixa
               rotulo=""
               min={0}
               max={96}
-              valor={no.gap?.[dispositivo] ?? 0}
+              // Mostra o padrão que o CSS base aplica: assim o campo diz o que
+              // está valendo, e arrastar para 0 grava zero de verdade.
+              valor={no.gap?.[dispositivo] ?? GAP_PADRAO}
               aoMudar={(v) =>
                 mutarNo((el) => {
                   if (el.tipo === 'container') el.gap = definir(el.gap, dispositivo, v)

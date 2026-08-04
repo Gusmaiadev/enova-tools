@@ -160,7 +160,38 @@ describe('espaçamento padrão da árvore', () => {
     const { briefingVazio } = await import('../tipos')
     const css = compilarCss(documentoBase(briefingVazio('Teste')), new Map())
     expect(css).toContain('.lp-c{min-width:0;gap:15px}')
-    expect(css).toContain('.lp-c > *{margin-block:10px}')
+    expect(css).toContain('.lp-c > *{margin-block:10px 10px}')
+  })
+
+  it('o padrão do CSS e o mostrado no painel vêm da mesma constante', async () => {
+    const { GAP_PADRAO, MARGEM_PADRAO } = await import('../padroes')
+    const { compilarCss } = await import('./css')
+    const { documentoBase } = await import('../documento')
+    const { briefingVazio } = await import('../tipos')
+    const css = compilarCss(documentoBase(briefingVazio('Teste')), new Map())
+    // Se alguém mudar a constante e esquecer o CSS (ou o contrário), quebra.
+    expect(css).toContain(`gap:${GAP_PADRAO}px`)
+    expect(css).toContain(`margin-block:${MARGEM_PADRAO.topo}px ${MARGEM_PADRAO.base}px`)
+  })
+
+  it('margem zerada no nó grava zero — não volta ao padrão', () => {
+    const { desktop } = cssDaArvore(
+      raiz([
+        {
+          id: 'w',
+          tipo: 'titulo',
+          nivel: 'h2',
+          texto: 'T',
+          estilo: { margem: { desktop: { topo: 0, direita: 0, base: 0, esquerda: 0 } } },
+        },
+      ]),
+    )
+    expect(desktop).toContain('.lp-e-w{margin:0px 0px 0px 0px}')
+  })
+
+  it('gap zero no container grava zero', () => {
+    const { desktop } = cssDaArvore(raiz([], { gap: { desktop: 0 } }))
+    expect(desktop).toContain('gap:0px')
   })
 
   it('gap do container vence o padrão, porque sai depois', async () => {

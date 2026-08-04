@@ -3,6 +3,7 @@
 import { PorDispositivo, definir } from './PorDispositivo'
 import type { MutarNo } from './CamposEstilo'
 import { CLASSE_CONTROLE, Marcar } from './campos'
+import { MARGEM_PADRAO } from '@/lib/lp/padroes'
 import type { Caixa, Dispositivo, LpElemento, LpEstilo } from '@/lib/lp/tipos'
 
 const LADOS: { chave: keyof Caixa; rotulo: string }[] = [
@@ -14,15 +15,22 @@ const LADOS: { chave: keyof Caixa; rotulo: string }[] = [
 
 const CAIXA_ZERO: Caixa = { topo: 0, direita: 0, base: 0, esquerda: 0 }
 
-/** Quatro medidas em px. Tudo zero apaga a chave — volta a herdar. */
+/**
+ * Quatro medidas em px. Zerar tudo GRAVA zero — não volta a herdar: quem quer o
+ * padrão de volta usa o "próprio ✕" no rótulo. Antes, zerar os quatro lados
+ * apagava a chave, o que tornava impossível definir margem zero num elemento.
+ */
 function CamposCaixa({
   valor,
+  padrao,
   aoMudar,
 }: {
   valor: Caixa | undefined
-  aoMudar: (c: Caixa | undefined) => void
+  /** Mostrado enquanto não há valor próprio — é o que o CSS base aplica. */
+  padrao: Caixa
+  aoMudar: (c: Caixa) => void
 }) {
-  const atual = valor ?? CAIXA_ZERO
+  const atual = valor ?? padrao
   return (
     <div className="grid grid-cols-4 gap-1.5">
       {LADOS.map(({ chave, rotulo }) => (
@@ -32,11 +40,7 @@ function CamposCaixa({
             type="number"
             className={`${CLASSE_CONTROLE} px-2 text-xs`}
             value={atual[chave]}
-            onChange={(e) => {
-              const novo = { ...atual, [chave]: Number(e.target.value) || 0 }
-              const vazio = LADOS.every(({ chave: c }) => novo[c] === 0)
-              aoMudar(vazio ? undefined : novo)
-            }}
+            onChange={(e) => aoMudar({ ...atual, [chave]: Number(e.target.value) || 0 })}
           />
         </label>
       ))}
@@ -78,6 +82,7 @@ export function CamposAvancado({
       >
         <CamposCaixa
           valor={e.margem?.[dispositivo]}
+          padrao={MARGEM_PADRAO}
           aoMudar={(c) => mudar((est) => { est.margem = definir(est.margem, dispositivo, c) }, 'av-margem')}
         />
       </PorDispositivo>
@@ -91,6 +96,7 @@ export function CamposAvancado({
       >
         <CamposCaixa
           valor={e.padding?.[dispositivo]}
+          padrao={CAIXA_ZERO}
           aoMudar={(c) => mudar((est) => { est.padding = definir(est.padding, dispositivo, c) }, 'av-padding')}
         />
       </PorDispositivo>
