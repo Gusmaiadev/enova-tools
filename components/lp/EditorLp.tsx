@@ -73,22 +73,13 @@ const ABAS: { chave: Aba; rotulo: string; icone: typeof LayoutList }[] = [
 ]
 
 /**
- * Dois formatos de alvo convivem enquanto houver seção não migrada:
- * 'el:ID' é um nó da árvore; 'sec:ID:item:IID:campo' é o formato tipado.
+ * 'el:ID' é um nó da árvore; 'sec:ID' é a seção inteira, que ainda tem painel
+ * próprio para nome, âncora, fundo e espaçamento.
  */
-function lerAlvo(alvo: string | null): {
-  secaoId: string | null
-  itemId: string | null
-  noId: string | null
-} {
-  if (alvo?.startsWith('el:')) return { secaoId: null, itemId: null, noId: alvo.slice(3) }
-  if (!alvo || !alvo.startsWith('sec:')) return { secaoId: null, itemId: null, noId: null }
-  const partes = alvo.split(':')
-  return {
-    secaoId: partes[1] ?? null,
-    itemId: partes[2] === 'item' ? (partes[3] ?? null) : null,
-    noId: null,
-  }
+function lerAlvo(alvo: string | null): { secaoId: string | null; noId: string | null } {
+  if (alvo?.startsWith('el:')) return { secaoId: null, noId: alvo.slice(3) }
+  if (!alvo || !alvo.startsWith('sec:')) return { secaoId: null, noId: null }
+  return { secaoId: alvo.split(':')[1] ?? null, noId: null }
 }
 
 export function EditorLp({
@@ -103,7 +94,6 @@ export function EditorLp({
   const [aba, setAba] = useState<Aba>('estrutura')
   const [dispositivo, setDispositivo] = useState<Dispositivo>('desktop')
   const [secaoId, setSecaoId] = useState<string | null>(null)
-  const [itemId, setItemId] = useState<string | null>(null)
   // Nó da árvore selecionado no canvas (formato novo).
   const [noId, setNoId] = useState<string | null>(null)
   // O rodapé não é seção: o painel precisa do alvo cru para editá-lo.
@@ -295,9 +285,8 @@ export function EditorLp({
         const selecionado = typeof m.alvo === 'string' ? m.alvo : null
         alvoSelecionado.current = selecionado
         setAlvo(selecionado)
-        const { secaoId: sid, itemId: iid, noId: nid } = lerAlvo(selecionado)
+        const { secaoId: sid, noId: nid } = lerAlvo(selecionado)
         setSecaoId(sid)
-        setItemId(iid)
         setNoId(nid)
         // Header e rodapé também têm painel próprio (botões, telefones).
         if (sid || nid || /^(header|footer)/.test(selecionado ?? '')) setAba('editar')
@@ -356,7 +345,6 @@ export function EditorLp({
   const selecionarSecao = useCallback(
     (id: string) => {
       setSecaoId(id)
-      setItemId(null)
       setNoId(null)
       setAba('editar')
       setAlvo(`sec:${id}`)
@@ -371,7 +359,6 @@ export function EditorLp({
     (id: string) => {
       setNoId(id)
       setSecaoId(null)
-      setItemId(null)
       setAlvo(`el:${id}`)
       alvoSelecionado.current = `el:${id}`
       setAba('editar')
@@ -620,10 +607,8 @@ export function EditorLp({
                   doc={doc}
                   lpId={projeto.id}
                   secaoId={secaoId}
-                  itemId={itemId}
                   alvo={alvo}
                   aplicar={aplicar}
-                  aoSelecionarItem={setItemId}
                 />
               ))}
             {aba === 'tema' && (
@@ -707,7 +692,6 @@ export function EditorLp({
             definirDoc(removerSecao(docRef.current, paraExcluir))
             if (secaoId === paraExcluir) {
               setSecaoId(null)
-              setItemId(null)
               setAlvo(null)
               alvoSelecionado.current = null
             }
