@@ -44,16 +44,6 @@ const urls = (html: string) =>
 /** HTML de referencia congelado do preset. */
 const referencia = (tipo: string) => (fixtures as Record<string, string>)[tipo]
 
-/** Os dois caminhos de render do mesmo preset. */
-function ambos(tipo: Parameters<typeof novaSecao>[0]) {
-  const tipada = novaSecao(tipo)
-  const { raiz, secao } = expandirPreset(tipada)
-  return {
-    tipado: compilarCorpo(docCom(tipada), { modo: 'export' }),
-    arvore: compilarCorpo(docCom({ ...secao, raiz }), { modo: 'export' }),
-  }
-}
-
 describe('equivalência com o HTML congelado', () => {
   for (const info of LAYOUTS) {
     it(`${info.tipo}: mesmo texto visível do compilador original`, () => {
@@ -72,30 +62,20 @@ describe('equivalência com o HTML congelado', () => {
   }
 })
 
-describe('equivalência árvore x layout tipado', () => {
-  for (const info of LAYOUTS) {
-    it(`${info.tipo}: mesmo texto visível nos dois caminhos`, () => {
-      const { tipado, arvore } = ambos(info.tipo)
-      expect(palavras(arvore.corpo)).toEqual(palavras(tipado.corpo))
-    })
 
-    it(`${info.tipo}: mesmas mídias e links`, () => {
-      const { tipado, arvore } = ambos(info.tipo)
-      expect(urls(arvore.corpo)).toEqual(urls(tipado.corpo))
-    })
-  }
-
+describe('cobertura e âncoras', () => {
   it('as fixtures cobrem todos os presets do catálogo', () => {
     expect(Object.keys(fixtures).sort()).toEqual(LAYOUTS.map((l) => l.tipo).sort())
   })
 
-  it('a âncora da seção não muda com a migração', () => {
+  it('a âncora da seção sobrevive à expansão', () => {
     const tipada = novaSecao('cards')
     const { raiz, secao } = expandirPreset(tipada)
-    const idTipado = compilarCorpo(docCom(tipada), { modo: 'export' }).idsPorSecao.get(tipada.id)
-    const idArvore = compilarCorpo(docCom({ ...secao, raiz }), { modo: 'export' }).idsPorSecao.get(
+    const id = compilarCorpo(docCom({ ...secao, raiz }), { modo: 'export' }).idsPorSecao.get(
       tipada.id,
     )
-    expect(idArvore).toBe(idTipado)
+    // A âncora vem de `secao.ancora`, que o expansor não toca — e é ela que o
+    // menu do header usa para rolar até aqui.
+    expect(id).toBe(tipada.ancora)
   })
 })

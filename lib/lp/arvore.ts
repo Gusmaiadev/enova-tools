@@ -98,3 +98,21 @@ export function duplicarNo(raiz: LpContainer, id: string): LpContainer {
   inserir(copia)
   return copia
 }
+
+/**
+ * Tipos presentes na pagina — os widgets de cada secao migrada, mais o preset
+ * das que ainda nao tiverem arvore. O compilador usa para emitir so o CSS e o
+ * JS do que a pagina realmente contem.
+ *
+ * Precisa ser por WIDGET, nao pelo preset da secao: assim que der para inserir
+ * um FAQ dentro de uma secao que nasceu como CTA, a chave do preset deixaria a
+ * pagina sem o CSS do accordion.
+ */
+export function tiposNaPagina(doc: { secoes: { tipo?: string; raiz?: LpContainer }[] }): Set<string> {
+  const usados = new Set<string>()
+  for (const s of doc.secoes) {
+    if (s.raiz) for (const el of caminharElementos(s.raiz)) usados.add(el.tipo)
+    else if (s.tipo) usados.add(s.tipo)
+  }
+  return usados
+}

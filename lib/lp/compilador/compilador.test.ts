@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { compilar, compilarEditor } from './index'
+import { migrarDocumentoParaArvore } from '../migrar'
 import { compilarCorpo } from './html'
 import { compilarJs } from './js'
 import { compilarCss, idHtmlSecao } from './css'
@@ -9,6 +10,16 @@ import type { LpBriefing, LpDocumento, LpMidia, LpSecao, TipoLayout } from '../t
 import { briefingVazio } from '../tipos'
 import { LAYOUTS } from '../layouts'
 import { coergirDocumento } from '../validar'
+
+/**
+ * Compila como a aplicação faz: o documento é expandido para árvore antes de
+ * virar página — migração na leitura, expansão na geração. Os testes montam o
+ * formato tipado porque é o que `documentoBase` e a IA produzem.
+ */
+const comArvore = (d: LpDocumento) => migrarDocumentoParaArvore(d)
+const compilarDoc = (d: LpDocumento, o?: Parameters<typeof compilar>[1]) =>
+  compilar(comArvore(d), o)
+const compilarEditorDoc = (d: LpDocumento) => compilarEditor(comArvore(d))
 
 function briefing(parcial: Partial<LpBriefing> = {}): LpBriefing {
   return { ...briefingVazio('Teste'), ...parcial }
@@ -52,7 +63,7 @@ function documentoCompleto(): LpDocumento {
 describe('compilador', () => {
   it('gera HTML, CSS e JS para todos os layouts sem quebrar', () => {
     const doc = documentoCompleto()
-    const saida = compilar(doc)
+    const saida = compilarDoc(doc)
 
     expect(saida.html).toContain('<!doctype html>')
     expect(saida.html).toContain('lang="pt-BR"')
@@ -71,7 +82,7 @@ describe('compilador', () => {
     // JS lê `'use strict'\n(function(){…})()` como chamada da string e o script
     // inteiro morre na primeira linha — a página abre com as seções invisíveis
     // (.lp-reveal nunca vira .lp-vis) e nenhum slider funcionando.
-    const { js } = compilar(documentoCompleto())
+    const { js } = compilarDoc(documentoCompleto())
     const doc = { querySelector: () => null, querySelectorAll: () => [] }
     const win = { addEventListener: () => {} }
     expect(() => new Function('document', 'window', js)(doc, win)).not.toThrow()
@@ -93,7 +104,7 @@ describe('compilador', () => {
 
   it('emite uma tag de abertura por seção do documento', () => {
     const doc = documentoCompleto()
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     const secoes = html.match(/<section /g) ?? []
     expect(secoes).toHaveLength(doc.secoes.length)
   })
@@ -114,7 +125,7 @@ describe('compilador', () => {
         ],
       }),
     )
-    const saida = compilar(doc)
+    const saida = compilarDoc(doc)
     expect(saida.css).toContain('.lp-faq')
     expect(saida.css).not.toContain('.lp-precos')
     // Sem slider/tabs/estatísticas/formulário, esses módulos JS ficam de fora.
@@ -131,7 +142,7 @@ describe('compilador', () => {
         texto: 'Fim & <script>alert(2)</script>',
       },
     ]
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     expect(html).not.toContain('<script>alert(2)</script>')
     expect(html).not.toContain('onerror="alert(1)"')
     expect(html).toContain('&lt;img src=x')
@@ -143,7 +154,7 @@ describe('compilador', () => {
     const secao = novaSecao('cta')
     secao.botao = { texto: 'Clique', url: 'javascript:alert(1)' }
     doc.secoes = [secao]
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     expect(html).not.toContain('javascript:')
     expect(html).toContain('href="#"')
   })
@@ -161,7 +172,7 @@ describe('compilador', () => {
       ],
     }
     const doc = coergirDocumento(bruto)!
-    const saida = compilar(doc)
+    const saida = compilarDoc(doc)
     expect(saida.html).not.toContain('onclick=alert')
     expect(saida.html).not.toContain('id="s-"')
     // A regra de ajuste da seção precisa ser um seletor válido (id sem aspas/espaço).
@@ -175,7 +186,7 @@ describe('compilador', () => {
         { id: 'a', tipo: 'cards', nome: 'X', itens: [{ id: '" onclick=alert(1) x', titulo: 'T' }] },
       ],
     })!
-    const editor = compilarEditor(doc)
+    const editor = compilarEditorDoc(doc)
     expect(editor).not.toContain('onclick=alert')
   })
 
@@ -185,7 +196,7 @@ describe('compilador', () => {
     secao.itens[0].botao = { texto: 'Assinar', url: '#', corFundo: '#16a34a' }
     secao.itens[1].botao = { texto: 'Assinar', url: '#', corFundo: '#2563eb' }
     doc.secoes = [secao]
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     expect(html).toContain('background:#16a34a')
     expect(html).toContain('background:#2563eb')
     // A classe .proprio deixou de existir (regra por seção pintaria todos juntos).
@@ -196,13 +207,13 @@ describe('compilador', () => {
     const doc = documentoBase(briefing())
     doc.tema.cores.header = '#fff'
     doc.tema.cores.footer = 'rgb(20, 20, 20)'
-    const { css } = compilar(doc)
+    const { css } = compilarDoc(doc)
     expect(css).toContain('--texto-header: #111318')
     expect(css).toContain('--texto-footer: #ffffff')
   })
 
   it('liga cada telefone do rodapé: wa.me quando é WhatsApp, tel: quando não', () => {
-    const { html } = compilar(documentoCompleto())
+    const { html } = compilarDoc(documentoCompleto())
     expect(html).toContain(
       '<a href="https://wa.me/5511900000000" target="_blank" rel="noopener" title="Conversar no WhatsApp">(11) 90000-0000</a>',
     )
@@ -212,18 +223,18 @@ describe('compilador', () => {
   })
 
   it('cada telefone tem seu alvo de edição no modo editor', () => {
-    const html = compilarEditor(documentoCompleto())
+    const html = compilarEditorDoc(documentoCompleto())
     expect(html).toContain('data-lp="footer:telefone:t1"')
     expect(html).toContain('data-lp="footer:telefone:t2"')
     // Na exportação nenhum data-lp sobra.
-    expect(compilar(documentoCompleto()).html).not.toContain('data-lp')
+    expect(compilarDoc(documentoCompleto()).html).not.toContain('data-lp')
   })
 
   it('rodapé de projeto antigo (telefones em uma string só) continua compilando', () => {
     const doc = documentoCompleto()
     // Documento salvo antes de os telefones virarem lista.
     ;(doc.footer as { telefones: unknown }).telefones = '(11) 3000-0000 / (11) 90000-0000'
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     expect(html).toContain('tel:+551130000000')
     expect(html).toContain('tel:+5511900000000')
   })
@@ -234,7 +245,7 @@ describe('compilador', () => {
       { id: 'b1', texto: 'Fale conosco', url: '#contato' },
       { id: 'b2', texto: 'Orçamento', url: 'https://exemplo.com', estilo: 'contorno' },
     ]
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     const nav = html.slice(html.indexOf('<nav'), html.indexOf('</nav>'))
     expect(nav).toContain('<div class="lp-header-acoes">')
     expect(nav).toContain('href="#contato"')
@@ -246,7 +257,7 @@ describe('compilador', () => {
     doc.header.menu = []
     doc.header.botoes = []
     doc.footer.menuSecundario = false
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     expect(html).not.toContain('<nav')
     expect(html).not.toContain('lp-menu-btn')
   })
@@ -254,7 +265,7 @@ describe('compilador', () => {
   it('botões do rodapé saem entre o texto institucional e as redes', () => {
     const doc = documentoCompleto()
     doc.footer.botoes = [{ id: 'f1', texto: 'Peça um orçamento', url: '#contato' }]
-    const rodape = compilar(doc).html.slice(compilar(doc).html.indexOf('<footer'))
+    const rodape = compilarDoc(doc).html.slice(compilarDoc(doc).html.indexOf('<footer'))
     expect(rodape).toContain('<div class="lp-footer-acoes">')
     expect(rodape.indexOf('lp-footer-acoes')).toBeLessThan(rodape.indexOf('lp-redes'))
   })
@@ -263,7 +274,7 @@ describe('compilador', () => {
     const doc = documentoCompleto()
     doc.header.botoes = [{ id: 'b1', texto: 'Fale conosco', url: '#' }]
     doc.footer.botoes = [{ id: 'f1', texto: 'Orçamento', url: '#' }]
-    const html = compilarEditor(doc)
+    const html = compilarEditorDoc(doc)
     expect(html).toContain('data-lp="header:botao:b1"')
     expect(html).toContain('data-lp="footer:botao:f1"')
   })
@@ -272,7 +283,7 @@ describe('compilador', () => {
     const doc = documentoCompleto()
     delete (doc.header as { botoes?: unknown }).botoes
     ;(doc.header as { botao?: unknown }).botao = { texto: 'Fale conosco', url: '#contato' }
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     expect(html).toContain('<div class="lp-header-acoes">')
     expect(html).toContain('>Fale conosco</a>')
   })
@@ -286,7 +297,7 @@ describe('compilador', () => {
         conteudo: '## 1. Objeto\nO uso do site.\nSegunda linha.\n\nOutro parágrafo.',
       },
     ]
-    const { paginas, css } = compilar(doc)
+    const { paginas, css } = compilarDoc(doc)
     expect(paginas.map((p) => p.arquivo)).toEqual(['termos.html'])
 
     const html = paginas[0].html
@@ -306,11 +317,11 @@ describe('compilador', () => {
     const doc = documentoCompleto()
     doc.header.botoes = [{ id: 'b1', texto: 'Fale conosco', url: '#contato' }]
     doc.paginas = [{ tipo: 'termos', titulo: 'Termos de Uso', conteudo: 'Texto.' }]
-    const html = compilar(doc).paginas[0].html
+    const html = compilarDoc(doc).paginas[0].html
     expect(html).toContain('href="index.html#topo"')
     expect(html).toContain('href="index.html#contato"')
     // O index continua com a âncora pura.
-    expect(compilar(doc).html).toContain('href="#contato"')
+    expect(compilarDoc(doc).html).toContain('href="#contato"')
   })
 
   it('o texto da página passa por escape', () => {
@@ -318,14 +329,14 @@ describe('compilador', () => {
     doc.paginas = [
       { tipo: 'privacidade', titulo: '<img src=x onerror=1>', conteudo: '<script>alert(1)</script>' },
     ]
-    const html = compilar(doc).paginas[0].html
+    const html = compilarDoc(doc).paginas[0].html
     expect(html).not.toContain('<script>alert(1)</script>')
     expect(html).not.toContain('<img src=x')
     expect(html).toContain('&lt;script&gt;')
   })
 
   it('sem páginas no documento o pacote não muda', () => {
-    const { paginas, css } = compilar(documentoCompleto())
+    const { paginas, css } = compilarDoc(documentoCompleto())
     expect(paginas).toEqual([])
     expect(css).not.toContain('.lp-legal')
   })
@@ -333,36 +344,34 @@ describe('compilador', () => {
   it('página ainda sem texto (recém-criada no editor) não vira arquivo', () => {
     const doc = documentoCompleto()
     doc.paginas = [{ tipo: 'termos', titulo: 'Termos de Uso', conteudo: '   ' }]
-    const { paginas, css } = compilar(doc)
+    const { paginas, css } = compilarDoc(doc)
     expect(paginas).toEqual([])
     expect(css).not.toContain('.lp-legal')
   })
 
-  it('troca os lados do conteúdo e da mídia nos layouts que dividem a linha', () => {
+  it('inverter vira ordem dos elementos, não classe CSS', () => {
+    // Antes era a classe `.inv` mudando o `order` no CSS. Na árvore o lado é a
+    // posição do filho, então a inversão se lê na ordem do HTML.
     const doc = documentoBase(briefing())
-    const hero = novaSecao('hero')
-    hero.midia = { tipo: 'imagem', url: 'https://ex.com/a.jpg', alt: 'A', busca: 'a', orientacao: 'paisagem' }
-    hero.inverter = true
     const tm = novaSecao('texto-midia')
+    tm.midia = {
+      tipo: 'imagem',
+      url: 'https://ex.com/a.jpg',
+      alt: 'A',
+      busca: 'a',
+      orientacao: 'paisagem',
+    }
+    doc.secoes = [tm]
+
+    const normal = compilarDoc(doc).html
+    expect(normal.indexOf('lp-el-titulo')).toBeLessThan(normal.indexOf('lp-midia'))
+
     tm.inverter = true
-    const blocos = novaSecao('blocos-alternados')
-    blocos.inverter = true
-    doc.secoes = [hero, tm, blocos]
-    const { html } = compilar(doc)
+    const invertido = compilarDoc(doc).html
+    expect(invertido.indexOf('lp-midia')).toBeLessThan(invertido.indexOf('lp-el-titulo'))
 
-    // Hero com mídia ao lado ganha a classe na seção; os outros, no container.
-    expect(html).toContain('lp-hero inv')
-    expect(html).toContain('<div class="lp-tm inv">')
-    expect(html).toContain('<div class="lp-blocos inv">')
-  })
-
-  it('sem inverter, nada de classe extra (a página de hoje não muda)', () => {
-    const doc = documentoBase(briefing())
-    doc.secoes = [novaSecao('texto-midia'), novaSecao('blocos-alternados')]
-    const { html } = compilar(doc)
-    expect(html).toContain('<div class="lp-tm">')
-    expect(html).toContain('<div class="lp-blocos">')
-    expect(html).not.toContain('inv')
+    // A classe do CSS antigo não existe mais em lugar nenhum.
+    expect(invertido).not.toContain('lp-tm')
   })
 
   it('leva os ajustes de header e rodapé para o CSS (e a fonte para o <head>)', () => {
@@ -373,7 +382,7 @@ describe('compilador', () => {
       alinhamento: 'centro',
     }
     doc.footer.estilo = { menu: { fonte: 'Lora' }, logo: 30, alinhamento: 'centro' }
-    const { css, html } = compilar(doc)
+    const { css, html } = compilarDoc(doc)
 
     expect(css).toContain("'Poppins'")
     // A coluna de contato não é menu: fica de fora da fonte escolhida.
@@ -398,11 +407,11 @@ describe('compilador', () => {
       orientacao: 'paisagem',
     }
     doc.header.estilo = { logo: 60 }
-    expect(compilar(doc).css).toContain('.lp-logo-img img{max-height:60px;max-width:300px}')
+    expect(compilarDoc(doc).css).toContain('.lp-logo-img img{max-height:60px;max-width:300px}')
   })
 
   it('sem ajuste nenhum nas barras, o CSS continua o de antes', () => {
-    const { css } = compilar(documentoCompleto())
+    const { css } = compilarDoc(documentoCompleto())
     expect(css).not.toContain('.lp-nav ul{margin')
     expect(css).not.toContain('.lp-logo{font-size')
     expect(css).not.toContain('.lp-logo-footer{font-size')
@@ -415,7 +424,7 @@ describe('compilador', () => {
     a.ancora = 'servicos'
     b.ancora = 'servicos'
     doc.secoes = [a, b]
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     expect(html).toContain('id="servicos"')
     expect(html).toContain('id="servicos-2"')
   })
@@ -432,11 +441,11 @@ describe('compilador', () => {
     }
     doc.secoes = [secao]
 
-    const previa = compilar(doc)
+    const previa = compilarDoc(doc)
     expect(previa.midias).toHaveLength(1)
     expect(previa.midias[0].url).toBe('https://cdn.exemplo.com/foto.jpg')
 
-    const local = compilar(doc, {
+    const local = compilarDoc(doc, {
       urlLocal: new Map([['https://cdn.exemplo.com/foto.jpg', 'assets/images/foto-1.jpg']]),
     })
     expect(local.html).toContain('assets/images/foto-1.jpg')
@@ -456,7 +465,7 @@ describe('compilador', () => {
     }
     doc.secoes = [secao]
 
-    const previa = compilar(doc)
+    const previa = compilarDoc(doc)
     expect(previa.html).toContain('poster="https://cdn.exemplo.com/poster.jpg"')
     // O poster entra na coleta como imagem, senão o ZIP exportado fica sem ele.
     expect(previa.midias.map((m) => [m.tipo, m.url])).toEqual([
@@ -480,7 +489,7 @@ describe('compilador', () => {
       ...extra,
     }
     doc.secoes = [secao]
-    return tagVideo(compilar(doc).html)
+    return tagVideo(compilarDoc(doc).html)
   }
 
   it('vídeo sai com controles, parado e sem repetir quando nada foi escolhido', () => {
@@ -522,7 +531,7 @@ describe('compilador', () => {
     }
     doc.secoes = [secao]
 
-    expect(compilar(doc).html).not.toContain('poster=')
+    expect(compilarDoc(doc).html).not.toContain('poster=')
   })
 
   it('big numbers sai com título, subtítulo, conteúdo e os números escritos', () => {
@@ -536,7 +545,7 @@ describe('compilador', () => {
       { id: 'n2', extra: '20 anos', titulo: 'De mercado' },
     ]
     doc.secoes = [secao]
-    const { html, js } = compilar(doc)
+    const { html, js } = compilarDoc(doc)
 
     expect(html).toContain('>Nossos números<')
     expect(html).toContain('>Vinte anos construindo<')
@@ -564,18 +573,20 @@ describe('compilador', () => {
       { id: 'c2', titulo: 'Manutenção', texto: 'Time fixo para o prédio.' },
     ]
     doc.secoes = [secao]
-    const { html, css } = compilar(doc)
+    const { html, css } = compilarDoc(doc)
 
-    expect(html).toContain('class="lp-card-subtitulo"')
     expect(html).toContain('>a partir de 30 dias<')
     expect(html).toContain('>Quero esta<')
     expect(html).toContain('hover-crescer')
-    // Card sem subtítulo/botão não emite os blocos vazios.
-    expect((html.match(/lp-card-subtitulo/g) ?? []).length).toBe(1)
-    expect((html.match(/lp-card-acao/g) ?? []).length).toBe(1)
-    // Botão encostado na base: cards de alturas diferentes alinham os botões.
-    expect(css).toContain('.lp-card-acao{margin-top:auto')
-    expect(css).toMatch(/\.lp-card\{[^}]*flex-direction:column/)
+    // Cada card é um container com a aparência de card — é ela que carrega
+    // borda, fundo e o hover que sobe 6px, coisas que LpEstilo não alcança.
+    expect((html.match(/lp-ap-card/g) ?? []).length).toBe(2)
+    // Card sem subtítulo/botão não emite os blocos vazios. Conta pelo texto do
+    // botão, não por `lp-btn`: o header da página também tem um.
+    expect((html.match(/lp-subtitulo/g) ?? []).length).toBe(1)
+    expect((html.match(/>Quero esta</g) ?? []).length).toBe(1)
+    expect(css).toMatch(/\.lp-ap-card\{[^}]*flex-direction:column/)
+    expect(css).toContain('.lp-ap-card:hover')
   })
 
   it('botão sai em qualquer layout, com posição, hover e animação', () => {
@@ -589,34 +600,32 @@ describe('compilador', () => {
         animacao: 'pulsar',
       }
     }
-    const { html, css } = compilar(doc)
+    const { html, css } = compilarDoc(doc)
 
     expect(doc.secoes.length).toBeGreaterThan(15)
-    expect((html.match(/class="lp-acao/g) ?? []).length).toBe(doc.secoes.length)
     expect((html.match(/>Quero saber</g) ?? []).length).toBe(doc.secoes.length)
     expect(html).toContain('hover-crescer')
     expect(html).toContain('anim-pulsar')
-    expect(css).toContain('.lp-acao.pos-centro')
     expect(css).toContain('@keyframes lp-pulsar')
+    // `posicao` deixou de existir no botão: alinhar é papel do container que o
+    // contém, e o painel dele tem o controle.
+    expect(html).not.toContain('lp-acao')
     // Fecha tudo que abre: o bloco do botão entra dentro do container de cada
     // layout, não solto depois dele.
     expect((html.match(/<div/g) ?? []).length).toBe((html.match(/<\/div>/g) ?? []).length)
   })
 
-  it('alinhamento padrão do botão acompanha o layout', () => {
+  it('o botão da seção vira um widget dentro da árvore', () => {
     const doc = documentoBase(briefing())
     const tm = novaSecao('texto-midia')
     const cards = novaSecao('cards')
     tm.botao = { texto: 'Ver', url: '#' }
     cards.botao = { texto: 'Ver', url: '#' }
     doc.secoes = [tm, cards]
-    const { html } = compilar(doc)
-    // Texto+mídia é coluna de texto à esquerda; grade de cards é centralizada.
-    expect(html).toContain('lp-acao pos-esquerda')
-    expect(html).toContain('lp-acao pos-centro')
-
-    tm.botao.posicao = 'direita'
-    expect(compilar(doc).html).toContain('lp-acao pos-direita')
+    const { html } = compilarDoc(doc)
+    // Um botão por seção, cada um dentro do container da sua seção.
+    expect((html.match(/>Ver</g) ?? []).length).toBe(2)
+    expect((html.match(/<div/g) ?? []).length).toBe((html.match(/<\/div>/g) ?? []).length)
   })
 
   it('põe a logo enviada no topo e a coleta para a exportação', () => {
@@ -631,7 +640,7 @@ describe('compilador', () => {
       orientacao: 'quadrado',
     }
 
-    const { html, midias } = compilar(doc)
+    const { html, midias } = compilarDoc(doc)
     expect(html).toContain('class="lp-logo lp-logo-img"')
     // Alt é o nome da marca, não o nome do arquivo enviado ("Felix", aqui).
     expect(html).toContain(
@@ -640,11 +649,11 @@ describe('compilador', () => {
     // Sem entrar na coleta, o ZIP exportado sairia sem o arquivo da logo.
     expect(midias.map((m) => m.url)).toContain('https://cdn.exemplo.com/logo.png')
     // No canvas o link com imagem não é texto editável (não dá para digitar num <img>).
-    expect(compilarEditor(doc)).not.toContain('data-lp="header:logo"')
+    expect(compilarEditorDoc(doc)).not.toContain('data-lp="header:logo"')
 
     doc.header.logo = null
-    expect(compilar(doc).html).toContain('>Felix Construtora</a>')
-    expect(compilarEditor(doc)).toContain('data-lp="header:logo"')
+    expect(compilarDoc(doc).html).toContain('>Felix Construtora</a>')
+    expect(compilarEditorDoc(doc)).toContain('data-lp="header:logo"')
   })
 
   it('usa o tamanho de título escolhido, sem piso fixo que o anule', () => {
@@ -652,7 +661,7 @@ describe('compilador', () => {
       briefing({ tipografia: { titulos: { fonte: 'Poppins', peso: 800, tamanho: '20px' } } }),
     )
     doc.secoes = [novaSecao('hero')]
-    const { css } = compilar(doc)
+    const { css } = compilarDoc(doc)
     expect(css).toContain('--tamanho-titulos: 20px')
     // Piso fixo (ex.: 2rem) vence o teto quando o usuário escolhe um tamanho
     // pequeno — clamp devolve o mínimo — e a página sai no tamanho padrão.
@@ -675,10 +684,10 @@ describe('compilador', () => {
       escurecer: 60,
     }
     doc.secoes = [secao]
-    expect(compilar(doc).html).toContain('lp-sobre-midia')
+    expect(compilarDoc(doc).html).toContain('lp-sobre-midia')
 
     secao.fundo.textoClaro = false
-    const { html, css } = compilar(doc)
+    const { html, css } = compilarDoc(doc)
     expect(html).not.toContain('lp-sobre-midia')
     // A regra continua no CSS (outras seções podem usar), só não se aplica aqui.
     expect(css).toContain('.lp-sobre-midia h1')
@@ -689,26 +698,34 @@ describe('compilador', () => {
     const secao = novaSecao('cta')
     secao.largura = 'full'
     doc.secoes = [secao]
-    const { html, css } = compilar(doc)
+    const { html, css } = compilarDoc(doc)
     expect(html).toMatch(/class="[^"]*\bfull\b[^"]*"/)
     // Sem esta regra a classe `full` não teria efeito nenhum.
     expect(css).toMatch(/\.full\s*>\s*\.lp-container\{[^}]*max-width:\s*none/)
   })
 
-  it('põe o conteúdo do banner num wrapper dentro do container', () => {
+  it('a mídia do banner vira fundo da seção, não elemento da página', () => {
     const doc = documentoBase(briefing())
-    doc.secoes = [novaSecao('banner')]
-    const { html, css } = compilar(doc)
-    // lp-banner precisa ser filho de lp-container: como seletor descendente de
-    // si mesmo (.lp-banner .lp-container) a largura nunca se aplicaria.
-    expect(html).toContain('<div class="lp-container"><div class="lp-banner">')
-    expect(css).toMatch(/\.lp-banner\{[^}]*max-width/)
+    const banner = novaSecao('banner')
+    banner.midia = {
+      tipo: 'imagem',
+      url: 'https://ex.com/faixa.jpg',
+      alt: 'Faixa',
+      busca: 'faixa',
+      orientacao: 'paisagem',
+    }
+    doc.secoes = [banner]
+    const { html } = compilarDoc(doc)
+    // Sai atrás do conteúdo, com o véu por cima — não como <img> no meio do texto.
+    expect(html).toContain('lp-fundo-midia')
+    expect(html).toContain('lp-veu')
+    expect(html).not.toContain('class="lp-midia"')
   })
 
   it('marca os elementos editáveis apenas no modo editor', () => {
     const doc = documentoCompleto()
-    expect(compilarEditor(doc)).toContain('data-lp="sec:')
-    expect(compilar(doc).html).not.toContain('data-lp')
+    expect(compilarEditorDoc(doc)).toContain('data-lp="sec:')
+    expect(compilarDoc(doc).html).not.toContain('data-lp')
   })
 
   it('mantém o placeholder de vídeo como imagem (data URI SVG)', () => {
@@ -727,7 +744,7 @@ describe('compilador', () => {
         ],
       }),
     )
-    const { html } = compilar(doc)
+    const { html } = compilarDoc(doc)
     expect(html).toContain('data:image/svg+xml')
     expect(html).not.toContain('<video')
   })
@@ -772,8 +789,8 @@ describe('documentoBase', () => {
     const doc = documentoBase(briefing({ cores: { principal: 'red; } body { display:none' } }))
     // Cai no padrão em vez de vazar a injeção para dentro do CSS.
     expect(doc.tema.cores.principal).toBe('#2563eb')
-    expect(compilar(doc).css).not.toContain('body {')
-    expect(compilar(doc).css).toContain('--cor-principal: #2563eb')
+    expect(compilarDoc(doc).css).not.toContain('body {')
+    expect(compilarDoc(doc).css).toContain('--cor-principal: #2563eb')
   })
 })
 
@@ -812,11 +829,25 @@ describe('compilador com árvore', () => {
     expect(corpo).not.toContain('IGNORADO')
   })
 
-  it('seção sem raiz continua no layout tipado', () => {
-    const doc = docCom([{ ...novaSecao('cta'), titulo: 'TIPADO' }])
+  it('seção sem raiz sai como moldura vazia, sem derrubar a página', () => {
+    // Não deveria acontecer — todo documento passa pela migração ou pela
+    // geração. Se acontecer, o resto da página continua de pé.
+    const doc = docCom([
+      { ...novaSecao('cta'), titulo: 'IGNORADO' },
+      {
+        ...novaSecao('cta'),
+        raiz: {
+          id: 'r',
+          tipo: 'container',
+          direcao: { desktop: 'coluna' },
+          filhos: [{ id: 't', tipo: 'titulo', nivel: 'h2', texto: 'DEPOIS' }],
+        },
+      },
+    ])
     const { corpo } = compilarCorpo(doc, { modo: 'export' })
-    expect(corpo).toContain('TIPADO')
-    expect(corpo).toContain('lp-cta-caixa')
+    expect(corpo).not.toContain('IGNORADO')
+    expect(corpo).toContain('DEPOIS')
+    expect((corpo.match(/<section /g) ?? []).length).toBe(2)
   })
 
   it('CSS traz as regras geradas dos elementos da árvore', () => {

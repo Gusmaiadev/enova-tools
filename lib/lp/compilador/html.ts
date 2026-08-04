@@ -14,17 +14,14 @@ import {
   type OpcoesHtml,
   alvo,
   atributosVideoFundo,
-  celula,
   href,
   htmlBotao,
-  htmlMidia,
   posterDe,
   quebras,
-  slider,
   urlMidia,
 } from './comum'
 import { svgIcone, svgRede } from '../icones'
-import type { LpDocumento, LpMidia, LpSecao, PaginaLegal, PosicaoBotao } from '../tipos'
+import type { LpDocumento, LpSecao, PaginaLegal } from '../tipos'
 import {
   esc,
   escCss,
@@ -39,326 +36,34 @@ import { idHtmlSecao } from './css'
 // cabecalho daquele arquivo para o porque.
 export type { Ctx, MidiaColetada, OpcoesHtml } from './comum'
 
-/**
- * Bloco do botao da secao, alinhado conforme `posicao`. `padrao` e o alinhamento
- * natural daquele layout (texto a esquerda, grade centralizada), usado enquanto
- * o usuario nao escolhe um. Vale para qualquer layout: botao nao e privilegio de
- * hero e CTA.
- */
-function acaoSecao(
-  ctx: Ctx,
-  s: LpSecao,
-  padrao: PosicaoBotao = 'esquerda',
-  extra = '',
-): string {
-  if (!s.botao) return ''
-  const classes = ['lp-acao', `pos-${s.botao.posicao ?? padrao}`]
-  if (extra) classes.push(extra)
-  return `<div class="${classes.join(' ')}">${htmlBotao(ctx, s.botao, `sec:${s.id}:botao`)}</div>`
-}
-
-function tituloEl(ctx: Ctx, s: LpSecao, tag: 'h1' | 'h2' | 'h3' = 'h2'): string {
-  if (!s.titulo) return ''
-  return `<${tag} class="lp-el-titulo"${alvo(ctx, `sec:${s.id}:titulo`)}>${quebras(s.titulo)}</${tag}>`
-}
-
-function subtituloEl(ctx: Ctx, s: LpSecao): string {
-  if (!s.subtitulo) return ''
-  return `<p class="lp-subtitulo lp-el-subtitulo"${alvo(ctx, `sec:${s.id}:subtitulo`)}>${quebras(s.subtitulo)}</p>`
-}
-
-function textoEl(ctx: Ctx, s: LpSecao): string {
-  if (!s.texto) return ''
-  return `<p class="lp-texto lp-el-texto"${alvo(ctx, `sec:${s.id}:texto`)}>${quebras(s.texto)}</p>`
-}
-
-/**
- * Cabecalho centralizado padrao das secoes de lista/grade. Inclui o texto da
- * secao: sem isso o que o usuario escrevia em "Conteudo" num layout de grade
- * (cards, FAQ, big numbers) nao aparecia em lugar nenhum da pagina.
- */
-function cabeca(ctx: Ctx, s: LpSecao): string {
-  if (!s.titulo && !s.subtitulo && !s.texto) return ''
-  return `<div class="lp-cabeca">${tituloEl(ctx, s)}${subtituloEl(ctx, s)}${textoEl(ctx, s)}</div>`
-}
-
-const itemAlvo = (s: LpSecao, itemId: string, campo: string) =>
-  `sec:${s.id}:item:${itemId}:${campo}`
-
-function textoItem(
-  ctx: Ctx,
-  s: LpSecao,
-  itemId: string,
-  campo: 'titulo' | 'texto' | 'extra' | 'detalhe',
-  valor: string | undefined,
-  tag: string,
-  classe: string,
-): string {
-  if (!valor) return ''
-  return `<${tag} class="${classe}"${alvo(ctx, itemAlvo(s, itemId, campo))}>${quebras(valor)}</${tag}>`
-}
-
-/* --------------------------- layouts de secao ---------------------------- */
-
-function lHero(ctx: Ctx, s: LpSecao): string {
-  const comFundo = Boolean(s.fundo?.midia)
-  const lateral = !comFundo && s.midia ? htmlMidia(ctx, s.midia, `sec:${s.id}:midia`) : ''
-  // Hero centralizado (sobre mídia ou sem mídia lateral) pede botão no centro.
-  const acoes = acaoSecao(ctx, s, comFundo || !s.midia ? 'centro' : 'esquerda', 'lp-hero-acoes')
-  return `<div class="lp-container"><div class="lp-hero-texto">${tituloEl(ctx, s, 'h1')}${subtituloEl(ctx, s)}${textoEl(ctx, s)}${acoes}</div>${lateral}</div>`
-}
-
-function lTextoMidia(ctx: Ctx, s: LpSecao): string {
-  const midia = s.midia ? htmlMidia(ctx, s.midia, `sec:${s.id}:midia`) : ''
-  return `<div class="lp-container"><div class="lp-tm${s.inverter ? ' inv' : ''}"><div class="lp-tm-texto">${tituloEl(ctx, s)}${subtituloEl(ctx, s)}${textoEl(ctx, s)}${acaoSecao(ctx, s)}</div>${midia}</div></div>`
-}
-
-function lTextoCentralizado(ctx: Ctx, s: LpSecao): string {
-  return `<div class="lp-container"><div class="lp-central">${tituloEl(ctx, s)}${subtituloEl(ctx, s)}${textoEl(ctx, s)}${acaoSecao(ctx, s, 'centro')}</div></div>`
-}
-
-function lCards(ctx: Ctx, s: LpSecao): string {
-  const cards = s.itens
-    .map((i) => {
-      const botao = i.botao
-        ? `<div class="lp-card-acao">${htmlBotao(ctx, i.botao, itemAlvo(s, i.id, 'botao'))}</div>`
-        : ''
-      return `<div class="lp-card lp-reveal"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}>${
-        i.icone ? `<span class="lp-icone">${svgIcone(i.icone)}</span>` : ''
-      }${textoItem(ctx, s, i.id, 'titulo', i.titulo, 'h3', 'lp-card-titulo')}${textoItem(ctx, s, i.id, 'extra', i.extra, 'p', 'lp-card-subtitulo')}${textoItem(ctx, s, i.id, 'texto', i.texto, 'p', 'lp-card-texto')}${botao}</div>`
-    })
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-cards" style="--cols:${s.colunas ?? 3}">${cards}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lGaleria(ctx: Ctx, s: LpSecao, masonry = false): string {
-  const figuras = s.itens
-    .filter((i) => i.imagem)
-    .map((i) => {
-      const legenda = i.titulo
-        ? `<figcaption${alvo(ctx, itemAlvo(s, i.id, 'titulo'))}>${quebras(i.titulo)}</figcaption>`
-        : ''
-      const img = i.imagem as LpMidia
-      return `<figure class="lp-reveal"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}><img src="${esc(urlMidia(ctx, img))}" alt="${esc(img.alt)}" loading="lazy">${legenda}</figure>`
-    })
-    .join('')
-  const classe = masonry ? 'lp-masonry' : 'lp-galeria'
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="${classe}" style="--cols:${s.colunas ?? 3}">${figuras}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lTimeline(ctx: Ctx, s: LpSecao): string {
-  const itens = s.itens
-    .map(
-      (i) => `<div class="lp-tl-item lp-reveal"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}>${textoItem(ctx, s, i.id, 'extra', i.extra, 'div', 'lp-tl-data')}${textoItem(ctx, s, i.id, 'titulo', i.titulo, 'h3', 'lp-tl-titulo')}${textoItem(ctx, s, i.id, 'texto', i.texto, 'p', 'lp-tl-texto')}</div>`,
-    )
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-timeline">${itens}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lFaq(ctx: Ctx, s: LpSecao): string {
-  const chevron = svgIcone('chevron-baixo')
-  const itens = s.itens
-    .map(
-      (i, n) => `<details${n === 0 ? ' open' : ''}${alvo(ctx, itemAlvo(s, i.id, 'sel'))}><summary><span${alvo(ctx, itemAlvo(s, i.id, 'titulo'))}>${quebras(i.titulo ?? '')}</span>${chevron}</summary><div class="lp-faq-corpo">${textoItem(ctx, s, i.id, 'texto', i.texto, 'p', 'lp-faq-resposta')}</div></details>`,
-    )
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-faq">${itens}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lDepoimentos(ctx: Ctx, s: LpSecao): string {
-  const slides = s.itens.map((i) => {
-    const foto = i.imagem
-      ? `<img src="${esc(urlMidia(ctx, i.imagem))}" alt="${esc(i.imagem.alt)}" loading="lazy">`
-      : ''
-    return `<div${alvo(ctx, itemAlvo(s, i.id, 'sel'))}><blockquote>${svgIcone('aspas')}${textoItem(ctx, s, i.id, 'texto', i.texto, 'p', 'lp-depo-fala')}</blockquote><div class="lp-depo-autor">${foto}${textoItem(ctx, s, i.id, 'extra', i.extra, 'div', 'lp-depo-nome')}${textoItem(ctx, s, i.id, 'detalhe', i.detalhe, 'div', 'lp-depo-cargo')}</div></div>`
-  })
-  return `<div class="lp-container lp-depo">${cabeca(ctx, s)}${slider(slides, 'depoimento')}${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lLogos(ctx: Ctx, s: LpSecao): string {
-  const logos = s.itens
-    .map((i) => {
-      const interno = i.imagem
-        ? `<img src="${esc(urlMidia(ctx, i.imagem))}" alt="${esc(i.titulo ?? i.imagem.alt)}" loading="lazy">`
-        : `<span class="lp-logo-nome"${alvo(ctx, itemAlvo(s, i.id, 'titulo'))}>${quebras(i.titulo ?? '')}</span>`
-      const li = `<li${alvo(ctx, itemAlvo(s, i.id, 'sel'))}>${
-        i.url ? `<a href="${esc(urlSegura(i.url))}" target="_blank" rel="noopener">${interno}</a>` : interno
-      }</li>`
-      return li
-    })
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-logos"><ul>${logos}</ul></div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lEstatisticas(ctx: Ctx, s: LpSecao): string {
-  const stats = s.itens
-    .map(
-      (i) => `<div class="lp-stat lp-reveal"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}><div class="lp-stat-valor" data-contar${alvo(ctx, itemAlvo(s, i.id, 'extra'))}>${esc(i.extra ?? '0')}</div>${textoItem(ctx, s, i.id, 'titulo', i.titulo, 'div', 'lp-stat-rotulo')}</div>`,
-    )
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-stats" style="--cols:${s.colunas ?? Math.min(4, Math.max(2, s.itens.length))}">${stats}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lCta(ctx: Ctx, s: LpSecao): string {
-  return `<div class="lp-container"><div class="lp-cta-caixa lp-reveal">${tituloEl(ctx, s)}${subtituloEl(ctx, s)}${textoEl(ctx, s)}${acaoSecao(ctx, s, 'centro')}</div></div>`
-}
-
-function lBanner(ctx: Ctx, s: LpSecao): string {
-  return `<div class="lp-container"><div class="lp-banner">${tituloEl(ctx, s)}${subtituloEl(ctx, s)}${acaoSecao(ctx, s, 'centro')}</div></div>`
-}
-
-function lFormulario(ctx: Ctx, s: LpSecao): string {
-  const lado = s.titulo || s.texto || s.subtitulo || s.midia || s.botao
-  const texto = `<div class="lp-form-texto">${tituloEl(ctx, s)}${subtituloEl(ctx, s)}${textoEl(ctx, s)}${
-    s.midia ? htmlMidia(ctx, s.midia, `sec:${s.id}:midia`) : ''
-  }${acaoSecao(ctx, s)}</div>`
-  // Sem destino não emite a confirmação — o script não finge que enviou.
-  const destino = s.destinoForm ? ` data-destino="${esc(urlSegura(s.destinoForm))}"` : ''
-  const confirmacao = s.destinoForm
-    ? '<div class="lp-form-ok">Mensagem enviada com sucesso! Retornaremos em breve.</div>'
-    : ''
-  const form = `<form class="lp-form" novalidate${destino}><input class="lp-mel" type="text" name="site" tabindex="-1" autocomplete="off" aria-hidden="true"><label>Nome<input type="text" name="nome" required placeholder="Seu nome"></label><label>E-mail<input type="email" name="email" required placeholder="voce@email.com"></label><label>Telefone<input type="tel" name="telefone" placeholder="(00) 00000-0000"></label><label>Mensagem<textarea name="mensagem" required placeholder="Como podemos ajudar?"></textarea></label>${confirmacao}<button class="lp-btn" type="submit">Enviar mensagem</button></form>`
-  return `<div class="lp-container"><div class="lp-form-grid${lado ? '' : ' sozinho'}">${lado ? texto : ''}${form}</div></div>`
-}
-
-function lPrecos(ctx: Ctx, s: LpSecao): string {
-  const check = svgIcone('check')
-  const planos = s.itens
-    .map((i) => {
-      const linhas = (i.lista ?? [])
-        .map((v) => `<li>${check}<span>${esc(v)}</span></li>`)
-        .join('')
-      const botao = i.botao ? htmlBotao(ctx, i.botao, itemAlvo(s, i.id, 'botao'), '') : ''
-      return `<div class="lp-preco${i.destaque ? ' destaque' : ''} lp-reveal"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}>${textoItem(ctx, s, i.id, 'titulo', i.titulo, 'h3', 'lp-preco-nome')}<div><span class="lp-preco-valor"${alvo(ctx, itemAlvo(s, i.id, 'extra'))}>${esc(i.extra ?? '')}</span><span class="lp-preco-periodo"${alvo(ctx, itemAlvo(s, i.id, 'detalhe'))}>${esc(i.detalhe ?? '')}</span></div><ul>${linhas}</ul>${botao}</div>`
-    })
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-precos" style="--cols:${s.colunas ?? Math.min(3, Math.max(2, s.itens.length))}">${planos}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lComparacao(ctx: Ctx, s: LpSecao): string {
-  const cabecalho = s.itens
-    .map((i) => `<th${i.destaque ? ' class="destaque"' : ''}${alvo(ctx, itemAlvo(s, i.id, 'titulo'))}>${quebras(i.titulo ?? '')}</th>`)
-    .join('')
-  const linhas = (s.rotulos ?? [])
-    .map((rotulo, n) => {
-      const celulas = s.itens
-        .map((i) => `<td${i.destaque ? ' class="destaque"' : ''}>${celula(i.lista?.[n] ?? '')}</td>`)
-        .join('')
-      return `<tr><td>${esc(rotulo)}</td>${celulas}</tr>`
-    })
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-comp"><table><thead><tr><th></th>${cabecalho}</tr></thead><tbody>${linhas}</tbody></table></div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lGridProdutos(ctx: Ctx, s: LpSecao): string {
-  const produtos = s.itens
-    .map((i) => {
-      const img = i.imagem ? htmlMidia(ctx, i.imagem, itemAlvo(s, i.id, 'imagem')) : ''
-      const botao = i.botao ? htmlBotao(ctx, i.botao, itemAlvo(s, i.id, 'botao')) : ''
-      return `<div class="lp-produto lp-reveal"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}>${img}<div class="lp-produto-corpo">${textoItem(ctx, s, i.id, 'titulo', i.titulo, 'h3', 'lp-produto-nome')}${textoItem(ctx, s, i.id, 'extra', i.extra, 'div', 'lp-produto-preco')}${botao}</div></div>`
-    })
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-produtos" style="--cols:${s.colunas ?? 3}">${produtos}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lListaBeneficios(ctx: Ctx, s: LpSecao): string {
-  const itens = s.itens
-    .map(
-      (i) => `<li class="lp-reveal"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}><span class="lp-icone">${svgIcone(i.icone ?? 'check')}</span><div>${textoItem(ctx, s, i.id, 'titulo', i.titulo, 'h3', 'lp-benef-titulo')}${textoItem(ctx, s, i.id, 'texto', i.texto, 'p', 'lp-benef-texto')}</div></li>`,
-    )
-    .join('')
-  const texto = `<div class="lp-benef-texto-col">${tituloEl(ctx, s)}${subtituloEl(ctx, s)}${textoEl(ctx, s)}<ul>${itens}</ul>${acaoSecao(ctx, s)}</div>`
-  const midia = s.midia ? htmlMidia(ctx, s.midia, `sec:${s.id}:midia`) : ''
-  return `<div class="lp-container"><div class="lp-benef${midia ? '' : ' sozinho'}">${texto}${midia}</div></div>`
-}
-
-function lBlocosAlternados(ctx: Ctx, s: LpSecao): string {
-  const blocos = s.itens
-    .map((i) => {
-      const img = i.imagem ? htmlMidia(ctx, i.imagem, itemAlvo(s, i.id, 'imagem')) : ''
-      const botao = i.botao ? htmlBotao(ctx, i.botao, itemAlvo(s, i.id, 'botao')) : ''
-      return `<div class="lp-bloco lp-reveal"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}><div class="lp-bloco-texto">${textoItem(ctx, s, i.id, 'titulo', i.titulo, 'h3', 'lp-bloco-titulo')}${textoItem(ctx, s, i.id, 'texto', i.texto, 'p', 'lp-bloco-corpo')}${botao}</div>${img}</div>`
-    })
-    .join('')
-  // `inv` troca de qual lado a alternancia comeca (1o bloco com a midia a esquerda).
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-blocos${s.inverter ? ' inv' : ''}">${blocos}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lTabs(ctx: Ctx, s: LpSecao): string {
-  const nav = s.itens
-    .map(
-      (i, n) => `<button type="button" class="${n === 0 ? 'ativo' : ''}" data-tab="${n}"${alvo(ctx, itemAlvo(s, i.id, 'titulo'))}>${quebras(i.titulo ?? `Aba ${n + 1}`)}</button>`,
-    )
-    .join('')
-  const paineis = s.itens
-    .map((i, n) => {
-      const img = i.imagem ? htmlMidia(ctx, i.imagem, itemAlvo(s, i.id, 'imagem')) : ''
-      return `<div class="lp-tab-painel${n === 0 ? ' ativo' : ''}${img ? '' : ' sozinho'}" data-painel="${n}"${alvo(ctx, itemAlvo(s, i.id, 'sel'))}><div>${textoItem(ctx, s, i.id, 'texto', i.texto, 'p', 'lp-tab-texto')}</div>${img}</div>`
-    })
-    .join('')
-  return `<div class="lp-container">${cabeca(ctx, s)}<div class="lp-tabs"><div class="lp-tabs-nav">${nav}</div>${paineis}</div>${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
-function lCarrossel(ctx: Ctx, s: LpSecao): string {
-  const slides = s.itens.map((i) => {
-    const img = i.imagem ? htmlMidia(ctx, i.imagem, itemAlvo(s, i.id, 'imagem')) : ''
-    return `<div${alvo(ctx, itemAlvo(s, i.id, 'sel'))}>${img}${textoItem(ctx, s, i.id, 'titulo', i.titulo, 'h3', 'lp-slide-titulo')}${textoItem(ctx, s, i.id, 'texto', i.texto, 'p', 'lp-slide-texto')}</div>`
-  })
-  return `<div class="lp-container lp-carrossel">${cabeca(ctx, s)}${slider(slides, 'slide')}${acaoSecao(ctx, s, 'centro')}</div>`
-}
-
 /* ------------------------------ montagem --------------------------------- */
 
+/**
+ * A secao e a moldura: fundo, veu, espacamento e largura. O conteudo vem todo da
+ * arvore — as 21 funcoes de layout que existiam aqui foram substituidas pelo
+ * renderizador recursivo.
+ */
 function htmlSecao(ctx: Ctx, s: LpSecao, idHtml: string): string {
-  const corpo: Record<string, () => string> = {
-    hero: () => lHero(ctx, s),
-    'texto-midia': () => lTextoMidia(ctx, s),
-    'texto-centralizado': () => lTextoCentralizado(ctx, s),
-    cards: () => lCards(ctx, s),
-    galeria: () => lGaleria(ctx, s),
-    masonry: () => lGaleria(ctx, s, true),
-    timeline: () => lTimeline(ctx, s),
-    faq: () => lFaq(ctx, s),
-    depoimentos: () => lDepoimentos(ctx, s),
-    logos: () => lLogos(ctx, s),
-    estatisticas: () => lEstatisticas(ctx, s),
-    cta: () => lCta(ctx, s),
-    banner: () => lBanner(ctx, s),
-    formulario: () => lFormulario(ctx, s),
-    precos: () => lPrecos(ctx, s),
-    comparacao: () => lComparacao(ctx, s),
-    'grid-produtos': () => lGridProdutos(ctx, s),
-    'lista-beneficios': () => lListaBeneficios(ctx, s),
-    'blocos-alternados': () => lBlocosAlternados(ctx, s),
-    tabs: () => lTabs(ctx, s),
-    carrossel: () => lCarrossel(ctx, s),
-  }
-
   const estilos: string[] = []
   if (s.espacamento) {
     estilos.push(`--pt:${s.espacamento.topo}px`, `--pb:${s.espacamento.base}px`)
   }
   if (s.fundo?.cor) estilos.push(`--fundo-secao:${escCss(s.fundo.cor)}`)
 
-  // Banner usa a midia da secao como fundo; hero tambem aceita fundo.midia.
-  const midiaFundo = s.tipo === 'banner' ? (s.midia ?? s.fundo?.midia) : s.fundo?.midia
+  const midiaFundo = s.fundo?.midia
   let fundo = ''
   if (midiaFundo) {
     const veu = s.fundo?.escurecer ?? 55
     estilos.push(`--veu:${(veu / 100).toFixed(2)}`)
     const urlFundo = urlMidia(ctx, midiaFundo)
-    fundo = `<div class="lp-fundo-midia"${alvo(ctx, s.tipo === 'banner' && s.midia ? `sec:${s.id}:midia` : `sec:${s.id}:fundo`)}>${
+    fundo = `<div class="lp-fundo-midia"${alvo(ctx, `sec:${s.id}:fundo`)}>${
       midiaFundo.tipo === 'video' && !urlFundo.startsWith('data:image')
         ? `<video src="${esc(urlFundo)}"${posterDe(ctx, midiaFundo)} ${atributosVideoFundo(midiaFundo)}></video>`
         : `<img src="${esc(urlFundo)}" alt="">`
     }</div><div class="lp-veu"></div>`
   }
 
-  const classes = ['lp-secao', `lp-sec-${s.tipo}`]
-  if (s.tipo === 'hero') classes.push('lp-hero')
-  if (s.tipo === 'hero' && (s.fundo?.midia || !s.midia)) classes.push('centrado')
-  // Hero com midia ao lado: `inv` troca os lados (no centrado nao ha o que trocar).
-  if (s.tipo === 'hero' && s.inverter) classes.push('inv')
+  const classes = ['lp-secao']
   // Texto branco sobre a midia e o padrao (contraste); quem desmarcou fica com
   // as cores do tema — as que o usuario escolheu na Identidade.
   if (midiaFundo && s.fundo?.textoClaro !== false) classes.push('lp-sobre-midia')
@@ -366,11 +71,10 @@ function htmlSecao(ctx: Ctx, s: LpSecao, idHtml: string): string {
 
   const estilo = estilos.length > 0 ? ` style="${estilos.join(';')}"` : ''
   const nomeEditor = ctx.modo === 'editor' ? ` data-lp-nome="${esc(s.nome)}"` : ''
-  // Secao migrada renderiza a arvore; a sem `raiz` segue no layout tipado, que
-  // e o que todo documento salvo ainda e.
-  const interno = s.raiz
-    ? `<div class="lp-container">${renderElemento(ctx, s.raiz)}</div>`
-    : (corpo[s.tipo]?.() ?? '')
+  // Secao sem raiz sai como moldura vazia em vez de derrubar a pagina: todo
+  // documento passa pela migracao ou pela geracao, entao isso nao deveria
+  // acontecer — mas se acontecer, o resto da pagina continua de pe.
+  const interno = s.raiz ? `<div class="lp-container">${renderElemento(ctx, s.raiz)}</div>` : ''
   return `<section id="${esc(idHtml)}" class="${classes.join(' ')}"${estilo}${alvo(ctx, `sec:${s.id}`)}${nomeEditor}>${fundo}${interno}</section>`
 }
 
