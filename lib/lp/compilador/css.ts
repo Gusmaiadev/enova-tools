@@ -249,7 +249,14 @@ const POR_WIDGET: Record<string, string> = {
  * dependerem dos layouts, que somem quando a migracao terminar.
  */
 const APARENCIAS = `
-.lp-c{min-width:0}
+/* Espacamento padrao da arvore. O CSS por layout, que saiu com a migracao,
+   trazia margem propria em cada elemento (.lp-tm h2, .lp-hero p.lp-texto…);
+   sem um padrao aqui os elementos saem colados.
+
+   Vem antes do CSS gerado e com uma classe so de especificidade, entao o valor
+   que o usuario definir no painel (.lp-e-<id>) vence por ordem. */
+.lp-c{min-width:0;gap:15px}
+.lp-c > *{margin-block:10px}
 .lp-ap-card{display:flex;flex-direction:column;background:color-mix(in srgb,var(--cor-titulos) 4%,transparent);border:1px solid color-mix(in srgb,var(--cor-titulos) 10%,transparent);border-radius:var(--raio);padding:32px 28px;transition:transform .25s,box-shadow .25s}
 .lp-ap-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px -24px color-mix(in srgb,var(--cor-principal) 45%,transparent)}
 .lp-ap-plano{display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--cor-titulos) 12%,transparent);border-radius:var(--raio);padding:36px 30px;background:color-mix(in srgb,var(--cor-titulos) 3%,transparent)}

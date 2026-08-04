@@ -152,3 +152,43 @@ describe('cssDaArvore — estilo', () => {
     expect(desktop).toContain('.lp-e-neto{color:#00ff00}')
   })
 })
+
+describe('espaçamento padrão da árvore', () => {
+  it('o CSS base dá gap ao container e margem vertical aos elementos', async () => {
+    const { compilarCss } = await import('./css')
+    const { documentoBase } = await import('../documento')
+    const { briefingVazio } = await import('../tipos')
+    const css = compilarCss(documentoBase(briefingVazio('Teste')), new Map())
+    expect(css).toContain('.lp-c{min-width:0;gap:15px}')
+    expect(css).toContain('.lp-c > *{margin-block:10px}')
+  })
+
+  it('gap do container vence o padrão, porque sai depois', async () => {
+    const { compilarCss } = await import('./css')
+    const { documentoBase } = await import('../documento')
+    const { briefingVazio } = await import('../tipos')
+    const base = documentoBase(briefingVazio('Teste'))
+    const doc = {
+      ...base,
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'cta' as const,
+          nome: 'X',
+          ancora: null,
+          itens: [],
+          largura: 'boxed' as const,
+          raiz: {
+            id: 'r',
+            tipo: 'container' as const,
+            direcao: { desktop: 'coluna' as const },
+            gap: { desktop: 40 },
+            filhos: [],
+          },
+        },
+      ],
+    }
+    const css = compilarCss(doc, new Map([['s1', 'x']]))
+    expect(css.indexOf('.lp-c{min-width:0;gap:15px}')).toBeLessThan(css.indexOf('gap:40px'))
+  })
+})
