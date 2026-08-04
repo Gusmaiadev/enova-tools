@@ -993,18 +993,36 @@ describe('links úteis do rodapé', () => {
     expect(rodape).not.toContain('>Contato<')
   })
 
-  it('links úteis repetidos entre si também saem uma vez só', () => {
+  it('o link repetido só some quando o rótulo também é o mesmo', () => {
     const { html } = compilarDoc(
       comRodape(
         [
           { id: 'l1', rotulo: 'Contato', url: '#contato' },
           { id: 'l2', rotulo: 'Fale conosco', url: '#contato' },
+          { id: 'l3', rotulo: 'Contato', url: '#contato' },
         ],
         false,
       ),
     )
     const rodape = html.slice(html.indexOf('lp-footer'))
-    expect((rodape.match(/href="#contato"/g) ?? []).length).toBe(1)
+    // Dois nomes diferentes são dois links; a terceira entrada é cópia da 1ª.
+    expect((rodape.match(/href="#contato"/g) ?? []).length).toBe(2)
+    expect(rodape).toContain('>Fale conosco<')
+  })
+
+  it('itens de menu que caem todos em #topo continuam saindo todos', () => {
+    // montarMenu dá "#topo" a todo item que não achou seção correspondente —
+    // deduplicar por destino deixava o rodapé com um link só.
+    const doc = comRodape([], true)
+    doc.header.menu = [
+      { id: 'm1', rotulo: 'Início', alvo: '#topo' },
+      { id: 'm2', rotulo: 'Serviços', alvo: '#topo' },
+      { id: 'm3', rotulo: 'Sobre', alvo: '#topo' },
+    ]
+    const { html } = compilarDoc(doc)
+    const rodape = html.slice(html.indexOf('lp-footer'))
+    expect((rodape.match(/href="#topo"/g) ?? []).length).toBe(3)
+    for (const r of ['Início', 'Serviços', 'Sobre']) expect(rodape).toContain(`>${r}<`)
   })
 })
 

@@ -124,12 +124,15 @@ function htmlFooter(ctx: Ctx, doc: LpDocumento): string {
    * "Links uteis" e a soma dos links do rodape com o menu do header, quando o
    * usuario pede para repeti-lo.
    *
-   * Deduplicado por DESTINO: a IA costuma escrever em `linksUteis` os mesmos
-   * itens que ja estao no menu, e sem isto ligar "repetir o menu" mostrava cada
-   * um duas vezes. O mesmo destino aparecer duas vezes na mesma lista e sempre
-   * erro, venha o par de onde vier.
+   * Deduplicado por ROTULO + DESTINO: a IA costuma escrever em `linksUteis` os
+   * mesmos itens que ja estao no menu, e sem isto ligar "repetir o menu"
+   * mostrava cada um duas vezes.
+   *
+   * So o destino nao serve de chave: item de menu que nao achou secao
+   * correspondente cai em "#topo" (montarMenu), entao varios itens diferentes
+   * dividem o mesmo destino e o rodape ficava com um link so.
    */
-  const destinos = new Set<string>()
+  const vistos = new Set<string>()
   const links = linksUteisOrdenados(
     [
       ...f.linksUteis.map((l) => ({ rotulo: l.rotulo, url: l.url })),
@@ -137,9 +140,11 @@ function htmlFooter(ctx: Ctx, doc: LpDocumento): string {
         ? doc.header.menu.map((m) => ({ rotulo: m.rotulo, url: m.alvo }))
         : []),
     ].filter((l) => {
-      const chave = href(ctx, l.url).trim().toLowerCase()
-      if (chave === '' || destinos.has(chave)) return false
-      destinos.add(chave)
+      const destino = href(ctx, l.url).trim().toLowerCase()
+      if (destino === '') return false
+      const chave = `${l.rotulo.trim().toLowerCase()}|${destino}`
+      if (vistos.has(chave)) return false
+      vistos.add(chave)
       return true
     }),
   )
