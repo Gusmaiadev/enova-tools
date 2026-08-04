@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   LayoutList,
+  Laptop,
   Monitor,
   Palette,
   PanelLeftClose,
@@ -51,20 +52,77 @@ import type {
 } from '@/lib/lp/tipos'
 import { PAGINAS_LEGAIS, infoPagina } from '@/lib/lp/tipos'
 
-type Dispositivo = 'desktop' | 'tablet' | 'mobile'
 type Aba = 'estrutura' | 'editar' | 'tema'
 
-const LARGURAS: Record<Dispositivo, string> = {
-  desktop: '100%',
-  tablet: '834px',
-  mobile: '390px',
-}
+/**
+ * Telas da PRÉVIA — não confundir com o `Dispositivo` de tipos.ts, que são os
+ * três breakpoints do CSS (base, ≤900px, ≤640px). Aqui são só larguras de
+ * simulação, e várias caem no mesmo breakpoint.
+ *
+ * `regra` diz em qual delas a largura cai — é o que o tooltip mostra. Sem isso,
+ * escolher "tablet deitado" (1024px) e ver os estilos de computador parece bug:
+ * é o CSS certo, porque 1024 não é ≤900.
+ */
+type Previa =
+  | 'desktop'
+  | 'notebook'
+  | 'tablet-deitado'
+  | 'tablet'
+  | 'celular-deitado'
+  | 'celular'
 
-const DISPOSITIVOS: { chave: Dispositivo; rotulo: string; icone: typeof Monitor }[] = [
-  { chave: 'desktop', rotulo: 'Computador', icone: Monitor },
-  { chave: 'tablet', rotulo: 'Tablet', icone: Tablet },
-  { chave: 'mobile', rotulo: 'Celular', icone: Smartphone },
+const TELAS: {
+  chave: Previa
+  nome: string
+  largura: string
+  /** Breakpoint do CSS em que essa largura cai. */
+  regra: 'Computador' | 'Tablet' | 'Celular'
+  icone: typeof Monitor
+  /** Ícone girado 90° representa a tela deitada. */
+  deitado?: boolean
+}[] = [
+  { chave: 'desktop', nome: 'Computador', largura: '100%', regra: 'Computador', icone: Monitor },
+  {
+    chave: 'notebook',
+    nome: 'Notebook · 1366px',
+    largura: '1366px',
+    regra: 'Computador',
+    icone: Laptop,
+  },
+  {
+    chave: 'tablet-deitado',
+    nome: 'Tablet deitado · 1024px',
+    largura: '1024px',
+    regra: 'Computador',
+    icone: Tablet,
+    deitado: true,
+  },
+  {
+    chave: 'tablet',
+    nome: 'Tablet em pé · 834px',
+    largura: '834px',
+    regra: 'Tablet',
+    icone: Tablet,
+  },
+  {
+    chave: 'celular-deitado',
+    nome: 'Celular deitado · 844px',
+    largura: '844px',
+    regra: 'Tablet',
+    icone: Smartphone,
+    deitado: true,
+  },
+  {
+    chave: 'celular',
+    nome: 'Celular em pé · 390px',
+    largura: '390px',
+    regra: 'Celular',
+    icone: Smartphone,
+  },
 ]
+
+/** Rótulo completo: o tamanho e qual conjunto de estilos vale nele. */
+const rotuloTela = (t: (typeof TELAS)[number]) => `${t.nome} — usa os estilos de ${t.regra}`
 
 const ABAS: { chave: Aba; rotulo: string; icone: typeof LayoutList }[] = [
   { chave: 'estrutura', rotulo: 'Estrutura', icone: LayoutList },
@@ -92,7 +150,7 @@ export function EditorLp({
   const [doc, setDocEstado] = useState<LpDocumento>(projeto.documento)
   const [srcDoc, setSrcDoc] = useState(() => compilarEditor(projeto.documento))
   const [aba, setAba] = useState<Aba>('estrutura')
-  const [dispositivo, setDispositivo] = useState<Dispositivo>('desktop')
+  const [tela, setTela] = useState<Previa>('desktop')
   const [secaoId, setSecaoId] = useState<string | null>(null)
   // Nó da árvore selecionado no canvas (formato novo).
   const [noId, setNoId] = useState<string | null>(null)
@@ -467,19 +525,24 @@ export function EditorLp({
           </button>
         </div>
 
-        <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5">
-          {DISPOSITIVOS.map((d) => (
+        <div
+          role="group"
+          aria-label="Tamanho da prévia"
+          className="flex items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5"
+        >
+          {TELAS.map((t) => (
             <button
-              key={d.chave}
+              key={t.chave}
               type="button"
-              onClick={() => setDispositivo(d.chave)}
-              aria-label={d.rotulo}
-              title={d.rotulo}
+              onClick={() => setTela(t.chave)}
+              aria-label={rotuloTela(t)}
+              aria-pressed={tela === t.chave}
+              title={rotuloTela(t)}
               className={`rounded p-1.5 transition-colors ${
-                dispositivo === d.chave ? 'bg-blue text-white' : 'text-text-dim hover:text-text'
+                tela === t.chave ? 'bg-blue text-white' : 'text-text-dim hover:text-text'
               }`}
             >
-              <d.icone className="h-4 w-4" />
+              <t.icone className={`h-4 w-4 ${t.deitado ? 'rotate-90' : ''}`} />
             </button>
           ))}
         </div>
@@ -626,7 +689,7 @@ export function EditorLp({
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <div
               className="mx-auto h-full bg-white shadow-2xl transition-[width] duration-300"
-              style={{ width: LARGURAS[dispositivo], maxWidth: '100%' }}
+              style={{ width: TELAS.find((t) => t.chave === tela)?.largura ?? '100%', maxWidth: '100%' }}
             >
               <iframe
                 ref={iframeRef}
