@@ -59,12 +59,10 @@ export function CamposAvancado({
   no,
   mutarNo,
   dispositivo,
-  aoTrocarDispositivo,
 }: {
   no: LpElemento
   mutarNo: MutarNo
   dispositivo: Dispositivo
-  aoTrocarDispositivo: (d: Dispositivo) => void
 }) {
   const e: LpEstilo = no.estilo ?? {}
   const mudar = (patch: (est: LpEstilo) => void, agrupar?: string) =>
@@ -80,7 +78,6 @@ export function CamposAvancado({
         rotulo="Margem"
         valor={e.margem}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         rotuloHerdado="padrão"
       >
         <CamposCaixa
@@ -96,7 +93,6 @@ export function CamposAvancado({
         rotulo="Espaçamento interno"
         valor={e.padding}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         rotuloHerdado="padrão"
       >
         <CamposCaixa
@@ -110,7 +106,6 @@ export function CamposAvancado({
         rotulo="Largura"
         valor={e.largura}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         rotuloHerdado="automática"
       >
         <input

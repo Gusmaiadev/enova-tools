@@ -14,7 +14,6 @@ type Props = {
   lpId: string
   mutarNo: MutarNo
   dispositivo: Dispositivo
-  aoTrocarDispositivo: (d: Dispositivo) => void
 }
 
 const APARENCIAS: { valor: Aparencia | ''; rotulo: string }[] = [
@@ -31,7 +30,7 @@ const APARENCIAS: { valor: Aparencia | ''; rotulo: string }[] = [
 ]
 
 /** Aba "Conteúdo" dos widgets simples e do container. */
-export function CamposConteudo({ no, lpId, mutarNo, dispositivo, aoTrocarDispositivo }: Props) {
+export function CamposConteudo({ no, lpId, mutarNo, dispositivo }: Props) {
   switch (no.tipo) {
     case 'titulo':
       return (
@@ -173,7 +172,6 @@ export function CamposConteudo({ no, lpId, mutarNo, dispositivo, aoTrocarDisposi
           rotulo="Altura"
           valor={no.altura}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
         >
           <Faixa
             rotulo=""
@@ -201,7 +199,6 @@ export function CamposConteudo({ no, lpId, mutarNo, dispositivo, aoTrocarDisposi
             rotulo="Direção"
             valor={no.direcao}
             ativo={dispositivo}
-            aoTrocar={aoTrocarDispositivo}
           >
             <Opcoes<'linha' | 'coluna'>
               aria="Direção do container"
@@ -224,7 +221,6 @@ export function CamposConteudo({ no, lpId, mutarNo, dispositivo, aoTrocarDisposi
             rotulo="Colunas"
             valor={no.colunas}
             ativo={dispositivo}
-            aoTrocar={aoTrocarDispositivo}
           >
             <Faixa
               rotulo=""
@@ -244,7 +240,6 @@ export function CamposConteudo({ no, lpId, mutarNo, dispositivo, aoTrocarDisposi
             rotulo="Espaço entre itens"
             valor={no.gap}
             ativo={dispositivo}
-            aoTrocar={aoTrocarDispositivo}
             rotuloHerdado="padrão"
             aoLimpar={() =>
               mutarNo((el) => {

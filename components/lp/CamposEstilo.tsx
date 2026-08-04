@@ -14,18 +14,8 @@ type Props = {
   tema: LpTema
   mutarNo: MutarNo
   dispositivo: Dispositivo
-  aoTrocarDispositivo: (d: Dispositivo) => void
 }
 
-/**
- * Aba "Estilo": as sobreposições que valem para qualquer nó.
- *
- * Cada campo mostra o valor EFETIVO — o que a página está usando. Sem override,
- * o que aparece é o do tema (o que o usuário definiu na Identidade), marcado
- * como "do tema". Mostrar não grava: o override só nasce quando ele mexe no
- * campo, senão cada elemento congelaria uma cópia e pararia de acompanhar o
- * tema quando a Identidade mudasse.
- */
 const PROPORCOES: { valor: string; rotulo: string }[] = [
   { valor: '', rotulo: 'Original' },
   { valor: '16/9', rotulo: '16:9 — vídeo panorâmico' },
@@ -36,7 +26,18 @@ const PROPORCOES: { valor: string; rotulo: string }[] = [
   { valor: '21/9', rotulo: '21:9 — cinema' },
 ]
 
-export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositivo }: Props) {
+/**
+ * Aba "Estilo": as sobreposições que valem para qualquer nó.
+ *
+ * Cada campo mostra o valor EFETIVO — o que a página está usando. Sem override,
+ * o que aparece é o do tema (o que o usuário definiu na Identidade), marcado
+ * como "do tema". Mostrar não grava: o override só nasce quando ele mexe no
+ * campo, senão cada elemento congelaria uma cópia e pararia de acompanhar o
+ * tema quando a Identidade mudasse.
+ *
+ * Qual dispositivo cada campo escreve vem do seletor único, no topo do painel.
+ */
+export function CamposEstilo({ no, tema, mutarNo, dispositivo }: Props) {
   const e: LpEstilo = no.estilo ?? {}
   const herdado = estiloHerdado(no, tema)
   const ehMidia = no.tipo === 'imagem' || no.tipo === 'video'
@@ -73,7 +74,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Largura do bloco"
           valor={e.largura}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('largura')}
           rotuloHerdado="ocupa tudo"
         >
@@ -94,7 +94,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
             rotulo="Largura das colunas"
             valor={no.proporcaoColunas}
             ativo={dispositivo}
-            aoTrocar={aoTrocarDispositivo}
             rotuloHerdado="iguais"
             aoLimpar={() =>
               mutarNo((el) => {
@@ -137,7 +136,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Cor de fundo"
           valor={e.fundo}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('fundo')}
           rotuloHerdado="sem fundo"
         >
@@ -153,7 +151,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Cantos"
           valor={e.raio}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('raio')}
         >
           <Faixa
@@ -183,7 +180,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Largura"
           valor={e.largura}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('largura')}
           rotuloHerdado="automática"
         >
@@ -203,7 +199,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Proporção"
           valor={e.proporcao}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('proporcao')}
           rotuloHerdado="original"
         >
@@ -228,7 +223,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Altura"
           valor={e.altura}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('altura')}
           rotuloHerdado="pela proporção"
         >
@@ -248,7 +242,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Encaixe"
           valor={e.ajuste}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('ajuste')}
           rotuloHerdado="cobrir"
         >
@@ -273,7 +266,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Alinhamento"
           valor={e.alinhamento}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('alinhamento')}
           rotuloHerdado="ocupa a largura"
         >
@@ -295,7 +287,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
           rotulo="Cantos"
           valor={e.raio}
           ativo={dispositivo}
-          aoTrocar={aoTrocarDispositivo}
           aoLimpar={limpar('raio')}
         >
           <Faixa
@@ -316,7 +307,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Cor do texto"
         valor={e.cor}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('cor')}
       >
         <Cor
@@ -332,7 +322,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Cor de fundo"
         valor={e.fundo}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('fundo')}
       >
         <Cor
@@ -348,7 +337,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Fonte"
         valor={e.fonte}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('fonte')}
       >
         <Fonte
@@ -364,7 +352,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Tamanho"
         valor={e.tamanho}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('tamanho')}
       >
         <input
@@ -381,7 +368,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Peso"
         valor={e.peso}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('peso')}
       >
         <Faixa
@@ -399,7 +385,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Altura da linha"
         valor={e.alturaLinha}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('alturaLinha')}
       >
         <input
@@ -418,7 +403,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Espaçamento das letras"
         valor={e.espacamentoLetras}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('espacamentoLetras')}
       >
         <input
@@ -437,7 +421,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Alinhamento"
         valor={e.alinhamento}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('alinhamento')}
       >
         <Opcoes<'left' | 'center' | 'right'>
@@ -456,7 +439,6 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         rotulo="Cantos"
         valor={e.raio}
         ativo={dispositivo}
-        aoTrocar={aoTrocarDispositivo}
         aoLimpar={limpar('raio')}
       >
         <Faixa

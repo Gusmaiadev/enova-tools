@@ -5,6 +5,7 @@ import { CamposAvancado } from './CamposAvancado'
 import { CamposConteudo } from './CamposConteudo'
 import { CamposEstilo } from './CamposEstilo'
 import { CamposLista } from './CamposLista'
+import { SeletorDispositivo } from './PorDispositivo'
 import { Vazio } from './campos'
 import { acharNo } from '@/lib/lp/arvore'
 import type { Dispositivo, LpContainer, LpDocumento, LpElemento } from '@/lib/lp/tipos'
@@ -114,7 +115,7 @@ export function PainelWidget({
     }, agrupar)
 
   const trilha = caminhoAte(secao.raiz, noId)
-  const comuns = { no, mutarNo, dispositivo, aoTrocarDispositivo }
+  const comuns = { no, mutarNo, dispositivo }
 
   return (
     <div className="space-y-3">
@@ -157,6 +158,10 @@ export function PainelWidget({
           </button>
         ))}
       </div>
+
+      {/* Um seletor para o painel inteiro. Antes cada campo tinha o seu, e a
+          coluna virava seis botões repetidos dez vezes. */}
+      <SeletorDispositivo ativo={dispositivo} aoTrocar={aoTrocarDispositivo} />
 
       {aba === 'conteudo' &&
         (COM_LISTA.has(no.tipo) ? (

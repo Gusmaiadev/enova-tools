@@ -35,15 +35,55 @@ export function definir<T>(
 }
 
 /**
- * Envolve um controle e escolhe em qual dispositivo o valor é escrito. O ponto
- * marca os dispositivos que já têm valor próprio — sem ele não há como saber que
- * o celular está diferente sem clicar em cada aba.
+ * Seletor de dispositivo do painel. Aparece UMA vez, no topo — antes ele era
+ * repetido em cada campo, o que enchia a coluna de seis botões dez vezes.
+ */
+export function SeletorDispositivo({
+  ativo,
+  aoTrocar,
+}: {
+  ativo: Dispositivo
+  aoTrocar: (d: Dispositivo) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-2/60 px-2 py-1.5">
+      <span className="text-[11px] text-text-dim">Editando</span>
+      <div
+        role="group"
+        aria-label="Dispositivo que os campos abaixo editam"
+        className="flex gap-0.5"
+      >
+        {DISPOSITIVOS.map((d) => {
+          const Icone = ICONES[d]
+          return (
+            <button
+              key={d}
+              type="button"
+              onClick={() => aoTrocar(d)}
+              aria-label={NOME_DISPOSITIVO[d]}
+              aria-pressed={ativo === d}
+              title={NOME_DISPOSITIVO[d]}
+              className={`rounded p-1 transition-colors ${
+                ativo === d ? 'bg-blue text-white' : 'text-text-dim hover:text-text'
+              }`}
+            >
+              <Icone className={`h-3.5 w-3.5 ${DEITADO.has(d) ? 'rotate-90' : ''}`} />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Envolve um controle e diz de onde vem o valor dele no dispositivo ativo. Quem
+ * escolhe o dispositivo é o SeletorDispositivo, no topo do painel.
  */
 export function PorDispositivo<T>({
   rotulo,
   valor,
   ativo,
-  aoTrocar,
   aoLimpar,
   rotuloHerdado = 'do tema',
   children,
@@ -51,7 +91,6 @@ export function PorDispositivo<T>({
   rotulo: string
   valor: PorDisp<T> | undefined
   ativo: Dispositivo
-  aoTrocar: (d: Dispositivo) => void
   /** Devolve o campo ao valor herdado. Sem isto, não aparece o botão. */
   aoLimpar?: () => void
   /** De onde vem o valor quando não há override — "do tema" só vale para o que
@@ -63,60 +102,38 @@ export function PorDispositivo<T>({
   // sem essa marca, o usuário não distingue o que ele mexeu do que veio da
   // Identidade, e não sabe o que o botão de limpar vai desfazer.
   const proprio = valor?.[ativo] !== undefined
+  // Sem o seletor em cada campo, este contador é o que resta avisando que o
+  // campo está diferente em OUTRA tela — a informação que os pontinhos davam.
+  const outros = DISPOSITIVOS.filter((d) => d !== ativo && valor?.[d] !== undefined)
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-baseline gap-1.5 text-sm text-text-dim">
-          {rotulo}
-          {proprio ? (
-            aoLimpar && (
-              <button
-                type="button"
-                onClick={aoLimpar}
-                title="Voltar ao valor do tema"
-                className="text-[11px] text-blue underline-offset-2 hover:underline"
-              >
-                próprio ✕
-              </button>
-            )
-          ) : (
-            <span className="text-[11px] opacity-60">{rotuloHerdado}</span>
-          )}
-        </span>
-        <div
-          role="group"
-          aria-label={`Dispositivo de "${rotulo}"`}
-          className="flex gap-0.5 rounded border border-border bg-surface-2 p-0.5"
-        >
-          {DISPOSITIVOS.map((d) => {
-            const Icone = ICONES[d]
-            const proprio = valor?.[d] !== undefined
-            return (
-              <button
-                key={d}
-                type="button"
-                onClick={() => aoTrocar(d)}
-                aria-label={NOME_DISPOSITIVO[d]}
-                aria-pressed={ativo === d}
-                title={proprio ? `${NOME_DISPOSITIVO[d]} — valor próprio` : NOME_DISPOSITIVO[d]}
-                className={`relative rounded p-1 transition-colors ${
-                  ativo === d ? 'bg-blue text-white' : 'text-text-dim hover:text-text'
-                }`}
-              >
-                <Icone className={`h-3.5 w-3.5 ${DEITADO.has(d) ? 'rotate-90' : ''}`} />
-                {proprio && (
-                  <span
-                    aria-hidden
-                    className={`absolute right-0.5 top-0.5 h-1 w-1 rounded-full ${
-                      ativo === d ? 'bg-white' : 'bg-blue'
-                    }`}
-                  />
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      <span className="flex items-baseline gap-1.5 text-sm text-text-dim">
+        {rotulo}
+        {proprio ? (
+          aoLimpar && (
+            <button
+              type="button"
+              onClick={aoLimpar}
+              title="Voltar ao valor herdado"
+              className="text-[11px] text-blue underline-offset-2 hover:underline"
+            >
+              próprio ✕
+            </button>
+          )
+        ) : (
+          <span className="text-[11px] opacity-60">{rotuloHerdado}</span>
+        )}
+        {outros.length > 0 && (
+          <span
+            className="text-[11px] text-blue/70"
+            title={`Também tem valor próprio em: ${outros
+              .map((d) => NOME_DISPOSITIVO[d])
+              .join(', ')}`}
+          >
+            +{outros.length}
+          </span>
+        )}
+      </span>
       {children}
     </div>
   )
