@@ -891,3 +891,59 @@ describe('compilador com árvore', () => {
     expect(compilarJs(doc, 'export')).toContain('lp-slider-trilho')
   })
 })
+
+describe('menu hambúrguer', () => {
+  const comMenu = (menuMobile?: LpDocumento['header']['menuMobile']) => {
+    const doc = docCom([novaSecao('cta')])
+    doc.header.menu = [{ id: 'm1', rotulo: 'Início', alvo: '#topo' }]
+    if (menuMobile) doc.header.menuMobile = menuMobile
+    return doc
+  }
+
+  it('sem ajuste, vira hambúrguer no tablet — como sempre foi', () => {
+    const { css, html } = compilarDoc(comMenu())
+    expect(css).toContain('@media (max-width:900px){\n.lp-menu-btn{display:block}')
+    expect(html).toContain('class="lp-menu-btn"')
+  })
+
+  it('o breakpoint escolhido manda', () => {
+    const { css } = compilarDoc(comMenu({ apartirDe: 'tabletDeitado' }))
+    expect(css).toContain('@media (max-width:1200px){\n.lp-menu-btn{display:block}')
+    expect(css).not.toContain('@media (max-width:900px){\n.lp-menu-btn')
+  })
+
+  it('o ícone escolhido sai no botão', () => {
+    const { html } = compilarDoc(comMenu({ icone: 'menu-duplo' }))
+    // menu-duplo tem duas linhas; o padrão tem três.
+    expect((html.match(/<line[^>]*y1="9"/g) ?? []).length).toBeGreaterThan(0)
+  })
+
+  /** coergirDocumento devolve null sem nenhuma seção válida — daí a seção aqui. */
+  const coagirCom = (menuMobile: Record<string, unknown>) =>
+    coergirDocumento({
+      header: { logoTexto: 'X', menu: [], menuMobile },
+      secoes: [{ id: 's1', tipo: 'cta', nome: 'X', titulo: 'Oi' }],
+    })
+
+  it('ícone fora do catálogo não vira SVG arbitrário', () => {
+    expect(coagirCom({ icone: '"><script>' })?.header.menuMobile?.icone).toBeUndefined()
+    // E um do catálogo passa — senão o teste acima passaria por vacuidade.
+    expect(coagirCom({ icone: 'menu-duplo' })?.header.menuMobile?.icone).toBe('menu-duplo')
+  })
+
+  it('cor e fundo passam por corSegura', () => {
+    const doc = coagirCom({ cor: 'red;}body{display:none', fundo: '#101828' })
+    expect(doc?.header.menuMobile?.cor).toBe('#111318')
+    expect(doc?.header.menuMobile?.fundo).toBe('#101828')
+  })
+
+  it('breakpoint fora da lista é descartado', () => {
+    expect(coagirCom({ apartirDe: 'relogio' })?.header.menuMobile?.apartirDe).toBeUndefined()
+    expect(coagirCom({ apartirDe: 'celular' })?.header.menuMobile?.apartirDe).toBe('celular')
+  })
+
+  it('alinhamento da gaveta vira align-items', () => {
+    const { css } = compilarDoc(comMenu({ alinhamento: 'centro' }))
+    expect(css).toContain('.lp-nav ul{flex-direction:column;align-items:center')
+  })
+})

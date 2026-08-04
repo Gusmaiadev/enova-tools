@@ -15,6 +15,7 @@ import type {
   AnimacaoBotao,
   BotaoComId,
   CampoTextoSecao,
+  Dispositivo,
   EstiloBarra,
   FonteMidia,
   HoverBotao,
@@ -26,6 +27,7 @@ import type {
   LpMidia,
   LpSecao,
   LpTema,
+  MenuMobile,
   Orientacao,
   PaginaLegal,
   TipoPaginaLegal,
@@ -126,6 +128,28 @@ function coergirEstiloBarra(v: unknown): EstiloBarra | undefined {
     estilo.alinhamento = e.alinhamento as Alinhamento
   }
   return Object.keys(estilo).length > 0 ? estilo : undefined
+}
+
+/**
+ * Menu do celular. `apartirDe` vira breakpoint no CSS e o icone vira SVG, entao
+ * so passam valores dos catalogos — o resto cai no padrao.
+ */
+function coergirMenuMobile(v: unknown): MenuMobile | undefined {
+  const m = obj(v)
+  const menu: MenuMobile = {}
+  if (DISPOSITIVOS.includes(m.apartirDe as Dispositivo)) {
+    menu.apartirDe = m.apartirDe as Dispositivo
+  }
+  const icone = str(m.icone, 40)
+  if (icone && ICONES[icone]) menu.icone = icone
+  const cor = opcional(m.cor, 40)
+  if (cor) menu.cor = corSegura(cor, '#111318')
+  const fundo = opcional(m.fundo, 40)
+  if (fundo) menu.fundo = corSegura(fundo, '#ffffff')
+  if (ALINHAMENTOS.includes(m.alinhamento as Alinhamento)) {
+    menu.alinhamento = m.alinhamento as Alinhamento
+  }
+  return Object.keys(menu).length > 0 ? menu : undefined
 }
 
 /**
@@ -658,6 +682,7 @@ export function coergirDocumento(bruto: unknown, temaBase: LpTema = TEMA_PADRAO)
   const logoTexto = strOu(header.logoTexto, 'Minha marca', 60)
   const logo = coergirMidia(header.logo)
   const estiloHeader = coergirEstiloBarra(header.estilo)
+  const menuMobile = coergirMenuMobile(header.menuMobile)
   const estiloFooter = coergirEstiloBarra(footer.estilo)
 
   return {
@@ -679,6 +704,7 @@ export function coergirDocumento(bruto: unknown, temaBase: LpTema = TEMA_PADRAO)
       // `header.botao` (um botao so) e o formato antigo, ainda vindo da IA.
       botoes: coergirBotoes(header.botoes ?? header.botao),
       ...(estiloHeader ? { estilo: estiloHeader } : {}),
+      ...(menuMobile ? { menuMobile } : {}),
     },
     secoes,
     footer: {

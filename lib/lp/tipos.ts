@@ -441,6 +441,24 @@ export const ROTULO_REDE: Record<Rede, string> = {
 
 export type RedeSocial = { id: string; rede: Rede; url: string }
 
+/**
+ * O menu no celular: o botao hamburguer e a gaveta que ele abre. Campo ausente
+ * = o comportamento de sempre (vira hamburguer a partir do tablet, icone de
+ * tres linhas, gaveta com a cor do header).
+ */
+export type MenuMobile = {
+  /** A partir de qual tela o menu vira hamburguer. Ausente = 'tablet'. */
+  apartirDe?: Dispositivo
+  /** Icone do botao, do catalogo de icones. Ausente = 'menu'. */
+  icone?: string
+  /** Cor do icone. Ausente = a cor do texto do header. */
+  cor?: string
+  /** Fundo da gaveta. Ausente = a cor do header. */
+  fundo?: string
+  /** Onde os itens ficam dentro da gaveta. */
+  alinhamento?: Alinhamento
+}
+
 export type LpHeader = {
   logoTexto: string
   /**
@@ -454,6 +472,7 @@ export type LpHeader = {
   /** Botoes de acao ao lado do menu (vazio = nenhum). */
   botoes: BotaoComId[]
   estilo?: EstiloBarra
+  menuMobile?: MenuMobile
 }
 
 /**

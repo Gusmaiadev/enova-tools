@@ -151,16 +151,36 @@ const HEADER = `
 .lp-header-acoes .lp-btn:hover{color:var(--cor-botoes)}
 .lp-header-acoes .lp-btn.contorno{color:var(--cor-fundo-botoes)}
 .lp-header-acoes .lp-btn.contorno:hover{color:var(--cor-botoes)}
-.lp-menu-btn{display:none;background:none;border:0;color:inherit;cursor:pointer;padding:8px}
-.lp-menu-btn svg{width:26px;height:26px}
-@media (max-width:900px){
+.lp-menu-btn{display:none;background:none;border:0;color:var(--cor-menu-btn,inherit);cursor:pointer;padding:8px}
+.lp-menu-btn svg{width:var(--tamanho-menu-btn,26px);height:var(--tamanho-menu-btn,26px)}
+`
+
+/**
+ * Gaveta do celular. Sai daqui, e nao da constante acima, porque o breakpoint em
+ * que o menu vira hamburguer e escolhido no painel do header — antes era 900px
+ * cravado no CSS, o que ficou incoerente quando os breakpoints viraram seis.
+ */
+function cssMenuMobile(doc: LpDocumento): string {
+  const m = doc.header.menuMobile
+  const max = BREAKPOINT[m?.apartirDe ?? 'tablet'] ?? 900
+  const fundo = m?.fundo ? escCss(corSegura(m.fundo, 'var(--cor-header)')) : 'var(--cor-header)'
+  const alinhar = { esquerda: 'flex-start', centro: 'center', direita: 'flex-end' }[
+    m?.alinhamento ?? 'esquerda'
+  ]
+  let fixo = ''
+  if (m?.cor) fixo += `.lp-menu-btn{--cor-menu-btn:${escCss(corSegura(m.cor, 'inherit'))}}\n`
+  return (
+    fixo +
+    `@media (max-width:${max}px){
 .lp-menu-btn{display:block}
-.lp-nav{position:fixed;inset:72px 0 auto 0;flex-direction:column;align-items:stretch;gap:16px;background:var(--cor-header);padding:16px 24px 24px;transform:translateY(-130%);transition:transform .3s ease;box-shadow:0 20px 40px -20px rgba(0,0,0,.4)}
+.lp-nav{position:fixed;inset:72px 0 auto 0;flex-direction:column;align-items:${alinhar};gap:16px;background:${fundo};padding:16px 24px 24px;transform:translateY(-130%);transition:transform .3s ease;box-shadow:0 20px 40px -20px rgba(0,0,0,.4)}
 .lp-nav.aberto{transform:none}
-.lp-nav ul{flex-direction:column;gap:16px}
+.lp-nav ul{flex-direction:column;align-items:${alinhar};gap:16px;margin:0}
 .lp-header-acoes{flex-direction:column;align-items:stretch}
 }
 `
+  )
+}
 
 const FOOTER = `
 .lp-footer{background:var(--cor-footer);color:var(--texto-footer);padding:64px 0 0;font-size:.95rem}
@@ -375,7 +395,9 @@ function cssBarras(doc: LpDocumento): string {
     // <ul> decide onde os links caem dentro dele. No celular o nav vira gaveta e
     // a margem tem de sumir — por isso o reset, que precisa vir depois daqui.
     const margem = { esquerda: 'margin-right:auto', centro: 'margin-inline:auto', direita: 'margin-left:auto' }
-    css += `.lp-nav{flex:1}\n.lp-nav ul{${margem[h.alinhamento]}}\n@media (max-width:900px){.lp-nav ul{margin:0}}\n`
+    // O reset da margem na gaveta sai em cssMenuMobile, que conhece o
+    // breakpoint escolhido — aqui só o alinhamento da barra larga.
+    css += `.lp-nav{flex:1}\n.lp-nav ul{${margem[h.alinhamento]}}\n`
   }
 
   const f = doc.footer.estilo
@@ -424,6 +446,8 @@ export function compilarCss(doc: LpDocumento, idsPorSecao: Map<string, string>):
   }
   const barras = cssBarras(doc)
   if (barras) partes.push(barras)
+  // Depois de cssBarras: a gaveta zera a margem que o alinhamento da barra pôs.
+  partes.push(cssMenuMobile(doc))
   for (const secao of doc.secoes) {
     const idHtml = idsPorSecao.get(secao.id)
     if (idHtml) {

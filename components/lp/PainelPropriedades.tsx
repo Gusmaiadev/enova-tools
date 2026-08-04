@@ -8,9 +8,17 @@ import { Cor, Faixa, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
 import { ListaBotoes } from './ListaBotoes'
 import { ListaTelefones } from './ListaTelefones'
 import { Aviso } from '@/components/Campo'
+import { SeletorIcone } from './SeletorIcone'
 import { garantirAncora } from '@/lib/lp/documento'
 import { infoLayout } from '@/lib/lp/layouts'
-import type { LpDocumento, LpSecao } from '@/lib/lp/tipos'
+import { BREAKPOINT, DISPOSITIVOS, NOME_DISPOSITIVO } from '@/lib/lp/padroes'
+import type {
+  Alinhamento,
+  Dispositivo,
+  LpDocumento,
+  LpSecao,
+  MenuMobile,
+} from '@/lib/lp/tipos'
 import { gerarId } from '@/lib/lp/util'
 
 type Aplicar = (mut: (d: LpDocumento) => void, agrupar?: string) => void
@@ -50,6 +58,61 @@ function Selecionado({ children }: { children: ReactNode }) {
     <div className="rounded-md border border-blue/40 bg-blue/10 px-3 py-2">
       <p className="text-xs text-blue">{children}</p>
     </div>
+  )
+}
+
+/**
+ * O menu do celular: quando o menu vira hambúrguer, com que ícone, e como fica a
+ * gaveta que ele abre. Só aparece quando o header tem menu ou botões — sem nada
+ * para abrir, o hambúrguer não é emitido.
+ */
+function MenuHamburguer({
+  menu,
+  aoMudar,
+}: {
+  menu: MenuMobile | undefined
+  aoMudar: (patch: Partial<MenuMobile>, agrupar?: string) => void
+}) {
+  return (
+    <>
+      <Selecao
+        rotulo="Vira hambúrguer a partir de"
+        dica="e abaixo disso"
+        value={menu?.apartirDe ?? 'tablet'}
+        onChange={(e) => aoMudar({ apartirDe: e.target.value as Dispositivo })}
+      >
+        {DISPOSITIVOS.filter((d) => BREAKPOINT[d] !== null).map((d) => (
+          <option key={d} value={d}>
+            {NOME_DISPOSITIVO[d]} (≤{BREAKPOINT[d]}px)
+          </option>
+        ))}
+      </Selecao>
+      <SeletorIcone valor={menu?.icone ?? 'menu'} aoMudar={(icone) => aoMudar({ icone })} />
+      <div className="grid grid-cols-2 gap-2">
+        <Cor
+          rotulo="Cor do ícone"
+          valor={menu?.cor}
+          placeholder="do header"
+          aoMudar={(v) => aoMudar({ cor: v || undefined })}
+        />
+        <Cor
+          rotulo="Fundo da gaveta"
+          valor={menu?.fundo}
+          placeholder="do header"
+          aoMudar={(v) => aoMudar({ fundo: v || undefined })}
+        />
+      </div>
+      <Opcoes<Alinhamento>
+        rotulo="Itens na gaveta"
+        valor={menu?.alinhamento ?? 'esquerda'}
+        aoMudar={(v) => aoMudar({ alinhamento: v })}
+        opcoes={[
+          { valor: 'esquerda', rotulo: 'À esquerda' },
+          { valor: 'centro', rotulo: 'Centro' },
+          { valor: 'direita', rotulo: 'À direita' },
+        ]}
+      />
+    </>
   )
 }
 
@@ -101,6 +164,16 @@ export function PainelPropriedades({
                 aplicar((d) => {
                   d.header.botoes = botoes
                 }, chave ?? 'header-botoes')
+              }
+            />
+          </Grupo>
+          <Grupo titulo="Menu hambúrguer">
+            <MenuHamburguer
+              menu={doc.header.menuMobile}
+              aoMudar={(patch, chave) =>
+                aplicar((d) => {
+                  d.header.menuMobile = { ...d.header.menuMobile, ...patch }
+                }, chave ?? 'header-menu')
               }
             />
           </Grupo>

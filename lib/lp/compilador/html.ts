@@ -97,7 +97,9 @@ function htmlHeader(ctx: Ctx, doc: LpDocumento): string {
       : ''
   // Sem nada no menu o hamburguer abriria uma gaveta vazia.
   const hamburger = nav
-    ? '<button type="button" class="lp-menu-btn" aria-label="Abrir menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>'
+    ? `<button type="button" class="lp-menu-btn" aria-label="Abrir menu" aria-expanded="false">${svgIcone(
+        doc.header.menuMobile?.icone ?? 'menu',
+      )}</button>`
     : ''
   // Com imagem de logo o link deixa de ser texto editavel no canvas (nao daria
   // para digitar dentro de um <img>); o nome escrito vira o alt.
