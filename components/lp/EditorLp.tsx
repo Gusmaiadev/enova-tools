@@ -44,6 +44,7 @@ import {
 import { novaSecao } from '@/lib/lp/layouts'
 import { reordenar } from './arrastar'
 import type {
+  Dispositivo,
   LpDocumento,
   LpProjeto,
   PaginaLegal,
@@ -75,25 +76,25 @@ const TELAS: {
   chave: Previa
   nome: string
   largura: string
-  /** Breakpoint do CSS em que essa largura cai. */
-  regra: 'Computador' | 'Tablet' | 'Celular'
+  /** Breakpoint do CSS em que essa largura cai — e que o painel passa a editar. */
+  dispositivo: Dispositivo
   icone: typeof Monitor
   /** Ícone girado 90° representa a tela deitada. */
   deitado?: boolean
 }[] = [
-  { chave: 'desktop', nome: 'Computador', largura: '100%', regra: 'Computador', icone: Monitor },
+  { chave: 'desktop', nome: 'Computador', largura: '100%', dispositivo: 'desktop', icone: Monitor },
   {
     chave: 'notebook',
     nome: 'Notebook · 1366px',
     largura: '1366px',
-    regra: 'Computador',
+    dispositivo: 'desktop',
     icone: Laptop,
   },
   {
     chave: 'tablet-deitado',
     nome: 'Tablet deitado · 1024px',
     largura: '1024px',
-    regra: 'Computador',
+    dispositivo: 'desktop',
     icone: Tablet,
     deitado: true,
   },
@@ -101,14 +102,14 @@ const TELAS: {
     chave: 'tablet',
     nome: 'Tablet em pé · 834px',
     largura: '834px',
-    regra: 'Tablet',
+    dispositivo: 'tablet',
     icone: Tablet,
   },
   {
     chave: 'celular-deitado',
     nome: 'Celular deitado · 844px',
     largura: '844px',
-    regra: 'Tablet',
+    dispositivo: 'tablet',
     icone: Smartphone,
     deitado: true,
   },
@@ -116,13 +117,30 @@ const TELAS: {
     chave: 'celular',
     nome: 'Celular em pé · 390px',
     largura: '390px',
-    regra: 'Celular',
+    dispositivo: 'celular',
     icone: Smartphone,
   },
 ]
 
+const NOME_DISPOSITIVO: Record<Dispositivo, string> = {
+  desktop: 'Computador',
+  tablet: 'Tablet',
+  celular: 'Celular',
+}
+
+/**
+ * Tela que o seletor de dispositivo do painel escolhe. Escolher "tablet" lá tem
+ * de levar a prévia ao tablet em pé, não ao deitado — que usa outro breakpoint.
+ */
+const TELA_DO_DISPOSITIVO: Record<Dispositivo, Previa> = {
+  desktop: 'desktop',
+  tablet: 'tablet',
+  celular: 'celular',
+}
+
 /** Rótulo completo: o tamanho e qual conjunto de estilos vale nele. */
-const rotuloTela = (t: (typeof TELAS)[number]) => `${t.nome} — usa os estilos de ${t.regra}`
+const rotuloTela = (t: (typeof TELAS)[number]) =>
+  `${t.nome} — edita os estilos de ${NOME_DISPOSITIVO[t.dispositivo]}`
 
 const ABAS: { chave: Aba; rotulo: string; icone: typeof LayoutList }[] = [
   { chave: 'estrutura', rotulo: 'Estrutura', icone: LayoutList },
@@ -169,6 +187,18 @@ export function EditorLp({
   const [paginaParaExcluir, setPaginaParaExcluir] = useState<TipoPaginaLegal | null>(null)
   const [podeDesfazer, setPodeDesfazer] = useState(false)
   const [podeRefazer, setPodeRefazer] = useState(false)
+
+  /**
+   * Dispositivo que os painéis editam. Sai da tela escolhida na barra de cima:
+   * um estado só para os dois, senão a prévia mostraria um tamanho e o campo
+   * gravaria em outro.
+   */
+  const dispositivo = TELAS.find((t) => t.chave === tela)?.dispositivo ?? 'desktop'
+  /** Trocar o dispositivo num campo leva a prévia junto. */
+  const trocarDispositivo = useCallback(
+    (d: Dispositivo) => setTela(TELA_DO_DISPOSITIVO[d]),
+    [],
+  )
 
   const avisos = avisosVisiveis ? avisosIniciais : []
 
@@ -664,6 +694,8 @@ export function EditorLp({
                   noId={noId}
                   aplicar={aplicar}
                   aoSelecionar={selecionarNo}
+                  dispositivo={dispositivo}
+                  aoTrocarDispositivo={trocarDispositivo}
                 />
               ) : (
                 <PainelPropriedades

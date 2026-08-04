@@ -73,15 +73,23 @@ export function PainelWidget({
   noId,
   aplicar,
   aoSelecionar,
+  dispositivo,
+  aoTrocarDispositivo,
 }: {
   doc: LpDocumento
   lpId: string
   noId: string
   aplicar: Aplicar
   aoSelecionar: (id: string) => void
+  /**
+   * Vem do EditorLp, derivado da tela escolhida na barra de cima. Não é estado
+   * daqui de propósito: com estado próprio, a prévia mostraria um tamanho e o
+   * campo gravaria em outro.
+   */
+  dispositivo: Dispositivo
+  aoTrocarDispositivo: (d: Dispositivo) => void
 }) {
   const [aba, setAba] = useState<Aba>('conteudo')
-  const [dispositivo, setDispositivo] = useState<Dispositivo>('desktop')
 
   const secao = doc.secoes.find((s) => s.raiz && acharNo(s.raiz, noId))
   const no = secao?.raiz ? acharNo(secao.raiz, noId) : null
@@ -106,7 +114,7 @@ export function PainelWidget({
     }, agrupar)
 
   const trilha = caminhoAte(secao.raiz, noId)
-  const comuns = { no, mutarNo, dispositivo, aoTrocarDispositivo: setDispositivo }
+  const comuns = { no, mutarNo, dispositivo, aoTrocarDispositivo }
 
   return (
     <div className="space-y-3">
