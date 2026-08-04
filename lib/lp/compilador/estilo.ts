@@ -8,6 +8,7 @@
  * vence por vir depois.
  */
 
+import { regrasTempo } from '../animacoes'
 import { caminharElementos } from '../arvore'
 import { familiaCss } from '../fontes'
 import { DISPOSITIVOS, PROPORCOES_VALIDAS } from '../padroes'
@@ -159,6 +160,9 @@ function regrasDoNo(el: LpElemento, d: Dispositivo): string {
   if (el.tipo === 'espacador' && el.altura[d] !== undefined) {
     r.push(`height:${num(el.altura[d])}px`)
   }
+  // Duracao e atraso da animacao so no desktop: sao um tempo, nao um tamanho —
+  // repetir por breakpoint so encheria a folha com a mesma regra.
+  if (d === 'desktop') r.push(...regrasTempo(el.animacao))
   // `oculto` por ultimo: esconder vence qualquer display que o layout pos.
   if (el.oculto?.[d]) r.push('display:none')
 

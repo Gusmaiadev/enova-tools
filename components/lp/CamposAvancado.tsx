@@ -1,5 +1,6 @@
 'use client'
 
+import { CamposAnimacao } from './CamposAnimacao'
 import { PorDispositivo, definir } from './PorDispositivo'
 import type { MutarNo } from './CamposEstilo'
 import { CLASSE_CONTROLE, Marcar } from './campos'
@@ -117,6 +118,20 @@ export function CamposAvancado({
           }
         />
       </PorDispositivo>
+
+      <div className="rounded-md border border-border bg-surface-2/40 p-3">
+        <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-text-dim">
+          Animação
+        </p>
+        <CamposAnimacao
+          animacao={no.animacao}
+          aoMudar={(a, agrupar) =>
+            mutarNo((el) => {
+              el.animacao = a
+            }, agrupar)
+          }
+        />
+      </div>
 
       <div className="rounded-md border border-border bg-surface-2/40 px-3 py-2.5">
         <p className="mb-2 text-xs text-text-dim">Não mostrar em</p>

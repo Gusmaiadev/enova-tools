@@ -13,6 +13,7 @@ import {
   type MidiaColetada,
   type OpcoesHtml,
   alvo,
+  animacaoDe,
   atributosVideoFundo,
   href,
   htmlBotao,
@@ -69,6 +70,10 @@ function htmlSecao(ctx: Ctx, s: LpSecao, idHtml: string): string {
   // as cores do tema — as que o usuario escolheu na Identidade.
   if (midiaFundo && s.fundo?.textoClaro !== false) classes.push('lp-sobre-midia')
   if (s.largura === 'full') classes.push('full')
+  // Duracao e atraso da secao saem em cssDaSecao, presos ao id ja saneado —
+  // aqui so a classe que escolhe o keyframe.
+  const anim = animacaoDe(ctx, s.animacao)
+  if (anim) classes.push(anim)
 
   const estilo = estilos.length > 0 ? ` style="${estilos.join(';')}"` : ''
   const nomeEditor = ctx.modo === 'editor' ? ` data-lp-nome="${esc(s.nome)}"` : ''

@@ -209,3 +209,34 @@ describe('estilo, transformação e decoração', () => {
     expect(el?.estilo?.decoracao).toBeUndefined()
   })
 })
+
+describe('animação de entrada', () => {
+  it('aceita tipo do catálogo com duração e atraso', () => {
+    const el = coagir({
+      tipo: 'titulo',
+      texto: 'T',
+      animacao: { tipo: 'zoom', duracao: 1200, atraso: 300 },
+    })
+    expect(el?.animacao).toEqual({ tipo: 'zoom', duracao: 1200, atraso: 300 })
+  })
+
+  it('tipo fora do catálogo derruba a animação inteira', () => {
+    // Sem isto o CSS receberia `animation-name: lp-k-<lixo>` e a duração de uma
+    // animação que não existe.
+    const el = coagir({
+      tipo: 'titulo',
+      texto: 'T',
+      animacao: { tipo: 'x;}body{display:none', duracao: 500 },
+    })
+    expect(el?.animacao).toBeUndefined()
+  })
+
+  it('tempo absurdo é preso na faixa em vez de derrubar a animação', () => {
+    const el = coagir({
+      tipo: 'titulo',
+      texto: 'T',
+      animacao: { tipo: 'fade', duracao: 999999, atraso: -5 },
+    })
+    expect(el?.animacao).toEqual({ tipo: 'fade', duracao: 3000 })
+  })
+})

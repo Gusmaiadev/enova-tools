@@ -3,6 +3,7 @@
 import { ChevronDown } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { CampoMidia } from './CampoMidia'
+import { CamposAnimacao } from './CamposAnimacao'
 import { CamposBarra } from './CamposBarra'
 import { Cor, Faixa, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
 import { ListaBotoes } from './ListaBotoes'
@@ -429,6 +430,17 @@ export function PainelPropriedades({
             )}
           </>
         )}
+      </Grupo>
+
+      <Grupo titulo="Animação">
+        <CamposAnimacao
+          animacao={secao.animacao}
+          aoMudar={(a, agrupar) => mudarSecao({ animacao: a }, agrupar)}
+        />
+        <p className="text-xs text-text-dim">
+          Anima a seção inteira de uma vez. Para os elementos entrarem um a um, deixe aqui
+          &ldquo;Nenhuma&rdquo; e anime cada um na aba <strong className="text-text">Avançado</strong>.
+        </p>
       </Grupo>
     </div>
   )

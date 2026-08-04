@@ -3,7 +3,8 @@
  * o CSS dos layouts presentes no documento. Puro (roda no client e no server).
  */
 
-import { tiposNaPagina } from '../arvore'
+import { cssAnimacoes, regrasTempo } from '../animacoes'
+import { animacoesNaPagina, tiposNaPagina } from '../arvore'
 import { paginasGeradas } from '../documento'
 import {
   BREAKPOINT,
@@ -438,6 +439,10 @@ function cssDaSecao(secao: LpSecao, idHtml: string): string {
       if (ajuste) css += ajusteParaCss(`#${idHtml} ${SELETOR_ELEMENTO[el]}`, ajuste)
     }
   }
+  // A secao nao e no da arvore, entao nao passa por cssDaArvore: o tempo da
+  // animacao dela sai aqui, preso ao id (que idHtmlSecao ja saneou).
+  const tempo = regrasTempo(secao.animacao)
+  if (tempo.length > 0) css += `#${idHtml}{${tempo.join(';')}}\n`
   return css
 }
 
@@ -454,6 +459,8 @@ export function compilarCss(doc: LpDocumento, idsPorSecao: Map<string, string>):
   for (const [tipo, css] of Object.entries(POR_WIDGET)) {
     if (usados.has(tipo)) partes.push(css)
   }
+  const animacoes = cssAnimacoes(animacoesNaPagina(doc))
+  if (animacoes) partes.push(animacoes)
   const barras = cssBarras(doc)
   if (barras) partes.push(barras)
   // Depois de cssBarras: a gaveta zera a margem que o alinhamento da barra pôs.

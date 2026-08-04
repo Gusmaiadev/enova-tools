@@ -28,7 +28,10 @@ const NAV = `
     window.addEventListener('scroll', aoRolar, { passive: true })
     aoRolar()
   }
-  var reveladas = document.querySelectorAll('.lp-reveal')
+  // .lp-reveal e a entrada padrao das secoes; .lp-an sao as animacoes que o
+  // usuario escolheu no editor. Os dois entram pelo mesmo observador: o que
+  // muda e o CSS que a classe .lp-vis dispara.
+  var reveladas = document.querySelectorAll('.lp-reveal,.lp-an')
   if ('IntersectionObserver' in window && reveladas.length) {
     var io = new IntersectionObserver(
       function (entradas) {

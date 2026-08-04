@@ -6,6 +6,8 @@
  * funcoes, e nenhum dos dois pode importar o outro.
  */
 
+import { classeAnimacao } from '../animacoes'
+import type { LpAnimacao } from '../animacoes'
 import { svgIcone } from '../icones'
 import type { LpBotao, LpMidia, TipoMidia } from '../tipos'
 import { corSegura, esc, escCss, urlSegura } from '../util'
@@ -34,6 +36,14 @@ export function href(ctx: Ctx, url: string): string {
   const segura = urlSegura(url)
   return ctx.base && segura.startsWith('#') ? `${ctx.base}${segura}` : segura
 }
+
+/**
+ * Classe da animacao de entrada — so na pagina final. No canvas do editor o
+ * elemento ficaria invisivel ate rolar ate ele, e a animacao recomecaria a cada
+ * tecla digitada: e o mesmo motivo pelo qual o Elementor nao anima no editor.
+ */
+export const animacaoDe = (ctx: Ctx, a: LpAnimacao | undefined) =>
+  ctx.modo === 'export' ? classeAnimacao(a) : ''
 
 /** data-lp="<alvo>" so no modo editor (escapado por defesa em profundidade). */
 export const alvo = (ctx: Ctx, caminho: string) =>

@@ -18,6 +18,7 @@ import type {
   LpBotao,
   PorDisp,
 } from './tipos'
+import { ATRASO_MAX, DURACAO_MAX, animacaoValida, type LpAnimacao } from './animacoes'
 import { DECORACOES, ESTILOS_FONTE, TRANSFORMACOES } from './tipos'
 import { DISPOSITIVOS, PROPORCOES_VALIDAS } from './padroes'
 import { corSegura, gerarId, limitar } from './util'
@@ -133,7 +134,33 @@ const APARENCIAS = new Set<string>([
   'caixa-cta',
 ])
 
-type Base = { id: string; estilo?: LpEstilo; oculto?: PorDisp<boolean> }
+/**
+ * Animação de entrada. Tipo fora do catálogo derruba a animação inteira — não
+ * adianta guardar duração de uma animação que não existe. Os tempos são presos
+ * na faixa em vez de recusados: valor absurdo vira o limite, não perde o resto.
+ */
+export function coergirAnimacao(v: unknown): LpAnimacao | undefined {
+  const o = obj(v)
+  const tipo = String(o.tipo ?? '')
+  if (!animacaoValida(tipo)) return undefined
+  const a: LpAnimacao = { tipo }
+  const ms = (x: unknown, max: number) =>
+    typeof x === 'number' && Number.isFinite(x)
+      ? Math.min(Math.max(Math.round(x), 0), max)
+      : undefined
+  const duracao = ms(o.duracao, DURACAO_MAX)
+  if (duracao !== undefined) a.duracao = duracao
+  const atraso = ms(o.atraso, ATRASO_MAX)
+  if (atraso) a.atraso = atraso
+  return a
+}
+
+type Base = {
+  id: string
+  estilo?: LpEstilo
+  oculto?: PorDisp<boolean>
+  animacao?: LpAnimacao
+}
 
 /** Campos que todo nó tem. */
 function base(o: Record<string, unknown>): Base {
@@ -142,6 +169,8 @@ function base(o: Record<string, unknown>): Base {
   if (estilo) b.estilo = estilo
   const oculto = porDisp(o.oculto, soVerdadeiro)
   if (oculto) b.oculto = oculto
+  const animacao = coergirAnimacao(o.animacao)
+  if (animacao) b.animacao = animacao
   return b
 }
 

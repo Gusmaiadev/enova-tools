@@ -4,7 +4,7 @@
  */
 
 import type { Aparencia, LpElemento } from '../tipos'
-import { type Ctx, alvo } from './comum'
+import { type Ctx, alvo, animacaoDe } from './comum'
 import { renderWidget } from './widgets'
 
 /** Classe CSS da aparencia do container (ver o bloco APARENCIAS em css.ts). */
@@ -22,7 +22,12 @@ const CLASSE_APARENCIA: Record<Aparencia, string> = {
 
 export function renderElemento(ctx: Ctx, el: LpElemento): string {
   if (el.tipo !== 'container') return renderWidget(ctx, el)
-  const classes = ['lp-c', el.aparencia ? CLASSE_APARENCIA[el.aparencia] : '', `lp-e-${el.id}`]
+  const classes = [
+    'lp-c',
+    el.aparencia ? CLASSE_APARENCIA[el.aparencia] : '',
+    `lp-e-${el.id}`,
+    animacaoDe(ctx, el.animacao),
+  ]
     .filter(Boolean)
     .join(' ')
   const filhos = el.filhos.map((f) => renderElemento(ctx, f)).join('')

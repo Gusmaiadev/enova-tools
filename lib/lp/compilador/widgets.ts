@@ -10,6 +10,7 @@ import { esc, urlSegura } from '../util'
 import {
   type Ctx,
   alvo,
+  animacaoDe,
   celula,
   htmlBotao,
   htmlMidia,
@@ -18,8 +19,13 @@ import {
   urlMidia,
 } from './comum'
 
-/** Classe de um no: a fixa do widget mais a do id, para o CSS gerado alcancar. */
-const cls = (fixa: string, id: string) => `${fixa} lp-e-${id}`.trim()
+/**
+ * Classe de um no: a fixa do widget, a do id (para o CSS gerado alcancar) e a
+ * da animacao de entrada. Passa o no inteiro, e nao so o id, justamente para a
+ * animacao entrar aqui — em um lugar so, valendo para todo widget.
+ */
+const cls = (ctx: Ctx, fixa: string, w: LpWidget) =>
+  `${fixa} lp-e-${w.id} ${animacaoDe(ctx, w.animacao)}`.trim().replace(/\s+/g, ' ')
 
 /**
  * Widgets cujo texto pode ser digitado direto no canvas. O runtime do editor
@@ -37,23 +43,23 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
   const marca = alvo(ctx, `el:${w.id}`) + editavel
   switch (w.tipo) {
     case 'titulo':
-      return `<${w.nivel} class="${cls('lp-el-titulo', w.id)}"${marca}>${quebras(w.texto)}</${w.nivel}>`
+      return `<${w.nivel} class="${cls(ctx, 'lp-el-titulo', w)}"${marca}>${quebras(w.texto)}</${w.nivel}>`
     case 'texto': {
       const base = w.papel === 'subtitulo' ? 'lp-subtitulo lp-el-subtitulo' : 'lp-texto lp-el-texto'
-      return `<p class="${cls(base, w.id)}"${marca}>${quebras(w.texto)}</p>`
+      return `<p class="${cls(ctx, base, w)}"${marca}>${quebras(w.texto)}</p>`
     }
     case 'imagem':
     case 'video':
       // htmlMidia ja emite .lp-midia e trata img/video, poster e autoplay; a
       // classe do no vai junto para o CSS gerado alcancar a midia.
-      return htmlMidia(ctx, w.midia, `el:${w.id}`, `lp-e-${w.id}`)
+      return htmlMidia(ctx, w.midia, `el:${w.id}`, cls(ctx, '', w))
     case 'botao':
-      return htmlBotao(ctx, w.botao, `el:${w.id}`, `lp-e-${w.id}`, editavel)
+      return htmlBotao(ctx, w.botao, `el:${w.id}`, cls(ctx, '', w), editavel)
     case 'icone':
-      return `<span class="${cls('lp-icone', w.id)}"${marca}>${svgIcone(w.nome)}</span>`
+      return `<span class="${cls(ctx, 'lp-icone', w)}"${marca}>${svgIcone(w.nome)}</span>`
     case 'numero':
       return (
-        `<div class="${cls('lp-stat', w.id)}"${marca}>` +
+        `<div class="${cls(ctx, 'lp-stat', w)}"${marca}>` +
         `<div class="lp-stat-valor" data-contar>${quebras(w.valor)}</div>` +
         `<div class="lp-stat-rotulo">${quebras(w.rotulo)}</div>` +
         `</div>`
@@ -62,12 +68,12 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
       const itens = w.itens
         .map((i) => `<li>${svgIcone(i.icone ?? 'check')}<span>${quebras(i.texto)}</span></li>`)
         .join('')
-      return `<ul class="${cls('lp-lista', w.id)}"${marca}>${itens}</ul>`
+      return `<ul class="${cls(ctx, 'lp-lista', w)}"${marca}>${itens}</ul>`
     }
     case 'espacador':
-      return `<div class="${cls('lp-espacador', w.id)}"${marca}></div>`
+      return `<div class="${cls(ctx, 'lp-espacador', w)}"${marca}></div>`
     case 'divisor':
-      return `<hr class="${cls('lp-divisor', w.id)}"${marca}>`
+      return `<hr class="${cls(ctx, 'lp-divisor', w)}"${marca}>`
     case 'faq': {
       const chevron = svgIcone('chevron-baixo')
       const itens = w.perguntas
@@ -77,7 +83,7 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
             `<div class="lp-faq-corpo"><p class="lp-faq-resposta">${quebras(p.resposta)}</p></div></details>`,
         )
         .join('')
-      return `<div class="${cls('lp-faq', w.id)}"${marca}>${itens}</div>`
+      return `<div class="${cls(ctx, 'lp-faq', w)}"${marca}>${itens}</div>`
     }
     case 'abas': {
       const nav = w.abas
@@ -95,7 +101,7 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
           )
         })
         .join('')
-      return `<div class="${cls('lp-tabs', w.id)}"${marca}><div class="lp-tabs-nav">${nav}</div>${paineis}</div>`
+      return `<div class="${cls(ctx, 'lp-tabs', w)}"${marca}><div class="lp-tabs-nav">${nav}</div>${paineis}</div>`
     }
     case 'carrossel': {
       const slides = w.slides.map((s) => {
@@ -104,7 +110,7 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
         const p = s.texto ? `<p class="lp-slide-texto">${quebras(s.texto)}</p>` : ''
         return `<div>${img}${t}${p}</div>`
       })
-      return `<div class="${cls('lp-carrossel', w.id)}"${marca}>${slider(slides, 'slide')}</div>`
+      return `<div class="${cls(ctx, 'lp-carrossel', w)}"${marca}>${slider(slides, 'slide')}</div>`
     }
     case 'depoimentos': {
       const slides = w.depoimentos.map((d) => {
@@ -117,7 +123,7 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
           `<div class="lp-depo-autor">${foto}<div class="lp-depo-nome">${quebras(d.nome)}</div>${cargo}</div></div>`
         )
       })
-      return `<div class="${cls('lp-depo', w.id)}"${marca}>${slider(slides, 'depoimento')}</div>`
+      return `<div class="${cls(ctx, 'lp-depo', w)}"${marca}>${slider(slides, 'depoimento')}</div>`
     }
     case 'comparacao': {
       const cabecalho = w.colunas
@@ -134,7 +140,7 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
         })
         .join('')
       return (
-        `<div class="${cls('lp-comp', w.id)}"${marca}><table><thead><tr><th></th>${cabecalho}</tr></thead>` +
+        `<div class="${cls(ctx, 'lp-comp', w)}"${marca}><table><thead><tr><th></th>${cabecalho}</tr></thead>` +
         `<tbody>${linhas}</tbody></table></div>`
       )
     }
@@ -144,7 +150,7 @@ export function renderWidget(ctx: Ctx, w: LpWidget): string {
         ? '<div class="lp-form-ok">Mensagem enviada com sucesso! Retornaremos em breve.</div>'
         : ''
       return (
-        `<form class="${cls('lp-form', w.id)}" novalidate${destino}${marca}>` +
+        `<form class="${cls(ctx, 'lp-form', w)}" novalidate${destino}${marca}>` +
         `<input class="lp-mel" type="text" name="site" tabindex="-1" autocomplete="off" aria-hidden="true">` +
         `<label>Nome<input type="text" name="nome" required placeholder="Seu nome"></label>` +
         `<label>E-mail<input type="email" name="email" required placeholder="voce@email.com"></label>` +

@@ -7,6 +7,12 @@
  * entao editor visual e codigo ficam sincronizados por construcao.
  */
 
+// O catalogo de animacoes mora em animacoes.ts (rotulo + keyframes juntos);
+// aqui so o tipo, para os nos e as secoes o declararem.
+import type { LpAnimacao } from './animacoes'
+
+export type { Animacao, LpAnimacao } from './animacoes'
+
 export type TipoLayout =
   | 'hero'
   | 'texto-midia'
@@ -234,6 +240,8 @@ export type LpSecao = {
   ajustes?: Partial<Record<ElementoTexto, AjusteTexto>>
   /** Endpoint que recebe o formulario (layout formulario). Vazio = sem envio. */
   destinoForm?: string
+  /** Animacao de entrada da secao inteira — ver lib/lp/animacoes.ts. */
+  animacao?: LpAnimacao
 }
 
 /* ------------------------------- Arvore ---------------------------------- */
@@ -312,6 +320,8 @@ type NoBase = {
   estilo?: LpEstilo
   /** Esconde o no no dispositivo marcado. */
   oculto?: PorDisp<boolean>
+  /** Animacao de entrada — ver lib/lp/animacoes.ts. */
+  animacao?: LpAnimacao
 }
 
 /**

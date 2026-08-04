@@ -116,3 +116,20 @@ export function tiposNaPagina(doc: { secoes: { tipo?: string; raiz?: LpContainer
   }
   return usados
 }
+
+/**
+ * Animacoes presentes na pagina — das secoes e de qualquer no dentro delas.
+ * Vazio = pagina sem keyframe nenhum e sem o observador no JS.
+ */
+export function animacoesNaPagina(doc: {
+  secoes: { animacao?: { tipo: string }; raiz?: LpContainer }[]
+}): Set<string> {
+  const usadas = new Set<string>()
+  for (const s of doc.secoes) {
+    if (s.animacao) usadas.add(s.animacao.tipo)
+    if (s.raiz) {
+      for (const el of caminharElementos(s.raiz)) if (el.animacao) usadas.add(el.animacao.tipo)
+    }
+  }
+  return usadas
+}

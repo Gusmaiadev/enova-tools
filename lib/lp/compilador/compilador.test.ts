@@ -1145,3 +1145,67 @@ describe('tamanho da logo por barra', () => {
     expect(css).toContain('.lp-logo-footer-img img{max-height:32px')
   })
 })
+
+describe('animações de entrada', () => {
+  /**
+   * Expande antes de anotar: a migração reconstrói a árvore de todo documento
+   * que ainda não é versão 2, e apagaria uma raiz montada à mão aqui.
+   */
+  const comAnimacoes = () => {
+    const doc = comArvore(docCom([novaSecao('cta')]))
+    const secao = doc.secoes[0]
+    secao.animacao = { tipo: 'fade-baixo' }
+    const alvo = secao.raiz?.filhos[0]
+    if (alvo) alvo.animacao = { tipo: 'zoom', atraso: 200 }
+    return doc
+  }
+
+  it('a seção e o widget levam suas classes na página final', () => {
+    const { html } = compilarDoc(comAnimacoes())
+    expect(html).toContain('lp-an lp-an-fade-baixo')
+    expect(html).toContain('lp-an lp-an-zoom')
+    // Um par por elemento animado, e mais nenhum: quem não escolheu animação
+    // não pode ganhar a classe — ele começaria invisível.
+    expect((html.match(/lp-an lp-an-/g) ?? []).length).toBe(2)
+  })
+
+  it('o canvas do editor não anima', () => {
+    // Animar ali deixaria o elemento invisível até rolar e recomeçaria a cada
+    // tecla digitada. "lp-an lp-an-" só existe em atributo class: o CSS emite
+    // ".lp-an-zoom.lp-vis", sem o espaço.
+    expect(compilarEditorDoc(comAnimacoes())).not.toContain('lp-an lp-an-')
+  })
+
+  it('só saem os keyframes das animações usadas', () => {
+    const { css } = compilarDoc(comAnimacoes())
+    expect(css).toContain('@keyframes lp-k-fade-baixo')
+    expect(css).toContain('@keyframes lp-k-zoom')
+    expect(css).not.toContain('@keyframes lp-k-girar')
+  })
+
+  it('página sem animação não carrega nada do mecanismo', () => {
+    const { css } = compilarDoc(docCom([novaSecao('cta')]))
+    expect(css).not.toContain('@keyframes lp-k-')
+    expect(css).not.toContain('.lp-an{')
+  })
+
+  it('duração e atraso saem na regra do nó, e o padrão não é repetido', () => {
+    const doc = comAnimacoes()
+    const secao = doc.secoes[0]
+    secao.animacao = { tipo: 'fade', duracao: 1500 }
+    const { css } = compilarDoc(doc)
+    expect(css).toContain('animation-duration:1500ms')
+    expect(css).toContain('animation-delay:200ms')
+    // 800ms é o padrão de .lp-an: emitir de novo seria regra morta.
+    expect(css).not.toContain('animation-duration:800ms;animation-delay')
+  })
+
+  it('quem pediu menos movimento vê tudo parado', () => {
+    const { css } = compilarDoc(comAnimacoes())
+    expect(css).toContain('prefers-reduced-motion:reduce){.lp-an{opacity:1;animation:none}')
+  })
+
+  it('o observador cobre as animações, não só o reveal padrão', () => {
+    expect(compilarDoc(comAnimacoes()).js).toContain(".lp-reveal,.lp-an'")
+  })
+})

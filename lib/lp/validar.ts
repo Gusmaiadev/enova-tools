@@ -59,7 +59,7 @@ import {
 } from './util'
 
 import { DISPOSITIVOS } from './padroes'
-import { coergirRaiz } from './validarArvore'
+import { coergirAnimacao, coergirRaiz } from './validarArvore'
 
 const TIPOS_LAYOUT = new Set<string>(LAYOUTS.map((l) => l.tipo))
 const ORIENTACOES = new Set<string>(['paisagem', 'retrato', 'quadrado'])
@@ -392,6 +392,9 @@ function coergirSecao(v: unknown, ancoras: Set<string>): LpSecao | null {
 
   const destinoForm = opcional(s.destinoForm, 600)
   if (destinoForm) secao.destinoForm = destinoForm
+
+  const animacao = coergirAnimacao(s.animacao)
+  if (animacao) secao.animacao = animacao
 
   const ajustes = obj(s.ajustes)
   const coletados: LpSecao['ajustes'] = {}
