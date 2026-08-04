@@ -275,6 +275,28 @@ export const paginasGeradas = (doc: LpDocumento): PaginaLegal[] =>
   (doc.paginas ?? []).filter((p) => p.conteudo.trim() !== '')
 
 /**
+ * Posicao do link nos "Links uteis" do rodape: os legais fecham a lista, nesta
+ * ordem (termos, depois privacidade); todo o resto fica com -1 e vem antes.
+ * Ordenar por isto e estavel, entao a lista so muda no que e legal.
+ *
+ * Casa pelo arquivo gerado e, para quem escreveu o link a mao apontando para
+ * fora, pelo rotulo — a mesma heuristica de sincronizarLinksPaginas.
+ */
+const ARQUIVO_LEGAL = new Map(PAGINAS_LEGAIS.map((p, i) => [p.arquivo, i]))
+export function ordemLegal(url: string, rotulo: string): number {
+  const porArquivo = ARQUIVO_LEGAL.get(url)
+  if (porArquivo !== undefined) return porArquivo
+  const slug = slugificar(rotulo)
+  if (slug.includes('termo')) return 0
+  if (slug.includes('privacidade')) return 1
+  return -1
+}
+
+/** Links uteis na ordem em que saem na pagina — ver ordemLegal. */
+export const linksUteisOrdenados = <T extends { rotulo: string; url: string }>(links: T[]): T[] =>
+  [...links].sort((a, b) => ordemLegal(a.url, a.rotulo) - ordemLegal(b.url, b.rotulo))
+
+/**
  * Acerta os "Links uteis" do rodape conforme as paginas que o documento tem
  * agora: tira o link de pagina que saiu e recoloca as atuais, com o titulo em
  * vigor. So mexe no que e desta feature — link escrito pelo usuario fica onde

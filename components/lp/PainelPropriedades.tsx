@@ -6,6 +6,7 @@ import { CampoMidia } from './CampoMidia'
 import { CamposBarra } from './CamposBarra'
 import { Cor, Faixa, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
 import { ListaBotoes } from './ListaBotoes'
+import { ListaLinks } from './ListaLinks'
 import { ListaTelefones } from './ListaTelefones'
 import { Aviso } from '@/components/Campo'
 import { SeletorIcone } from './SeletorIcone'
@@ -195,6 +196,16 @@ export function PainelPropriedades({
                 aplicar((d) => {
                   d.footer.estilo = { ...d.footer.estilo, ...patch }
                 }, chave ?? 'footer-estilo')
+              }
+            />
+          </Grupo>
+          <Grupo titulo="Links úteis">
+            <ListaLinks
+              links={doc.footer.linksUteis}
+              aoMudar={(links, chave) =>
+                aplicar((d) => {
+                  d.footer.linksUteis = links
+                }, chave ?? 'footer-links')
               }
             />
           </Grupo>

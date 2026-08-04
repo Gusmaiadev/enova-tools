@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { acharNo } from './arvore'
-import { aplicarTexto, arquivosUsados } from './documento'
+import { aplicarTexto, arquivosUsados, linksUteisOrdenados, ordemLegal } from './documento'
 import type { LpContainer, LpDocumento, LpMidia, LpSecao } from './tipos'
 
 const enviada = (caminho: string): LpMidia => ({
@@ -155,5 +155,45 @@ describe('aplicarTexto na árvore', () => {
     expect(noDe(antes, 'w1')?.tipo === 'titulo' && noDe(antes, 'w1')).toMatchObject({
       texto: 'antes',
     })
+  })
+})
+
+describe('linksUteisOrdenados', () => {
+  const link = (rotulo: string, url: string) => ({ id: rotulo, rotulo, url })
+
+  it('empurra os legais para o fim, termos antes de privacidade', () => {
+    const ordenado = linksUteisOrdenados([
+      link('Política de Privacidade', 'privacidade.html'),
+      link('Blog', '/blog'),
+      link('Termos de Uso', 'termos.html'),
+      link('Vagas', '/vagas'),
+    ])
+    expect(ordenado.map((l) => l.rotulo)).toEqual([
+      'Blog',
+      'Vagas',
+      'Termos de Uso',
+      'Política de Privacidade',
+    ])
+  })
+
+  it('não reordena o que não é legal', () => {
+    const entrada = [link('Vagas', '/vagas'), link('Blog', '/blog'), link('Sobre', '#sobre')]
+    expect(linksUteisOrdenados(entrada).map((l) => l.rotulo)).toEqual([
+      'Vagas',
+      'Blog',
+      'Sobre',
+    ])
+  })
+
+  it('não altera o array recebido', () => {
+    const entrada = [link('Termos de Uso', 'termos.html'), link('Blog', '/blog')]
+    linksUteisOrdenados(entrada)
+    expect(entrada[0].rotulo).toBe('Termos de Uso')
+  })
+
+  it('reconhece link legal escrito à mão pelo rótulo', () => {
+    expect(ordemLegal('https://exemplo.com/p', 'Privacidade')).toBe(1)
+    expect(ordemLegal('https://exemplo.com/t', 'Termos e condições')).toBe(0)
+    expect(ordemLegal('/blog', 'Blog')).toBe(-1)
   })
 })
