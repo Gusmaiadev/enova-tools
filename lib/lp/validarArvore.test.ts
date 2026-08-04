@@ -177,3 +177,35 @@ describe('proporção das colunas', () => {
     }
   })
 })
+
+describe('estilo, transformação e decoração', () => {
+  it('aceita os valores do catálogo', () => {
+    const el = coagir({
+      tipo: 'titulo',
+      texto: 'T',
+      estilo: {
+        estiloFonte: { desktop: 'oblique' },
+        transformacao: { celular: 'capitalize' },
+        decoracao: { desktop: 'overline' },
+      },
+    })
+    expect(el?.estilo?.estiloFonte).toEqual({ desktop: 'oblique' })
+    expect(el?.estilo?.transformacao).toEqual({ celular: 'capitalize' })
+    expect(el?.estilo?.decoracao).toEqual({ desktop: 'overline' })
+  })
+
+  it('descarta valor fora do catálogo', () => {
+    const el = coagir({
+      tipo: 'titulo',
+      texto: 'T',
+      estilo: {
+        estiloFonte: { desktop: 'italic;}body{}' },
+        transformacao: { desktop: 'UPPERCASE' },
+        decoracao: { desktop: 'blink' },
+      },
+    })
+    expect(el?.estilo?.estiloFonte).toBeUndefined()
+    expect(el?.estilo?.transformacao).toBeUndefined()
+    expect(el?.estilo?.decoracao).toBeUndefined()
+  })
+})

@@ -18,6 +18,7 @@ import type {
   LpBotao,
   PorDisp,
 } from './tipos'
+import { DECORACOES, ESTILOS_FONTE, TRANSFORMACOES } from './tipos'
 import { DISPOSITIVOS, PROPORCOES_VALIDAS } from './padroes'
 import { corSegura, gerarId, limitar } from './util'
 
@@ -105,6 +106,9 @@ function coergirEstilo(v: unknown): LpEstilo | undefined {
   por('peso', o.peso, numeroEntre(100, 900))
   por('alturaLinha', o.alturaLinha, textoAte(12))
   por('espacamentoLetras', o.espacamentoLetras, textoAte(12))
+  por('estiloFonte', o.estiloFonte, umDe(ESTILOS_FONTE))
+  por('transformacao', o.transformacao, umDe(TRANSFORMACOES))
+  por('decoracao', o.decoracao, umDe(DECORACOES))
   por('alinhamento', o.alinhamento, umDe(['left', 'center', 'right'] as const))
   por('margem', o.margem, caixa)
   por('padding', o.padding, caixa)

@@ -5,7 +5,7 @@ import { PorDispositivo, definir } from './PorDispositivo'
 import { CLASSE_CONTROLE, Cor, Faixa, Fonte, Opcoes, Selecao } from './campos'
 import { estiloHerdado } from '@/lib/lp/heranca'
 import { PROPORCOES_COLUNAS } from '@/lib/lp/padroes'
-import type { Dispositivo, LpElemento, LpEstilo, LpTema } from '@/lib/lp/tipos'
+import type { Dispositivo, LpElemento, LpEstilo, LpTema, PorDisp } from '@/lib/lp/tipos'
 
 export type MutarNo = (mut: (el: LpElemento) => void, agrupar?: string) => void
 
@@ -15,6 +15,47 @@ type Props = {
   mutarNo: MutarNo
   dispositivo: Dispositivo
 }
+
+/**
+ * Os três seletores de tipografia. Ficam numa lista porque são idênticos em
+ * estrutura — só mudam rótulo e catálogo — e assim a aba não vira 90 linhas
+ * de JSX repetido.
+ */
+const LISTAS_FONTE: {
+  campo: 'estiloFonte' | 'transformacao' | 'decoracao'
+  rotulo: string
+  opcoes: { valor: string; rotulo: string }[]
+}[] = [
+  {
+    campo: 'estiloFonte',
+    rotulo: 'Estilo',
+    opcoes: [
+      { valor: 'normal', rotulo: 'Normal' },
+      { valor: 'italic', rotulo: 'Itálico' },
+      { valor: 'oblique', rotulo: 'Oblíquo' },
+    ],
+  },
+  {
+    campo: 'transformacao',
+    rotulo: 'Transformação',
+    opcoes: [
+      { valor: 'uppercase', rotulo: 'MAIÚSCULA' },
+      { valor: 'lowercase', rotulo: 'minúscula' },
+      { valor: 'capitalize', rotulo: 'Capitalizar' },
+      { valor: 'none', rotulo: 'Normal' },
+    ],
+  },
+  {
+    campo: 'decoracao',
+    rotulo: 'Decoração',
+    opcoes: [
+      { valor: 'underline', rotulo: 'Sublinhado' },
+      { valor: 'overline', rotulo: 'Sobrelinhado' },
+      { valor: 'line-through', rotulo: 'Linha através' },
+      { valor: 'none', rotulo: 'Nenhum' },
+    ],
+  },
+]
 
 const PROPORCOES: { valor: string; rotulo: string }[] = [
   { valor: '', rotulo: 'Original' },
@@ -416,6 +457,41 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo }: Props) {
           }
         />
       </PorDispositivo>
+
+      {/* Padrão = a chave não existe, então a cascata decide. Por isso cada
+          lista tem também o valor que DESLIGA o que veio do tema ou da
+          aparência ('normal' na fonte, 'none' nas outras duas). */}
+      {LISTAS_FONTE.map((l) => (
+        <PorDispositivo
+          key={l.campo}
+          rotulo={l.rotulo}
+          valor={e[l.campo]}
+          ativo={dispositivo}
+          aoLimpar={limpar(l.campo)}
+          rotuloHerdado="padrão"
+        >
+          <Selecao
+            rotulo=""
+            value={e[l.campo]?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              mudar((est) => {
+                // Mesmo caminho genérico de `limpar`: a chave vem da lista, e o
+                // catálogo de valores quem garante é a coerção do servidor.
+                const novo = definir(est[l.campo] as PorDisp<string>, dispositivo, ev.target.value)
+                if (novo) (est as Record<string, unknown>)[l.campo] = novo
+                else delete est[l.campo]
+              })
+            }
+          >
+            <option value="">Padrão</option>
+            {l.opcoes.map((o) => (
+              <option key={o.valor} value={o.valor}>
+                {o.rotulo}
+              </option>
+            ))}
+          </Selecao>
+        </PorDispositivo>
+      ))}
 
       <PorDispositivo
         rotulo="Alinhamento"

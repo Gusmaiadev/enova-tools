@@ -265,6 +265,19 @@ export type PorDisp<T> = Partial<Record<Dispositivo, T>>
 export type Caixa = { topo: number; direita: number; base: number; esquerda: number }
 
 /** Sobreposicoes visuais de um no. Ausente = herda do tema. */
+/**
+ * Os tres controles de tipografia que nao sao numero nem cor. Sao unioes
+ * fechadas de proposito: o valor vira CSS direto e o documento nao e confiavel.
+ * "Padrao" (herdar) e a AUSENCIA da chave, nao um valor — por isso 'normal' e
+ * 'none' existem: sao o jeito de DESLIGAR o que veio do tema ou da aparencia.
+ */
+export const ESTILOS_FONTE = ['normal', 'italic', 'oblique'] as const
+export const TRANSFORMACOES = ['none', 'uppercase', 'lowercase', 'capitalize'] as const
+export const DECORACOES = ['none', 'underline', 'overline', 'line-through'] as const
+export type EstiloFonte = (typeof ESTILOS_FONTE)[number]
+export type Transformacao = (typeof TRANSFORMACOES)[number]
+export type Decoracao = (typeof DECORACOES)[number]
+
 export type LpEstilo = {
   cor?: PorDisp<string>
   fundo?: PorDisp<string>
@@ -273,6 +286,12 @@ export type LpEstilo = {
   peso?: PorDisp<number>
   alturaLinha?: PorDisp<string>
   espacamentoLetras?: PorDisp<string>
+  /** `font-style`. Ausente = herda a cascata. */
+  estiloFonte?: PorDisp<EstiloFonte>
+  /** `text-transform`. Ausente = herda a cascata; 'none' desliga a herdada. */
+  transformacao?: PorDisp<Transformacao>
+  /** `text-decoration-line`. Ausente = herda a cascata. */
+  decoracao?: PorDisp<Decoracao>
   alinhamento?: PorDisp<'left' | 'center' | 'right'>
   margem?: PorDisp<Caixa>
   padding?: PorDisp<Caixa>

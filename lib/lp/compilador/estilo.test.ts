@@ -504,3 +504,49 @@ describe('os seis breakpoints', () => {
     expect(css).not.toContain('max-width:1200px')
   })
 })
+
+describe('cssDaArvore — estilo, transformação e decoração', () => {
+  const titulo = (estilo: Record<string, unknown>) =>
+    cssDaArvore(
+      raiz([
+        {
+          id: 't1',
+          tipo: 'titulo',
+          texto: 'Oi',
+          nivel: 'h2',
+          estilo: estilo as never,
+        },
+      ]),
+    )
+
+  it('emite as três propriedades no dispositivo em que foram definidas', () => {
+    const css = titulo({
+      estiloFonte: { desktop: 'italic' },
+      transformacao: { desktop: 'uppercase' },
+      decoracao: { desktop: 'line-through' },
+    })
+    expect(css.desktop).toContain('font-style:italic')
+    expect(css.desktop).toContain('text-transform:uppercase')
+    expect(css.desktop).toContain('text-decoration-line:line-through')
+    // Sem valor próprio no celular, a herança sai da cascata: nada emitido.
+    expect(css.celular).toBe('')
+  })
+
+  it('cada dispositivo pode ter o seu', () => {
+    const css = titulo({
+      transformacao: { desktop: 'uppercase', celular: 'none' },
+    })
+    expect(css.desktop).toContain('text-transform:uppercase')
+    expect(css.celular).toContain('text-transform:none')
+  })
+
+  it('valor fora do catálogo não vira CSS', () => {
+    // Defesa em profundidade: a coerção já filtra, mas o compilador não confia.
+    const css = titulo({
+      estiloFonte: { desktop: 'italic;}body{display:none' },
+      decoracao: { desktop: 'underline overline' },
+    })
+    expect(css.desktop).not.toContain('display:none')
+    expect(css.desktop).not.toContain('overline')
+  })
+})

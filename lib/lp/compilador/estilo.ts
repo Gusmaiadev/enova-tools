@@ -12,6 +12,7 @@ import { caminharElementos } from '../arvore'
 import { familiaCss } from '../fontes'
 import { DISPOSITIVOS, PROPORCOES_VALIDAS } from '../padroes'
 import type { Caixa, Dispositivo, LpContainer, LpElemento, LpEstilo, PorDisp } from '../tipos'
+import { DECORACOES, ESTILOS_FONTE, TRANSFORMACOES } from '../tipos'
 import { corSegura, escCss } from '../util'
 
 
@@ -111,6 +112,15 @@ function regrasEstilo(e: LpEstilo, d: Dispositivo, posicionavel: boolean): strin
   if (altura) r.push(`line-height:${escCss(altura)}`)
   const espaco = em(e.espacamentoLetras)
   if (espaco) r.push(`letter-spacing:${escCss(espaco)}`)
+  // Unioes fechadas: so entra no CSS o que esta no catalogo de tipos.ts.
+  const estiloFonte = em(e.estiloFonte)
+  if (estiloFonte && ESTILOS_FONTE.includes(estiloFonte)) r.push(`font-style:${estiloFonte}`)
+  const transformacao = em(e.transformacao)
+  if (transformacao && TRANSFORMACOES.includes(transformacao)) {
+    r.push(`text-transform:${transformacao}`)
+  }
+  const decoracao = em(e.decoracao)
+  if (decoracao && DECORACOES.includes(decoracao)) r.push(`text-decoration-line:${decoracao}`)
   const margem = em(e.margem)
   if (margem) r.push(`margin:${caixaCss(margem)}`)
   const padding = em(e.padding)
