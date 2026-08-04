@@ -169,8 +169,16 @@ function htmlFooter(ctx: Ctx, doc: LpDocumento): string {
     .map((b) => htmlBotao(ctx, b, `footer:botao:${b.id}`))
     .join('')
 
+  // Mesma logo do topo: quando o usuario sobe uma imagem, o rodape mostra a
+  // imagem tambem — antes ele caia sempre no nome escrito. A classe e propria
+  // para o tamanho do rodape nao ficar preso ao do header.
+  const logo = doc.header.logo
+  const conteudoLogo = logo
+    ? `<img src="${esc(urlMidia(ctx, logo))}" alt="${esc(doc.header.logoTexto || logo.alt)}">`
+    : esc(doc.header.logoTexto)
+
   const colunas = [
-    `<div><h4 class="lp-logo-footer">${esc(doc.header.logoTexto)}</h4>${
+    `<div><h4 class="lp-logo-footer${logo ? ' lp-logo-footer-img' : ''}">${conteudoLogo}</h4>${
       f.textoInstitucional ? `<p${alvo(ctx, 'footer:institucional')}>${quebras(f.textoInstitucional)}</p>` : ''
     }${acoes ? `<div class="lp-footer-acoes">${acoes}</div>` : ''}${
       redes ? `<div class="lp-redes">${redes}</div>` : ''

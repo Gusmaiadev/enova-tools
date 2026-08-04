@@ -138,7 +138,7 @@ const HEADER = `
 .lp-header .lp-container{display:flex;align-items:center;justify-content:space-between;gap:24px;height:72px}
 .lp-logo{font-family:var(--fonte-titulos);font-weight:700;font-size:1.35rem;color:inherit}
 .lp-logo-img{display:flex;align-items:center;flex:none}
-.lp-logo-img img{max-height:44px;max-width:220px;width:auto;height:auto;object-fit:contain}
+.lp-logo-img img,.lp-logo-footer-img img{max-height:44px;max-width:220px;width:auto;height:auto;object-fit:contain}
 .lp-nav{display:flex;align-items:center;gap:28px}
 .lp-nav ul{display:flex;gap:28px;list-style:none}
 .lp-nav a{color:inherit;font-weight:500;font-size:.95rem;opacity:.85;transition:opacity .2s}
@@ -409,7 +409,12 @@ function cssBarras(doc: LpDocumento): string {
   // Menu do rodapé são as colunas de links; a coluna de contato (endereço,
   // telefone, e-mail) não é menu e fica com a fonte do tema.
   if (f?.menu) css += ajusteParaCss('.lp-footer ul:not(.lp-contato) a', f.menu)
-  if (f?.logo) css += `.lp-logo-footer{font-size:${f.logo}px}\n`
+  // Mesma regra do header: imagem cresce pela altura, nome escrito pelo corpo.
+  if (f?.logo) {
+    css += doc.header.logo
+      ? `.lp-logo-footer-img img{max-height:${f.logo}px;max-width:${f.logo * 5}px}\n`
+      : `.lp-logo-footer{font-size:${f.logo}px}\n`
+  }
   if (f?.alinhamento && f.alinhamento !== 'esquerda') {
     const texto = f.alinhamento === 'centro' ? 'center' : 'right'
     const flex = f.alinhamento === 'centro' ? 'center' : 'flex-end'

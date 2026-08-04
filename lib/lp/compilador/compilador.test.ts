@@ -1007,3 +1007,50 @@ describe('links úteis do rodapé', () => {
     expect((rodape.match(/href="#contato"/g) ?? []).length).toBe(1)
   })
 })
+
+describe('logo do rodapé', () => {
+  const comLogo = () => {
+    const doc = docCom([novaSecao('cta')])
+    doc.header.logoTexto = 'Clínica Vida'
+    doc.header.logo = {
+      tipo: 'imagem',
+      url: 'https://cdn/logo.png',
+      alt: 'logo.png',
+      busca: '',
+      orientacao: 'paisagem',
+    }
+    return doc
+  }
+
+  it('a logo enviada aparece no rodapé, não só no topo', () => {
+    const { html } = compilarDoc(comLogo())
+    const rodape = html.slice(html.indexOf('lp-footer'))
+    expect(rodape).toContain('lp-logo-footer-img')
+    expect(rodape).toContain('<img src="https://cdn/logo.png"')
+    // O alt é o nome da marca, não o do arquivo.
+    expect(rodape).toContain('alt="Clínica Vida"')
+  })
+
+  it('sem imagem o rodapé continua mostrando o nome escrito', () => {
+    const doc = docCom([novaSecao('cta')])
+    doc.header.logoTexto = 'Clínica Vida'
+    const { html } = compilarDoc(doc)
+    const rodape = html.slice(html.indexOf('lp-footer'))
+    expect(rodape).toContain('<h4 class="lp-logo-footer">Clínica Vida</h4>')
+  })
+
+  it('o tamanho da logo do rodapé vira altura quando é imagem', () => {
+    const doc = comLogo()
+    doc.footer.estilo = { logo: 60 }
+    const { css } = compilarDoc(doc)
+    expect(css).toContain('.lp-logo-footer-img img{max-height:60px')
+    expect(css).not.toContain('.lp-logo-footer{font-size:60px}')
+  })
+
+  it('sem imagem, o mesmo ajuste continua sendo corpo de fonte', () => {
+    const doc = docCom([novaSecao('cta')])
+    doc.footer.estilo = { logo: 60 }
+    const { css } = compilarDoc(doc)
+    expect(css).toContain('.lp-logo-footer{font-size:60px}')
+  })
+})

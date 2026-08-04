@@ -163,6 +163,36 @@ describe('coergirDocumento', () => {
     ])
   })
 
+  it('as redes do briefing sobrevivem à IA que as esqueceu', () => {
+    const briefing = {
+      ...briefingVazio('Clínica Vida'),
+      redes: [
+        { id: 'r1', rede: 'instagram' as const, url: 'https://instagram.com/clinica' },
+        { id: 'r2', rede: 'facebook' as const, url: 'https://facebook.com/clinica' },
+      ],
+    }
+    // A IA devolveu o documento sem a chave `redes` — o caso comum.
+    const semRedes: Record<string, unknown> = { ...respostaIA }
+    delete semRedes.redes
+    const doc = coergirDocumentoIA(semRedes, briefing)
+    expect(doc?.redes).toEqual(briefing.redes)
+  })
+
+  it('a logo enviada sobrevive à IA, que não tem como escrevê-la', () => {
+    const briefing = {
+      ...briefingVazio('Clínica Vida'),
+      logo: {
+        tipo: 'imagem' as const,
+        url: 'https://cdn/logo.png',
+        alt: 'logo.png',
+        busca: '',
+        orientacao: 'paisagem' as const,
+      },
+    }
+    const doc = coergirDocumentoIA(respostaIA, briefing)
+    expect(doc?.header.logo?.url).toBe('https://cdn/logo.png')
+  })
+
   it('limpa os ajustes de header e rodapé', () => {
     const doc = coergirDocumento({
       ...respostaIA,

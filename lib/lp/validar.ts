@@ -752,5 +752,13 @@ export function coergirDocumentoIA(bruto: unknown, briefing: LpBriefing): LpDocu
   // e esquecer o "whatsapp": true).
   const telefones = normalizarTelefones(briefing.footer.telefones)
   if (telefones.length > 0) doc.footer.telefones = telefones
+  // Redes sociais tambem nao: as URLs vieram prontas do briefing e a IA
+  // costuma omitir a lista inteira (ou inventar um perfil), deixando o rodape
+  // sem icone nenhum.
+  if (briefing.redes.length > 0) doc.redes = briefing.redes.map((r) => ({ ...r }))
+  // A logo enviada e um arquivo no storage: a IA nao tem como escreve-la no
+  // JSON, entao sem isto a pagina gerada sai sempre com o nome em texto no
+  // lugar da imagem que o usuario subiu.
+  if (briefing.logo) doc.header.logo = briefing.logo
   return doc
 }
