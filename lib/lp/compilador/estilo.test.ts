@@ -266,18 +266,52 @@ describe('estilo de mídia', () => {
     expect(desktop).toContain('.lp-e-m img,.lp-e-m video{object-fit:contain}')
   })
 
-  it('alinhamento em mídia é align-self; em texto é text-align', () => {
-    const daMidia = cssDaArvore(
-      raiz([{ id: 'm', tipo: 'imagem', midia, estilo: { alinhamento: { desktop: 'right' } } }]),
-    ).desktop
-    const doTexto = cssDaArvore(
-      raiz([
-        { id: 't', tipo: 'titulo', nivel: 'h2', texto: 'T', estilo: { alinhamento: { desktop: 'right' } } },
-      ]),
-    ).desktop
-    expect(daMidia).toContain('align-self:flex-end')
-    expect(daMidia).not.toContain('text-align')
+  it('alinhamento posiciona o bloco; em texto continua sendo text-align', () => {
+    const alinhado = (el: Parameters<typeof raiz>[0][number]) => cssDaArvore(raiz([el])).desktop
+    const est = { alinhamento: { desktop: 'right' as const } }
+
+    // Bloco: margin-inline move o elemento. `text-align` não moveria — num
+    // botão ele só centraliza o rótulo dentro do próprio botão.
+    expect(alinhado({ id: 'm', tipo: 'imagem', midia, estilo: est })).toContain(
+      'margin-inline:auto 0',
+    )
+    expect(alinhado({ id: 'b', tipo: 'botao', botao: { texto: 'B', url: '#' }, estilo: est })).toContain(
+      'margin-inline:auto 0',
+    )
+    expect(alinhado({ id: 'i', tipo: 'icone', nome: 'check', estilo: est })).toContain(
+      'margin-inline:auto 0',
+    )
+
+    // Texto continua com text-align: ali o alinhamento é do conteúdo mesmo.
+    const doTexto = alinhado({ id: 't', tipo: 'titulo', nivel: 'h2', texto: 'T', estilo: est })
     expect(doTexto).toContain('text-align:right')
+    expect(doTexto).not.toContain('margin-inline')
+  })
+
+  it('centralizar o botão vale em qualquer container — coluna, linha ou grade', () => {
+    const { desktop } = cssDaArvore(
+      raiz([{ id: 'b', tipo: 'botao', botao: { texto: 'B', url: '#' }, estilo: { alinhamento: { desktop: 'center' } } }]),
+    )
+    // `margin-inline:auto` funciona nos três; align-self só na coluna e
+    // justify-self só na grade — daí a escolha.
+    expect(desktop).toContain('margin-inline:auto')
+  })
+
+  it('alinhamento sai depois da margem, senão a margem o apagaria', () => {
+    const { desktop } = cssDaArvore(
+      raiz([
+        {
+          id: 'b',
+          tipo: 'botao',
+          botao: { texto: 'B', url: '#' },
+          estilo: {
+            margem: { desktop: { topo: 8, direita: 0, base: 8, esquerda: 0 } },
+            alinhamento: { desktop: 'center' },
+          },
+        },
+      ]),
+    )
+    expect(desktop.indexOf('margin:8px')).toBeLessThan(desktop.indexOf('margin-inline'))
   })
 
   it('encaixe fora do conjunto não vira CSS', () => {

@@ -75,8 +75,26 @@ const OBJECT_FIT: Record<string, string> = {
   preencher: 'fill',
 }
 
+/**
+ * Nos que sao um BLOCO dentro do container, e nao texto corrido. Neles
+ * `text-align` nao posiciona nada — no botao ele so centraliza o rotulo dentro
+ * do proprio botao, que ja vem centralizado.
+ *
+ * `margin-inline:auto` posiciona, e funciona nos tres casos que o container
+ * pode ser: coluna, linha e grade. `align-self` so serviria na coluna, e
+ * `justify-self` so na grade.
+ */
+const POSICIONAVEIS = new Set(['imagem', 'video', 'botao', 'icone'])
+
+/** `margin-inline` leva dois valores: inicio e fim. */
+const MARGEM_ALINHAMENTO: Record<string, string> = {
+  left: '0 auto',
+  center: 'auto',
+  right: 'auto 0',
+}
+
 /** Regras de LpEstilo num dispositivo. */
-function regrasEstilo(e: LpEstilo, d: Dispositivo, ehMidia: boolean): string[] {
+function regrasEstilo(e: LpEstilo, d: Dispositivo, posicionavel: boolean): string[] {
   const r: string[] = []
   const em = <T>(p: PorDisp<T> | undefined): T | undefined => p?.[d]
   const cor = em(e.cor)
@@ -93,16 +111,6 @@ function regrasEstilo(e: LpEstilo, d: Dispositivo, ehMidia: boolean): string[] {
   if (altura) r.push(`line-height:${escCss(altura)}`)
   const espaco = em(e.espacamentoLetras)
   if (espaco) r.push(`letter-spacing:${escCss(espaco)}`)
-  const alinhamento = em(e.alinhamento)
-  // Em midia o no e um bloco dentro do container flex: `text-align` nao moveria
-  // o quadro. `align-self` move — e e o que o painel oferece la.
-  if (alinhamento) {
-    r.push(
-      ehMidia
-        ? `align-self:${{ left: 'flex-start', center: 'center', right: 'flex-end' }[alinhamento]}`
-        : `text-align:${escCss(alinhamento)}`,
-    )
-  }
   const margem = em(e.margem)
   if (margem) r.push(`margin:${caixaCss(margem)}`)
   const padding = em(e.padding)
@@ -117,6 +125,17 @@ function regrasEstilo(e: LpEstilo, d: Dispositivo, ehMidia: boolean): string[] {
   if (alturaCaixa) r.push(`height:${escCss(alturaCaixa)}`)
   const proporcao = em(e.proporcao)
   if (proporcao) r.push(`aspect-ratio:${escCss(proporcao)}`)
+
+  // Alinhamento por ULTIMO, e depois de `margem`: no bloco posicionavel ele sai
+  // como margin-inline, que a regra de `margin` acima apagaria se viesse antes.
+  const alinhamento = em(e.alinhamento)
+  if (alinhamento) {
+    r.push(
+      posicionavel
+        ? `margin-inline:${MARGEM_ALINHAMENTO[alinhamento]}`
+        : `text-align:${escCss(alinhamento)}`,
+    )
+  }
   return r
 }
 
@@ -124,7 +143,7 @@ function regrasDoNo(el: LpElemento, d: Dispositivo): string {
   const ehMidia = el.tipo === 'imagem' || el.tipo === 'video'
   const r: string[] = []
   if (el.tipo === 'container') r.push(...regrasContainer(el, d))
-  if (el.estilo) r.push(...regrasEstilo(el.estilo, d, ehMidia))
+  if (el.estilo) r.push(...regrasEstilo(el.estilo, d, POSICIONAVEIS.has(el.tipo)))
   // A checagem de tipo vem antes do acesso: `altura` so existe no espacador, e
   // o TypeScript so libera o campo depois de estreitar a uniao.
   if (el.tipo === 'espacador' && el.altura[d] !== undefined) {

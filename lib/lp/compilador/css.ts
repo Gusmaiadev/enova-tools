@@ -307,6 +307,11 @@ const APARENCIAS = `
    secao ganha espaco por cima do padding que ela ja tem. */
 .lp-c > :first-child{margin-top:0}
 .lp-c > :last-child{margin-bottom:0}
+/* Botao e icone sao inline-flex: num container em coluna o align-items:stretch
+   padrao os esticaria de ponta a ponta. O flex-start deixa cada um do tamanho do
+   proprio conteudo — e o alinhamento escolhido no painel, que sai como
+   margin-inline:auto, vence isto porque margem automatica e resolvida antes. */
+.lp-c > .lp-btn,.lp-c > .lp-icone{align-self:flex-start}
 .lp-ap-card{display:flex;flex-direction:column;background:color-mix(in srgb,var(--cor-titulos) 4%,transparent);border:1px solid color-mix(in srgb,var(--cor-titulos) 10%,transparent);border-radius:var(--raio);padding:32px 28px;transition:transform .25s,box-shadow .25s}
 .lp-ap-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px -24px color-mix(in srgb,var(--cor-principal) 45%,transparent)}
 .lp-ap-plano{display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--cor-titulos) 12%,transparent);border-radius:var(--raio);padding:36px 30px;background:color-mix(in srgb,var(--cor-titulos) 3%,transparent)}
