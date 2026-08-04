@@ -1054,3 +1054,58 @@ describe('logo do rodapé', () => {
     expect(css).toContain('.lp-logo-footer{font-size:60px}')
   })
 })
+
+describe('ordem dos links úteis', () => {
+  /** Rótulos dos <li> da coluna "Links úteis", na ordem em que saem. */
+  const rotulos = (html: string) => {
+    const col = html.slice(html.indexOf('Links úteis'))
+    return [...col.slice(0, col.indexOf('</ul>')).matchAll(/<a [^>]*>([^<]*)<\/a>/g)].map(
+      (m) => m[1],
+    )
+  }
+
+  it('termos e privacidade fecham a lista, mesmo entrando antes', () => {
+    const doc = docCom([novaSecao('cta')])
+    doc.footer.linksUteis = [
+      { id: 'l1', rotulo: 'Termos de Uso', url: 'termos.html' },
+      { id: 'l2', rotulo: 'Política de Privacidade', url: 'privacidade.html' },
+      { id: 'l3', rotulo: 'Blog', url: '/blog' },
+      { id: 'l4', rotulo: 'Trabalhe conosco', url: '/vagas' },
+    ]
+    expect(rotulos(compilarDoc(doc).html)).toEqual([
+      'Blog',
+      'Trabalhe conosco',
+      'Termos de Uso',
+      'Política de Privacidade',
+    ])
+  })
+
+  it('o menu repetido do header não passa na frente dos legais', () => {
+    // Era o caso real: menuSecundario concatena depois dos links úteis, e os
+    // legais — que sincronizarLinksPaginas põe no fim — ficavam no meio.
+    const doc = docCom([novaSecao('cta')])
+    doc.header.menu = [{ id: 'm1', rotulo: 'Contato', alvo: '#contato' }]
+    doc.footer.linksUteis = [{ id: 'l1', rotulo: 'Termos de Uso', url: 'termos.html' }]
+    doc.footer.menuSecundario = true
+    expect(rotulos(compilarDoc(doc).html)).toEqual(['Contato', 'Termos de Uso'])
+  })
+
+  it('link legal escrito à mão, apontando para fora, também vai para o fim', () => {
+    const doc = docCom([novaSecao('cta')])
+    doc.footer.linksUteis = [
+      { id: 'l1', rotulo: 'Privacidade', url: 'https://exemplo.com/privacidade' },
+      { id: 'l2', rotulo: 'Blog', url: '/blog' },
+    ]
+    expect(rotulos(compilarDoc(doc).html)).toEqual(['Blog', 'Privacidade'])
+  })
+
+  it('sem links legais a ordem do documento é preservada', () => {
+    const doc = docCom([novaSecao('cta')])
+    doc.footer.linksUteis = [
+      { id: 'l1', rotulo: 'Blog', url: '/blog' },
+      { id: 'l2', rotulo: 'Sobre', url: '#sobre' },
+      { id: 'l3', rotulo: 'Vagas', url: '/vagas' },
+    ]
+    expect(rotulos(compilarDoc(doc).html)).toEqual(['Blog', 'Sobre', 'Vagas'])
+  })
+})

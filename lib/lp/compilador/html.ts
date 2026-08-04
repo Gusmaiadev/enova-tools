@@ -21,6 +21,7 @@ import {
   urlMidia,
 } from './comum'
 import { svgIcone, svgRede } from '../icones'
+import { PAGINAS_LEGAIS } from '../tipos'
 import type { LpDocumento, LpSecao, PaginaLegal } from '../tipos'
 import {
   esc,
@@ -28,6 +29,7 @@ import {
   linkTelefone,
   normalizarBotoes,
   normalizarTelefones,
+  slugificar,
   urlSegura,
 } from '../util'
 import { idHtmlSecao } from './css'
@@ -35,6 +37,25 @@ import { idHtmlSecao } from './css'
 // Ctx, midia, botao e os mecanismos compartilhados vivem em comum.ts — ver o
 // cabecalho daquele arquivo para o porque.
 export type { Ctx, MidiaColetada, OpcoesHtml } from './comum'
+
+/**
+ * Posicao dos links legais no fim dos "Links uteis" do rodape. O catalogo ja
+ * esta na ordem que sai na pagina (termos, depois privacidade); tudo que nao e
+ * legal fica com -1 e portanto vem antes.
+ *
+ * Casa pelo arquivo gerado e, para quem escreveu o link a mao apontando para
+ * fora, pelo rotulo — a mesma heuristica que sincronizarLinksPaginas usa para
+ * nao deixar os dois conviverem.
+ */
+const ARQUIVO_LEGAL = new Map(PAGINAS_LEGAIS.map((p, i) => [p.arquivo, i]))
+function ordemLegal(url: string, rotulo: string): number {
+  const porArquivo = ARQUIVO_LEGAL.get(url)
+  if (porArquivo !== undefined) return porArquivo
+  const slug = slugificar(rotulo)
+  if (slug.includes('termo')) return 0
+  if (slug.includes('privacidade')) return 1
+  return -1
+}
 
 /* ------------------------------ montagem --------------------------------- */
 
@@ -130,18 +151,21 @@ function htmlFooter(ctx: Ctx, doc: LpDocumento): string {
    */
   const destinos = new Set<string>()
   const links = [
-    ...f.linksUteis.map((l) => ({ rotulo: l.rotulo, alvo: href(ctx, l.url) })),
+    ...f.linksUteis.map((l) => ({ rotulo: l.rotulo, url: l.url })),
     ...(f.menuSecundario
-      ? doc.header.menu.map((m) => ({ rotulo: m.rotulo, alvo: href(ctx, m.alvo) }))
+      ? doc.header.menu.map((m) => ({ rotulo: m.rotulo, url: m.alvo }))
       : []),
   ]
     .filter((l) => {
-      const chave = l.alvo.trim().toLowerCase()
+      const chave = href(ctx, l.url).trim().toLowerCase()
       if (chave === '' || destinos.has(chave)) return false
       destinos.add(chave)
       return true
     })
-    .map((l) => `<li><a href="${esc(l.alvo)}">${esc(l.rotulo)}</a></li>`)
+    // Termos e privacidade fecham a lista, nesta ordem — sao rodape legal, nao
+    // navegacao. Ordenacao estavel: o resto fica como esta no documento.
+    .sort((a, b) => ordemLegal(a.url, a.rotulo) - ordemLegal(b.url, b.rotulo))
+    .map((l) => `<li><a href="${esc(href(ctx, l.url))}">${esc(l.rotulo)}</a></li>`)
     .join('')
   // Cada telefone e uma linha propria: com WhatsApp vira link do wa.me (icone da
   // rede, abre em outra aba), sem vira link tel:.
