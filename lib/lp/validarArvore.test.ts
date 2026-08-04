@@ -163,3 +163,17 @@ describe('coergirDocumento preserva a árvore', () => {
     expect(coergirDocumento(mentiroso)?.versao).toBeUndefined()
   })
 })
+
+describe('proporção das colunas', () => {
+  it('aceita valor do catálogo', () => {
+    const el = coagir({ tipo: 'container', colunas: { desktop: 2 }, proporcaoColunas: { desktop: '2fr 1fr' } })
+    expect(el).toMatchObject({ proporcaoColunas: { desktop: '2fr 1fr' } })
+  })
+
+  it('recusa qualquer coisa fora dele — isto vira grid-template-columns', () => {
+    for (const veneno of ['1fr;}body{display:none', 'repeat(99,1fr)', '1fr 1fr 1fr 1fr 1fr']) {
+      const el = coagir({ tipo: 'container', proporcaoColunas: { desktop: veneno } })
+      expect(el).not.toHaveProperty('proporcaoColunas')
+    }
+  })
+})

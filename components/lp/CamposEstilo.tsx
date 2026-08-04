@@ -4,6 +4,7 @@ import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 import { PorDispositivo, definir } from './PorDispositivo'
 import { CLASSE_CONTROLE, Cor, Faixa, Fonte, Opcoes, Selecao } from './campos'
 import { estiloHerdado } from '@/lib/lp/heranca'
+import { PROPORCOES_COLUNAS } from '@/lib/lp/padroes'
 import type { Dispositivo, LpElemento, LpEstilo, LpTema } from '@/lib/lp/tipos'
 
 export type MutarNo = (mut: (el: LpElemento) => void, agrupar?: string) => void
@@ -60,6 +61,118 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo, aoTrocarDispositi
         delete est[chave]
       }
     })
+
+  // Container não tem texto próprio: o que importa nele é o tamanho, como as
+  // colunas se repartem e o fundo. Fonte e cor de texto pertencem aos filhos.
+  if (no.tipo === 'container') {
+    const colunas = no.colunas?.[dispositivo] ?? 1
+    const proporcoes = PROPORCOES_COLUNAS[colunas]
+    return (
+      <div className="space-y-3">
+        <PorDispositivo
+          rotulo="Largura do bloco"
+          valor={e.largura}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('largura')}
+          rotuloHerdado="ocupa tudo"
+        >
+          <input
+            className={CLASSE_CONTROLE}
+            placeholder="ex.: 60%, 480px"
+            value={e.largura?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              mudar((est) => {
+                est.largura = definir(est.largura, dispositivo, ev.target.value)
+              }, 'cont-largura')
+            }
+          />
+        </PorDispositivo>
+
+        {proporcoes ? (
+          <PorDispositivo
+            rotulo="Largura das colunas"
+            valor={no.proporcaoColunas}
+            ativo={dispositivo}
+            aoTrocar={aoTrocarDispositivo}
+            rotuloHerdado="iguais"
+            aoLimpar={() =>
+              mutarNo((el) => {
+                if (el.tipo === 'container') {
+                  el.proporcaoColunas = definir(el.proporcaoColunas, dispositivo, undefined)
+                }
+              })
+            }
+          >
+            <Selecao
+              rotulo=""
+              value={no.proporcaoColunas?.[dispositivo] ?? ''}
+              onChange={(ev) =>
+                mutarNo((el) => {
+                  if (el.tipo === 'container') {
+                    el.proporcaoColunas = definir(
+                      el.proporcaoColunas,
+                      dispositivo,
+                      ev.target.value,
+                    )
+                  }
+                })
+              }
+            >
+              {proporcoes.map((p) => (
+                <option key={p.valor} value={p.valor}>
+                  {p.rotulo}
+                </option>
+              ))}
+            </Selecao>
+          </PorDispositivo>
+        ) : (
+          <p className="text-xs text-text-dim">
+            Este bloco está com {colunas === 1 ? 'uma coluna' : `${colunas} colunas`}. Para repartir
+            larguras diferentes, deixe-o com 2, 3 ou 4 colunas na aba Conteúdo.
+          </p>
+        )}
+
+        <PorDispositivo
+          rotulo="Cor de fundo"
+          valor={e.fundo}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('fundo')}
+          rotuloHerdado="sem fundo"
+        >
+          <Cor
+            rotulo=""
+            valor={e.fundo?.[dispositivo]}
+            placeholder="sem fundo"
+            aoMudar={(v) => mudar((est) => { est.fundo = definir(est.fundo, dispositivo, v) }, 'cont-fundo')}
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Cantos"
+          valor={e.raio}
+          ativo={dispositivo}
+          aoTrocar={aoTrocarDispositivo}
+          aoLimpar={limpar('raio')}
+        >
+          <Faixa
+            rotulo=""
+            min={0}
+            max={64}
+            valor={e.raio?.[dispositivo] ?? tema.raio}
+            aoMudar={(v) => mudar((est) => { est.raio = definir(est.raio, dispositivo, v) }, 'cont-raio')}
+          />
+        </PorDispositivo>
+
+        <p className="text-xs text-text-dim">
+          Direção, número de colunas e espaço entre itens ficam na aba{' '}
+          <strong className="text-text">Conteúdo</strong>; margem e espaçamento interno, na{' '}
+          <strong className="text-text">Avançado</strong>.
+        </p>
+      </div>
+    )
+  }
 
   // Imagem e vídeo não têm fonte, peso nem entrelinha: o que importa neles é o
   // tamanho do quadro, a proporção e como a mídia se encaixa dentro dele.

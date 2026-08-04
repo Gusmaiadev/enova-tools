@@ -18,6 +18,7 @@ import type {
   LpBotao,
   PorDisp,
 } from './tipos'
+import { PROPORCOES_VALIDAS } from './padroes'
 import { corSegura, gerarId, limitar } from './util'
 
 const obj = (v: unknown): Record<string, unknown> =>
@@ -175,6 +176,11 @@ export function coergirElemento(
     if (APARENCIAS.has(String(o.aparencia))) c.aparencia = o.aparencia as Aparencia
     const colunas = porDisp(o.colunas, numeroEntre(1, 12))
     if (colunas) c.colunas = colunas
+    // Catalogo fechado: isto vira grid-template-columns.
+    const proporcao = porDisp(o.proporcaoColunas, (v) =>
+      typeof v === 'string' && PROPORCOES_VALIDAS.has(v) ? v : undefined,
+    )
+    if (proporcao) c.proporcaoColunas = proporcao
     const gap = porDisp(o.gap, numeroEntre(0, 200))
     if (gap) c.gap = gap
     const alinhar = porDisp(o.alinhar, umDe(['inicio', 'centro', 'fim', 'esticar'] as const))

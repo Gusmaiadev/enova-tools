@@ -10,6 +10,7 @@
 
 import { caminharElementos } from '../arvore'
 import { familiaCss } from '../fontes'
+import { PROPORCOES_VALIDAS } from '../padroes'
 import type { Caixa, Dispositivo, LpContainer, LpElemento, LpEstilo, PorDisp } from '../tipos'
 import { corSegura, escCss } from '../util'
 
@@ -42,15 +43,24 @@ function regrasContainer(c: LpContainer, d: Dispositivo): string[] {
   const r: string[] = []
   const direcao = c.direcao[d]
   const colunas = c.colunas?.[d]
-  if (direcao === 'linha' && colunas !== undefined) {
-    r.push('display:grid', `grid-template-columns:repeat(${num(colunas)},1fr)`)
+  // Proporcao so vale do catalogo — ver PROPORCOES_VALIDAS. Fora dele, ignora e
+  // cai em colunas iguais, em vez de deixar passar CSS arbitrario.
+  const proporcao = c.proporcaoColunas?.[d]
+  const trilhas =
+    proporcao && PROPORCOES_VALIDAS.has(proporcao)
+      ? proporcao
+      : colunas !== undefined
+        ? `repeat(${num(colunas)},1fr)`
+        : ''
+  if (direcao === 'linha' && trilhas) {
+    r.push('display:grid', `grid-template-columns:${trilhas}`)
   } else if (direcao === 'linha') {
     r.push('display:flex', 'flex-direction:row', 'flex-wrap:wrap')
   } else if (direcao === 'coluna') {
     r.push('display:flex', 'flex-direction:column')
-  } else if (colunas !== undefined) {
+  } else if (trilhas) {
     // Colunas mudam de valor num breakpoint em que a direcao nao muda.
-    r.push(`grid-template-columns:repeat(${num(colunas)},1fr)`)
+    r.push(`grid-template-columns:${trilhas}`)
   }
   if (c.gap?.[d] !== undefined) r.push(`gap:${num(c.gap[d])}px`)
   const al = c.alinhar?.[d]

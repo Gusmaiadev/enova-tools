@@ -19,6 +19,45 @@ export const GAP_PADRAO = 15
  */
 export const LARGURA_PADRAO = 1140
 
+/**
+ * Proporcoes de coluna oferecidas por quantidade de colunas. Catalogo FECHADO
+ * de proposito: o valor vira `grid-template-columns`, e o documento chega do
+ * cliente e da IA — aceitar texto livre ali seria injecao de CSS.
+ *
+ * Lido pelo painel (para montar o seletor) e pela coercao (para recusar o que
+ * nao estiver na lista).
+ */
+export const PROPORCOES_COLUNAS: Record<number, { valor: string; rotulo: string }[]> = {
+  2: [
+    { valor: '', rotulo: 'Iguais (50 / 50)' },
+    { valor: '2fr 1fr', rotulo: '66 / 33' },
+    { valor: '1fr 2fr', rotulo: '33 / 66' },
+    { valor: '3fr 2fr', rotulo: '60 / 40' },
+    { valor: '2fr 3fr', rotulo: '40 / 60' },
+    { valor: '3fr 1fr', rotulo: '75 / 25' },
+    { valor: '1fr 3fr', rotulo: '25 / 75' },
+  ],
+  3: [
+    { valor: '', rotulo: 'Iguais (1/3 cada)' },
+    { valor: '2fr 1fr 1fr', rotulo: 'Primeira maior' },
+    { valor: '1fr 2fr 1fr', rotulo: 'Do meio maior' },
+    { valor: '1fr 1fr 2fr', rotulo: 'Última maior' },
+  ],
+  4: [
+    { valor: '', rotulo: 'Iguais' },
+    { valor: '2fr 1fr 1fr 1fr', rotulo: 'Primeira maior' },
+    { valor: '1fr 1fr 1fr 2fr', rotulo: 'Última maior' },
+  ],
+}
+
+/** Todo valor aceito, para a coercao conferir sem conhecer o painel. */
+export const PROPORCOES_VALIDAS = new Set(
+  Object.values(PROPORCOES_COLUNAS)
+    .flat()
+    .map((p) => p.valor)
+    .filter(Boolean),
+)
+
 /** Limites do controle de largura, por dispositivo. */
 export const FAIXA_LARGURA: Record<'desktop' | 'tablet' | 'celular', [number, number]> = {
   desktop: [720, 1920],

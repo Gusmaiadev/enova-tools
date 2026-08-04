@@ -335,3 +335,48 @@ describe('largura do projeto', () => {
     expect(css).toContain('--largura:280px')
   })
 })
+
+describe('largura das colunas do container', () => {
+  it('sem proporção, as colunas saem iguais', () => {
+    const { desktop } = cssDaArvore(
+      raiz([], { direcao: { desktop: 'linha' }, colunas: { desktop: 2 } }),
+    )
+    expect(desktop).toContain('grid-template-columns:repeat(2,1fr)')
+  })
+
+  it('proporção do catálogo vira as trilhas do grid', () => {
+    const { desktop } = cssDaArvore(
+      raiz([], {
+        direcao: { desktop: 'linha' },
+        colunas: { desktop: 2 },
+        proporcaoColunas: { desktop: '2fr 1fr' },
+      }),
+    )
+    expect(desktop).toContain('grid-template-columns:2fr 1fr')
+    expect(desktop).not.toContain('repeat(2,1fr)')
+  })
+
+  it('proporção fora do catálogo é ignorada e cai em colunas iguais', () => {
+    const { desktop } = cssDaArvore(
+      raiz([], {
+        direcao: { desktop: 'linha' },
+        colunas: { desktop: 2 },
+        proporcaoColunas: { desktop: '1fr;}body{display:none' },
+      }),
+    )
+    expect(desktop).toContain('grid-template-columns:repeat(2,1fr)')
+    expect(desktop).not.toContain('display:none')
+  })
+
+  it('a proporção pode mudar por dispositivo', () => {
+    const { desktop, celular } = cssDaArvore(
+      raiz([], {
+        direcao: { desktop: 'linha' },
+        colunas: { desktop: 2, celular: 1 },
+        proporcaoColunas: { desktop: '3fr 1fr' },
+      }),
+    )
+    expect(desktop).toContain('3fr 1fr')
+    expect(celular).toContain('repeat(1,1fr)')
+  })
+})

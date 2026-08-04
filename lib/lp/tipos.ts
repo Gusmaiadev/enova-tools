@@ -305,6 +305,12 @@ export type LpContainer = NoBase & {
   aparencia?: Aparencia
   direcao: PorDisp<'linha' | 'coluna'>
   colunas?: PorDisp<number>
+  /**
+   * Larguras relativas das colunas (ex.: '2fr 1fr'), quando `colunas` >= 2.
+   * Ausente = todas iguais. So aceita valor do catalogo PROPORCOES_COLUNAS:
+   * isto vira grid-template-columns e o documento nao e confiavel.
+   */
+  proporcaoColunas?: PorDisp<string>
   gap?: PorDisp<number>
   alinhar?: PorDisp<'inicio' | 'centro' | 'fim' | 'esticar'>
   justificar?: PorDisp<'inicio' | 'centro' | 'fim' | 'entre'>
