@@ -3,7 +3,7 @@
 import { PorDispositivo, definir } from './PorDispositivo'
 import type { MutarNo } from './CamposEstilo'
 import { CLASSE_CONTROLE, Marcar } from './campos'
-import { MARGEM_PADRAO } from '@/lib/lp/padroes'
+import { CAIXA_ZERO, margemPadraoDe } from '@/lib/lp/padroes'
 import type { Caixa, Dispositivo, LpElemento, LpEstilo } from '@/lib/lp/tipos'
 
 const LADOS: { chave: keyof Caixa; rotulo: string }[] = [
@@ -12,8 +12,6 @@ const LADOS: { chave: keyof Caixa; rotulo: string }[] = [
   { chave: 'base', rotulo: 'Base' },
   { chave: 'esquerda', rotulo: 'Esquerda' },
 ]
-
-const CAIXA_ZERO: Caixa = { topo: 0, direita: 0, base: 0, esquerda: 0 }
 
 /**
  * Quatro medidas em px. Zerar tudo GRAVA zero — não volta a herdar: quem quer o
@@ -82,7 +80,9 @@ export function CamposAvancado({
       >
         <CamposCaixa
           valor={e.margem?.[dispositivo]}
-          padrao={MARGEM_PADRAO}
+          // Só texto tem margem por padrão — numa imagem o campo mostraria 10
+          // e a página estaria com 0.
+          padrao={margemPadraoDe(no.tipo)}
           aoMudar={(c) => mudar((est) => { est.margem = definir(est.margem, dispositivo, c) }, 'av-margem')}
         />
       </PorDispositivo>

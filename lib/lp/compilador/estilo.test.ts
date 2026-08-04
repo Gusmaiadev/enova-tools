@@ -160,7 +160,24 @@ describe('espaçamento padrão da árvore', () => {
     const { briefingVazio } = await import('../tipos')
     const css = compilarCss(documentoBase(briefingVazio('Teste')), new Map())
     expect(css).toContain('.lp-c{min-width:0;gap:15px}')
-    expect(css).toContain('.lp-c > *{margin-block:10px 10px}')
+    // A margem mira as classes de TEXTO, não todo filho do container.
+    expect(css).toContain(
+      '.lp-el-titulo,.lp-el-subtitulo,.lp-el-texto{margin-block:10px 10px}',
+    )
+    expect(css).not.toContain('.lp-c > *{margin-block')
+    // E não sobra nas bordas do container, senão a seção cresce sozinha.
+    expect(css).toContain('.lp-c > :first-child{margin-top:0}')
+    expect(css).toContain('.lp-c > :last-child{margin-bottom:0}')
+  })
+
+  it('só texto tem margem padrão; mídia e container têm zero', async () => {
+    const { margemPadraoDe, MARGEM_PADRAO, CAIXA_ZERO } = await import('../padroes')
+    expect(margemPadraoDe('titulo')).toEqual(MARGEM_PADRAO)
+    expect(margemPadraoDe('texto')).toEqual(MARGEM_PADRAO)
+    expect(margemPadraoDe('imagem')).toEqual(CAIXA_ZERO)
+    expect(margemPadraoDe('video')).toEqual(CAIXA_ZERO)
+    expect(margemPadraoDe('container')).toEqual(CAIXA_ZERO)
+    expect(margemPadraoDe('botao')).toEqual(CAIXA_ZERO)
   })
 
   it('o padrão do CSS e o mostrado no painel vêm da mesma constante', async () => {

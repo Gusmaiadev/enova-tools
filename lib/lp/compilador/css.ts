@@ -259,7 +259,13 @@ const APARENCIAS = `
    classe so de especificidade, entao o valor proprio do no vence por ordem,
    inclusive quando for zero. */
 .lp-c{min-width:0;gap:${GAP_PADRAO}px}
-.lp-c > *{margin-block:${MARGEM_PADRAO.topo}px ${MARGEM_PADRAO.base}px}
+/* Margem vertical SO em texto. Midia, botao e container ja se separam pelo gap
+   do pai; margem neles alem disso empurraria a secao inteira para baixo. */
+.lp-el-titulo,.lp-el-subtitulo,.lp-el-texto{margin-block:${MARGEM_PADRAO.topo}px ${MARGEM_PADRAO.base}px}
+/* Sem isto o primeiro e o ultimo texto empurram a borda do container, e a
+   secao ganha espaco por cima do padding que ela ja tem. */
+.lp-c > :first-child{margin-top:0}
+.lp-c > :last-child{margin-bottom:0}
 .lp-ap-card{display:flex;flex-direction:column;background:color-mix(in srgb,var(--cor-titulos) 4%,transparent);border:1px solid color-mix(in srgb,var(--cor-titulos) 10%,transparent);border-radius:var(--raio);padding:32px 28px;transition:transform .25s,box-shadow .25s}
 .lp-ap-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px -24px color-mix(in srgb,var(--cor-principal) 45%,transparent)}
 .lp-ap-plano{display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--cor-titulos) 12%,transparent);border-radius:var(--raio);padding:36px 30px;background:color-mix(in srgb,var(--cor-titulos) 3%,transparent)}
