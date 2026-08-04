@@ -56,6 +56,7 @@ import {
   normalizarUrl,
 } from './util'
 
+import { DISPOSITIVOS } from './padroes'
 import { coergirRaiz } from './validarArvore'
 
 const TIPOS_LAYOUT = new Set<string>(LAYOUTS.map((l) => l.tipo))
@@ -409,7 +410,7 @@ function coergirTema(v: unknown, base: LpTema): LpTema {
   // de limites — o valor vira `max-width` no CSS da pagina inteira.
   const largura = obj(t.largura)
   const fora: NonNullable<LpTema['largura']> = {}
-  for (const d of ['desktop', 'tablet', 'celular'] as const) {
+  for (const d of DISPOSITIVOS) {
     const n = largura[d]
     if (typeof n === 'number' && Number.isFinite(n)) fora[d] = limitar(n, 280, 2560, 1140)
   }

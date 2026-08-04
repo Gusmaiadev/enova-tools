@@ -6,21 +6,14 @@ import { Cor, Faixa, Fonte, Selecao, Texto } from './campos'
 import { EnviarMidia } from './EnviarMidia'
 import { fontePorNome } from '@/lib/lp/fontes'
 import { LOGO_MAX_LADO } from '@/lib/lp/formatos'
-import { FAIXA_LARGURA, LARGURA_PADRAO } from '@/lib/lp/padroes'
-import type {
-  CategoriaTexto,
-  CoresTema,
-  Dispositivo,
-  LpDocumento,
-  LpMidia,
-  LpTema,
-} from '@/lib/lp/tipos'
-
-const DISPOSITIVOS: { chave: Dispositivo; rotulo: string }[] = [
-  { chave: 'desktop', rotulo: 'Computador' },
-  { chave: 'tablet', rotulo: 'Tablet' },
-  { chave: 'celular', rotulo: 'Celular' },
-]
+import {
+  BREAKPOINT,
+  DISPOSITIVOS,
+  FAIXA_LARGURA,
+  LARGURA_PADRAO,
+  NOME_DISPOSITIVO,
+} from '@/lib/lp/padroes'
+import type { CategoriaTexto, CoresTema, LpDocumento, LpMidia, LpTema } from '@/lib/lp/tipos'
 
 const CATEGORIAS: { chave: CategoriaTexto; rotulo: string }[] = [
   { chave: 'titulos', rotulo: 'Títulos' },
@@ -182,19 +175,17 @@ export function PainelTema({
         </p>
         <div className="space-y-3">
           {DISPOSITIVOS.map((d) => {
-            const [min, max] = FAIXA_LARGURA[d.chave]
+            const [min, max] = FAIXA_LARGURA[d]
+            const bp = BREAKPOINT[d]
             return (
               <Faixa
-                key={d.chave}
-                rotulo={d.rotulo}
+                key={d}
+                rotulo={bp === null ? NOME_DISPOSITIVO[d] : `${NOME_DISPOSITIVO[d]} (≤${bp}px)`}
                 min={min}
                 max={max}
-                valor={doc.tema.largura?.[d.chave] ?? LARGURA_PADRAO}
+                valor={doc.tema.largura?.[d] ?? LARGURA_PADRAO}
                 aoMudar={(v) =>
-                  aoMudar({
-                    ...doc.tema,
-                    largura: { ...doc.tema.largura, [d.chave]: v },
-                  })
+                  aoMudar({ ...doc.tema, largura: { ...doc.tema.largura, [d]: v } })
                 }
               />
             )

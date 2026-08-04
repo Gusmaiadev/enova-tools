@@ -7,7 +7,45 @@
  * mudar — inclusive para zero).
  */
 
-import type { Caixa } from './tipos'
+import type { Caixa, Dispositivo } from './tipos'
+
+/** Do mais largo para o mais estreito — a ordem em que o CSS e emitido. */
+export const DISPOSITIVOS: Dispositivo[] = [
+  'desktop',
+  'notebook',
+  'tabletDeitado',
+  'tablet',
+  'celularDeitado',
+  'celular',
+]
+
+/**
+ * `max-width` de cada breakpoint; `null` no desktop, que e a base sem media
+ * query. Emitidos nesta ordem, entao o mais estreito vence por vir depois — e a
+ * heranca sai de graca: valor posto no notebook vale dali para baixo ate alguem
+ * sobrepor.
+ *
+ * Os numeros nao seguem a largura real de cada aparelho, seguem BANDAS que nao
+ * se cruzam. Celular deitado do iPhone 14 tem 844px, mais que os 834px do iPad
+ * em pe — usar as larguras reais faria uma banda engolir a outra.
+ */
+export const BREAKPOINT: Record<Dispositivo, number | null> = {
+  desktop: null,
+  notebook: 1440,
+  tabletDeitado: 1200,
+  tablet: 900,
+  celularDeitado: 767,
+  celular: 640,
+}
+
+export const NOME_DISPOSITIVO: Record<Dispositivo, string> = {
+  desktop: 'Computador',
+  notebook: 'Notebook',
+  tabletDeitado: 'Tablet deitado',
+  tablet: 'Tablet em pé',
+  celularDeitado: 'Celular deitado',
+  celular: 'Celular em pé',
+}
 
 /** Espaco entre os filhos de um container, em px. */
 export const GAP_PADRAO = 15
@@ -59,10 +97,13 @@ export const PROPORCOES_VALIDAS = new Set(
 )
 
 /** Limites do controle de largura, por dispositivo. */
-export const FAIXA_LARGURA: Record<'desktop' | 'tablet' | 'celular', [number, number]> = {
+export const FAIXA_LARGURA: Record<Dispositivo, [number, number]> = {
   desktop: [720, 1920],
-  tablet: [480, 1280],
-  celular: [320, 900],
+  notebook: [720, 1600],
+  tabletDeitado: [600, 1280],
+  tablet: [480, 1000],
+  celularDeitado: [400, 820],
+  celular: [320, 700],
 }
 
 /**

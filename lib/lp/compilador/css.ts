@@ -5,10 +5,16 @@
 
 import { tiposNaPagina } from '../arvore'
 import { paginasGeradas } from '../documento'
-import { GAP_PADRAO, LARGURA_PADRAO, MARGEM_PADRAO } from '../padroes'
+import {
+  BREAKPOINT,
+  DISPOSITIVOS,
+  GAP_PADRAO,
+  LARGURA_PADRAO,
+  MARGEM_PADRAO,
+} from '../padroes'
 import { familiaCss } from '../fontes'
 import { cssDaArvore } from './estilo'
-import type { AjusteTexto, LpDocumento, LpSecao } from '../tipos'
+import type { AjusteTexto, Dispositivo, LpDocumento, LpSecao } from '../tipos'
 import { corContraste, corSegura, escCss, limitar, slugificar } from '../util'
 
 /** Id de HTML/CSS de uma secao (ancora do menu ou fallback estavel). */
@@ -61,14 +67,13 @@ function varsTema(doc: LpDocumento): string {
 
   // Largura por dispositivo: redefinir a variável em :root basta, porque header,
   // rodapé e seções leem a MESMA variável pelo .lp-container. Só sai quando o
-  // usuário definiu — sem isso a página mantém a largura do desktop, que é o
+  // usuário definiu — sem isso a página mantém a largura da tela maior, que é o
   // comportamento de sempre.
   const blocos = [`:root{\n${linhas.join('\n')}\n}`]
-  if (largura?.tablet !== undefined) {
-    blocos.push(`@media (max-width:900px){:root{--largura:${larguraSegura(largura.tablet)}px}}`)
-  }
-  if (largura?.celular !== undefined) {
-    blocos.push(`@media (max-width:640px){:root{--largura:${larguraSegura(largura.celular)}px}}`)
+  for (const d of DISPOSITIVOS) {
+    const max = BREAKPOINT[d]
+    if (max === null || largura?.[d] === undefined) continue
+    blocos.push(`@media (max-width:${max}px){:root{--largura:${larguraSegura(largura[d])}px}}`)
   }
   return blocos.join('\n')
 }
@@ -427,27 +432,24 @@ export function compilarCss(doc: LpDocumento, idsPorSecao: Map<string, string>):
     }
   }
 
-  // CSS dos elementos por ultimo e agrupado por breakpoint: um bloco de media
-  // query com todos os nos, em vez de tres por no. Vindo depois do CSS base
-  // (que nunca passa de uma classe), o ajuste do usuario vence por ordem.
-  const porDisp: Record<'desktop' | 'tablet' | 'celular', string[]> = {
-    desktop: [],
-    tablet: [],
-    celular: [],
-  }
+  // CSS dos elementos por ultimo e agrupado por breakpoint: UM bloco de media
+  // query com todos os nos, em vez de um por no. Vindo depois do CSS base (que
+  // nunca passa de uma classe), o ajuste do usuario vence por ordem.
+  //
+  // A ordem de DISPOSITIVOS vai do mais largo ao mais estreito, e e ela que faz
+  // a heranca funcionar: numa tela de 500px varios blocos valem, e o ultimo
+  // emitido — o mais especifico — ganha.
+  const porDisp = new Map<Dispositivo, string[]>(DISPOSITIVOS.map((d) => [d, []]))
   for (const secao of doc.secoes) {
     if (!secao.raiz) continue
     const css = cssDaArvore(secao.raiz)
-    if (css.desktop) porDisp.desktop.push(css.desktop)
-    if (css.tablet) porDisp.tablet.push(css.tablet)
-    if (css.celular) porDisp.celular.push(css.celular)
+    for (const d of DISPOSITIVOS) if (css[d]) porDisp.get(d)?.push(css[d])
   }
-  if (porDisp.desktop.length > 0) partes.push(porDisp.desktop.join('\n'))
-  if (porDisp.tablet.length > 0) {
-    partes.push(`@media (max-width:900px){\n${porDisp.tablet.join('\n')}\n}`)
-  }
-  if (porDisp.celular.length > 0) {
-    partes.push(`@media (max-width:640px){\n${porDisp.celular.join('\n')}\n}`)
+  for (const d of DISPOSITIVOS) {
+    const regras = porDisp.get(d) ?? []
+    if (regras.length === 0) continue
+    const max = BREAKPOINT[d]
+    partes.push(max === null ? regras.join('\n') : `@media (max-width:${max}px){\n${regras.join('\n')}\n}`)
   }
 
   return partes.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'

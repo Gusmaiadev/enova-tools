@@ -52,95 +52,52 @@ import type {
   TipoPaginaLegal,
 } from '@/lib/lp/tipos'
 import { PAGINAS_LEGAIS, infoPagina } from '@/lib/lp/tipos'
+import { BREAKPOINT } from '@/lib/lp/padroes'
 
 type Aba = 'estrutura' | 'editar' | 'tema'
 
 /**
- * Telas da PRÉVIA — não confundir com o `Dispositivo` de tipos.ts, que são os
- * três breakpoints do CSS (base, ≤900px, ≤640px). Aqui são só larguras de
- * simulação, e várias caem no mesmo breakpoint.
+ * Largura simulada de cada breakpoint na prévia. Um por `Dispositivo`, na mesma
+ * ordem — escolher aqui é escolher qual conjunto de estilos os painéis editam.
  *
- * `regra` diz em qual delas a largura cai — é o que o tooltip mostra. Sem isso,
- * escolher "tablet deitado" (1024px) e ver os estilos de computador parece bug:
- * é o CSS certo, porque 1024 não é ≤900.
+ * A largura fica DENTRO da banda do breakpoint, o que nem sempre bate com o
+ * aparelho real: celular deitado do iPhone 14 tem 844px, mas a banda vai até
+ * 767px (acima disso é tablet). Usamos 736px, que é celular deitado de verdade
+ * e cai na banda certa — senão o botão mostraria estilos de outro breakpoint.
  */
-type Previa =
-  | 'desktop'
-  | 'notebook'
-  | 'tablet-deitado'
-  | 'tablet'
-  | 'celular-deitado'
-  | 'celular'
-
 const TELAS: {
-  chave: Previa
+  dispositivo: Dispositivo
   nome: string
   largura: string
-  /** Breakpoint do CSS em que essa largura cai — e que o painel passa a editar. */
-  dispositivo: Dispositivo
   icone: typeof Monitor
   /** Ícone girado 90° representa a tela deitada. */
   deitado?: boolean
 }[] = [
-  { chave: 'desktop', nome: 'Computador', largura: '100%', dispositivo: 'desktop', icone: Monitor },
+  { dispositivo: 'desktop', nome: 'Computador', largura: '100%', icone: Monitor },
+  { dispositivo: 'notebook', nome: 'Notebook · 1366px', largura: '1366px', icone: Laptop },
   {
-    chave: 'notebook',
-    nome: 'Notebook · 1366px',
-    largura: '1366px',
-    dispositivo: 'desktop',
-    icone: Laptop,
-  },
-  {
-    chave: 'tablet-deitado',
+    dispositivo: 'tabletDeitado',
     nome: 'Tablet deitado · 1024px',
     largura: '1024px',
-    dispositivo: 'desktop',
     icone: Tablet,
     deitado: true,
   },
+  { dispositivo: 'tablet', nome: 'Tablet em pé · 834px', largura: '834px', icone: Tablet },
   {
-    chave: 'tablet',
-    nome: 'Tablet em pé · 834px',
-    largura: '834px',
-    dispositivo: 'tablet',
-    icone: Tablet,
-  },
-  {
-    chave: 'celular-deitado',
-    nome: 'Celular deitado · 844px',
-    largura: '844px',
-    dispositivo: 'tablet',
+    dispositivo: 'celularDeitado',
+    nome: 'Celular deitado · 736px',
+    largura: '736px',
     icone: Smartphone,
     deitado: true,
   },
-  {
-    chave: 'celular',
-    nome: 'Celular em pé · 390px',
-    largura: '390px',
-    dispositivo: 'celular',
-    icone: Smartphone,
-  },
+  { dispositivo: 'celular', nome: 'Celular em pé · 390px', largura: '390px', icone: Smartphone },
 ]
 
-const NOME_DISPOSITIVO: Record<Dispositivo, string> = {
-  desktop: 'Computador',
-  tablet: 'Tablet',
-  celular: 'Celular',
+/** Rótulo do botão: o tamanho simulado e a faixa de CSS que ele edita. */
+const rotuloTela = (t: (typeof TELAS)[number]) => {
+  const max = BREAKPOINT[t.dispositivo]
+  return max === null ? `${t.nome} — estilos base` : `${t.nome} — estilos até ${max}px`
 }
-
-/**
- * Tela que o seletor de dispositivo do painel escolhe. Escolher "tablet" lá tem
- * de levar a prévia ao tablet em pé, não ao deitado — que usa outro breakpoint.
- */
-const TELA_DO_DISPOSITIVO: Record<Dispositivo, Previa> = {
-  desktop: 'desktop',
-  tablet: 'tablet',
-  celular: 'celular',
-}
-
-/** Rótulo completo: o tamanho e qual conjunto de estilos vale nele. */
-const rotuloTela = (t: (typeof TELAS)[number]) =>
-  `${t.nome} — edita os estilos de ${NOME_DISPOSITIVO[t.dispositivo]}`
 
 const ABAS: { chave: Aba; rotulo: string; icone: typeof LayoutList }[] = [
   { chave: 'estrutura', rotulo: 'Estrutura', icone: LayoutList },
@@ -168,7 +125,7 @@ export function EditorLp({
   const [doc, setDocEstado] = useState<LpDocumento>(projeto.documento)
   const [srcDoc, setSrcDoc] = useState(() => compilarEditor(projeto.documento))
   const [aba, setAba] = useState<Aba>('estrutura')
-  const [tela, setTela] = useState<Previa>('desktop')
+  const [dispositivo, setDispositivo] = useState<Dispositivo>('desktop')
   const [secaoId, setSecaoId] = useState<string | null>(null)
   // Nó da árvore selecionado no canvas (formato novo).
   const [noId, setNoId] = useState<string | null>(null)
@@ -188,17 +145,9 @@ export function EditorLp({
   const [podeDesfazer, setPodeDesfazer] = useState(false)
   const [podeRefazer, setPodeRefazer] = useState(false)
 
-  /**
-   * Dispositivo que os painéis editam. Sai da tela escolhida na barra de cima:
-   * um estado só para os dois, senão a prévia mostraria um tamanho e o campo
-   * gravaria em outro.
-   */
-  const dispositivo = TELAS.find((t) => t.chave === tela)?.dispositivo ?? 'desktop'
-  /** Trocar o dispositivo num campo leva a prévia junto. */
-  const trocarDispositivo = useCallback(
-    (d: Dispositivo) => setTela(TELA_DO_DISPOSITIVO[d]),
-    [],
-  )
+  // Um estado so para a previa e para os paineis: com dois, a previa mostraria
+  // um tamanho e o campo gravaria em outro.
+  const larguraPrevia = TELAS.find((t) => t.dispositivo === dispositivo)?.largura ?? '100%'
 
   const avisos = avisosVisiveis ? avisosIniciais : []
 
@@ -562,14 +511,14 @@ export function EditorLp({
         >
           {TELAS.map((t) => (
             <button
-              key={t.chave}
+              key={t.dispositivo}
               type="button"
-              onClick={() => setTela(t.chave)}
+              onClick={() => setDispositivo(t.dispositivo)}
               aria-label={rotuloTela(t)}
-              aria-pressed={tela === t.chave}
+              aria-pressed={dispositivo === t.dispositivo}
               title={rotuloTela(t)}
               className={`rounded p-1.5 transition-colors ${
-                tela === t.chave ? 'bg-blue text-white' : 'text-text-dim hover:text-text'
+                dispositivo === t.dispositivo ? 'bg-blue text-white' : 'text-text-dim hover:text-text'
               }`}
             >
               <t.icone className={`h-4 w-4 ${t.deitado ? 'rotate-90' : ''}`} />
@@ -695,7 +644,7 @@ export function EditorLp({
                   aplicar={aplicar}
                   aoSelecionar={selecionarNo}
                   dispositivo={dispositivo}
-                  aoTrocarDispositivo={trocarDispositivo}
+                  aoTrocarDispositivo={setDispositivo}
                 />
               ) : (
                 <PainelPropriedades
@@ -721,7 +670,7 @@ export function EditorLp({
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <div
               className="mx-auto h-full bg-white shadow-2xl transition-[width] duration-300"
-              style={{ width: TELAS.find((t) => t.chave === tela)?.largura ?? '100%', maxWidth: '100%' }}
+              style={{ width: larguraPrevia, maxWidth: '100%' }}
             >
               <iframe
                 ref={iframeRef}

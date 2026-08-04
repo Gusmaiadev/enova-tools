@@ -1,12 +1,21 @@
 'use client'
 
-import { Monitor, Smartphone, Tablet } from 'lucide-react'
+import { Laptop, Monitor, Smartphone, Tablet } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { DISPOSITIVOS, NOME_DISPOSITIVO } from '@/lib/lp/padroes'
 import type { Dispositivo, PorDisp } from '@/lib/lp/tipos'
 
-const ICONES = { desktop: Monitor, tablet: Tablet, celular: Smartphone } as const
-const ROTULOS = { desktop: 'Computador', tablet: 'Tablet', celular: 'Celular' } as const
-const DISPOSITIVOS: Dispositivo[] = ['desktop', 'tablet', 'celular']
+const ICONES: Record<Dispositivo, typeof Monitor> = {
+  desktop: Monitor,
+  notebook: Laptop,
+  tabletDeitado: Tablet,
+  tablet: Tablet,
+  celularDeitado: Smartphone,
+  celular: Smartphone,
+}
+
+/** Ícone girado 90° marca a tela deitada — mesma convenção da barra de cima. */
+const DEITADO = new Set<Dispositivo>(['tabletDeitado', 'celularDeitado'])
 
 /**
  * Escreve `valor` no dispositivo escolhido. Valor vazio APAGA a chave — é o que
@@ -87,14 +96,14 @@ export function PorDispositivo<T>({
                 key={d}
                 type="button"
                 onClick={() => aoTrocar(d)}
-                aria-label={ROTULOS[d]}
+                aria-label={NOME_DISPOSITIVO[d]}
                 aria-pressed={ativo === d}
-                title={proprio ? `${ROTULOS[d]} — valor próprio` : ROTULOS[d]}
+                title={proprio ? `${NOME_DISPOSITIVO[d]} — valor próprio` : NOME_DISPOSITIVO[d]}
                 className={`relative rounded p-1 transition-colors ${
                   ativo === d ? 'bg-blue text-white' : 'text-text-dim hover:text-text'
                 }`}
               >
-                <Icone className="h-3.5 w-3.5" />
+                <Icone className={`h-3.5 w-3.5 ${DEITADO.has(d) ? 'rotate-90' : ''}`} />
                 {proprio && (
                   <span
                     aria-hidden

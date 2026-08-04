@@ -10,11 +10,10 @@
 
 import { caminharElementos } from '../arvore'
 import { familiaCss } from '../fontes'
-import { PROPORCOES_VALIDAS } from '../padroes'
+import { DISPOSITIVOS, PROPORCOES_VALIDAS } from '../padroes'
 import type { Caixa, Dispositivo, LpContainer, LpElemento, LpEstilo, PorDisp } from '../tipos'
 import { corSegura, escCss } from '../util'
 
-const DISPOSITIVOS: Dispositivo[] = ['desktop', 'tablet', 'celular']
 
 const ALINHAR: Record<string, string> = {
   inicio: 'flex-start',
@@ -148,7 +147,7 @@ function regrasDoNo(el: LpElemento, d: Dispositivo): string {
 /** CSS de todos os nos da arvore, separado por dispositivo. */
 export function cssDaArvore(raiz: LpContainer): Record<Dispositivo, string> {
   const nos = caminharElementos(raiz)
-  const fora: Record<Dispositivo, string> = { desktop: '', tablet: '', celular: '' }
+  const fora = Object.fromEntries(DISPOSITIVOS.map((d) => [d, ''])) as Record<Dispositivo, string>
   for (const d of DISPOSITIVOS) {
     fora[d] = nos
       .map((el) => regrasDoNo(el, d))

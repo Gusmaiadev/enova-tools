@@ -380,3 +380,93 @@ describe('largura das colunas do container', () => {
     expect(celular).toContain('repeat(1,1fr)')
   })
 })
+
+describe('os seis breakpoints', () => {
+  it('as bandas não se cruzam e vão do mais largo ao mais estreito', async () => {
+    const { DISPOSITIVOS, BREAKPOINT } = await import('../padroes')
+    expect(DISPOSITIVOS).toHaveLength(6)
+    expect(BREAKPOINT.desktop).toBeNull()
+    // Se duas bandas se cruzarem, uma nunca é alcançada.
+    const larguras = DISPOSITIVOS.slice(1).map((d) => BREAKPOINT[d] as number)
+    for (let i = 1; i < larguras.length; i++) {
+      expect(larguras[i], `${DISPOSITIVOS[i + 1]} não é mais estreito que o anterior`).toBeLessThan(
+        larguras[i - 1],
+      )
+    }
+  })
+
+  it('tablet e celular seguem em 900 e 640 — documento salvo não muda', async () => {
+    const { BREAKPOINT } = await import('../padroes')
+    expect(BREAKPOINT.tablet).toBe(900)
+    expect(BREAKPOINT.celular).toBe(640)
+  })
+
+  it('cada dispositivo emite o seu bloco, na ordem da cascata', () => {
+    const porDisp = cssDaArvore(
+      raiz([
+        {
+          id: 'w',
+          tipo: 'titulo',
+          nivel: 'h2',
+          texto: 'T',
+          estilo: {
+            tamanho: {
+              desktop: '48px',
+              notebook: '40px',
+              tabletDeitado: '34px',
+              tablet: '30px',
+              celularDeitado: '26px',
+              celular: '22px',
+            },
+          },
+        },
+      ]),
+    )
+    expect(porDisp.notebook).toContain('font-size:40px')
+    expect(porDisp.tabletDeitado).toContain('font-size:34px')
+    expect(porDisp.celularDeitado).toContain('font-size:26px')
+  })
+
+  it('valor num breakpoint largo vale nos estreitos até alguém sobrepor', async () => {
+    const { compilarCss } = await import('./css')
+    const { documentoBase } = await import('../documento')
+    const { briefingVazio } = await import('../tipos')
+    const base = documentoBase(briefingVazio('Teste'))
+    const doc = {
+      ...base,
+      secoes: [
+        {
+          id: 's1',
+          tipo: 'cta' as const,
+          nome: 'X',
+          ancora: null,
+          itens: [],
+          largura: 'boxed' as const,
+          raiz: {
+            id: 'r',
+            tipo: 'container' as const,
+            direcao: { desktop: 'coluna' as const },
+            filhos: [
+              {
+                id: 'w',
+                tipo: 'titulo' as const,
+                nivel: 'h2' as const,
+                texto: 'T',
+                estilo: { tamanho: { notebook: '40px', celular: '22px' } },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    const css = compilarCss(doc, new Map([['s1', 'x']]))
+    // O de 1440 vem antes do de 640: numa tela de 500px os dois valem e o
+    // último ganha, que é como a herança acontece sem código nenhum.
+    //
+    // `lastIndexOf` porque 640px também aparece antes, no bloco de aparências
+    // (.lp-ap-caixa-cta) — o que interessa aqui é o bloco gerado, no fim.
+    expect(css.lastIndexOf('max-width:1440px')).toBeLessThan(css.lastIndexOf('max-width:640px'))
+    // Nenhum valor em tabletDeitado, então aquele bloco não sai.
+    expect(css).not.toContain('max-width:1200px')
+  })
+})

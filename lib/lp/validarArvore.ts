@@ -18,7 +18,7 @@ import type {
   LpBotao,
   PorDisp,
 } from './tipos'
-import { PROPORCOES_VALIDAS } from './padroes'
+import { DISPOSITIVOS, PROPORCOES_VALIDAS } from './padroes'
 import { corSegura, gerarId, limitar } from './util'
 
 const obj = (v: unknown): Record<string, unknown> =>
@@ -38,7 +38,7 @@ const idSeguro = (v: unknown): string => {
   return limpo === '' ? gerarId() : limpo
 }
 
-const DISPOSITIVOS_VALIDOS = new Set(['desktop', 'tablet', 'celular'])
+const DISPOSITIVOS_VALIDOS = new Set<string>(DISPOSITIVOS)
 
 /**
  * Limites contra payload hostil. Sem teto de profundidade, uma arvore aninhada

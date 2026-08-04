@@ -238,7 +238,21 @@ export type LpSecao = {
 
 /* ------------------------------- Arvore ---------------------------------- */
 
-export type Dispositivo = 'desktop' | 'tablet' | 'celular'
+/**
+ * Breakpoints do CSS, do mais largo para o mais estreito. `desktop` e a base
+ * (sem media query); os outros sao max-width, definidos em BREAKPOINT
+ * (lib/lp/padroes.ts).
+ *
+ * `tablet` e `celular` continuam valendo 900px e 640px, os mesmos de antes —
+ * documento salvo com valor nessas chaves nao muda de aparencia.
+ */
+export type Dispositivo =
+  | 'desktop'
+  | 'notebook'
+  | 'tabletDeitado'
+  | 'tablet'
+  | 'celularDeitado'
+  | 'celular'
 
 /**
  * Valor de estilo por dispositivo. `desktop` e a base (sem media query); tablet
