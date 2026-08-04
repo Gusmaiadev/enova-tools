@@ -947,3 +947,63 @@ describe('menu hambúrguer', () => {
     expect(css).toContain('.lp-nav ul{flex-direction:column;align-items:center')
   })
 })
+
+describe('links úteis do rodapé', () => {
+  const comRodape = (
+    linksUteis: { id: string; rotulo: string; url: string }[],
+    menuSecundario: boolean,
+  ) => {
+    const doc = docCom([novaSecao('cta')])
+    doc.header.menu = [
+      { id: 'm1', rotulo: 'Início', alvo: '#topo' },
+      { id: 'm2', rotulo: 'Contato', alvo: '#contato' },
+    ]
+    doc.footer.linksUteis = linksUteis
+    doc.footer.menuSecundario = menuSecundario
+    return doc
+  }
+
+  it('repetir o menu não duplica o que já está nos links úteis', () => {
+    // A IA costuma escrever em linksUteis os mesmos itens do menu.
+    const { html } = compilarDoc(
+      comRodape(
+        [
+          { id: 'l1', rotulo: 'Início', url: '#topo' },
+          { id: 'l2', rotulo: 'Contato', url: '#contato' },
+        ],
+        true,
+      ),
+    )
+    // Contado só no rodapé: o menu do header emite os mesmos href.
+    const rodape = html.slice(html.indexOf('lp-footer'))
+    expect((rodape.match(/href="#topo"/g) ?? []).length).toBe(1)
+    expect((rodape.match(/href="#contato"/g) ?? []).length).toBe(1)
+  })
+
+  it('o que só existe no menu entra quando a opção está ligada', () => {
+    const { html } = compilarDoc(comRodape([{ id: 'l1', rotulo: 'Blog', url: '/blog' }], true))
+    expect(html).toContain('>Blog<')
+    expect(html).toContain('>Contato<')
+  })
+
+  it('sem a opção, o menu não aparece no rodapé', () => {
+    const { html } = compilarDoc(comRodape([{ id: 'l1', rotulo: 'Blog', url: '/blog' }], false))
+    const rodape = html.slice(html.indexOf('lp-footer'))
+    expect(rodape).toContain('>Blog<')
+    expect(rodape).not.toContain('>Contato<')
+  })
+
+  it('links úteis repetidos entre si também saem uma vez só', () => {
+    const { html } = compilarDoc(
+      comRodape(
+        [
+          { id: 'l1', rotulo: 'Contato', url: '#contato' },
+          { id: 'l2', rotulo: 'Fale conosco', url: '#contato' },
+        ],
+        false,
+      ),
+    )
+    const rodape = html.slice(html.indexOf('lp-footer'))
+    expect((rodape.match(/href="#contato"/g) ?? []).length).toBe(1)
+  })
+})

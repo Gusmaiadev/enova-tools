@@ -119,12 +119,30 @@ function htmlFooter(ctx: Ctx, doc: LpDocumento): string {
       (r) => `<a href="${esc(urlSegura(r.url))}" target="_blank" rel="noopener" aria-label="${esc(r.rede)}">${svgRede(r.rede)}</a>`,
     )
     .join('')
-  const links = f.linksUteis
-    .map((l) => `<li><a href="${esc(href(ctx, l.url))}">${esc(l.rotulo)}</a></li>`)
+  /**
+   * "Links uteis" e a soma dos links do rodape com o menu do header, quando o
+   * usuario pede para repeti-lo.
+   *
+   * Deduplicado por DESTINO: a IA costuma escrever em `linksUteis` os mesmos
+   * itens que ja estao no menu, e sem isto ligar "repetir o menu" mostrava cada
+   * um duas vezes. O mesmo destino aparecer duas vezes na mesma lista e sempre
+   * erro, venha o par de onde vier.
+   */
+  const destinos = new Set<string>()
+  const links = [
+    ...f.linksUteis.map((l) => ({ rotulo: l.rotulo, alvo: href(ctx, l.url) })),
+    ...(f.menuSecundario
+      ? doc.header.menu.map((m) => ({ rotulo: m.rotulo, alvo: href(ctx, m.alvo) }))
+      : []),
+  ]
+    .filter((l) => {
+      const chave = l.alvo.trim().toLowerCase()
+      if (chave === '' || destinos.has(chave)) return false
+      destinos.add(chave)
+      return true
+    })
+    .map((l) => `<li><a href="${esc(l.alvo)}">${esc(l.rotulo)}</a></li>`)
     .join('')
-  const menuSec = f.menuSecundario
-    ? doc.header.menu.map((m) => `<li><a href="${esc(href(ctx, m.alvo))}">${esc(m.rotulo)}</a></li>`).join('')
-    : ''
   // Cada telefone e uma linha propria: com WhatsApp vira link do wa.me (icone da
   // rede, abre em outra aba), sem vira link tel:.
   const telefones = normalizarTelefones(f.telefones).map((t) => {
@@ -157,9 +175,7 @@ function htmlFooter(ctx: Ctx, doc: LpDocumento): string {
     }${acoes ? `<div class="lp-footer-acoes">${acoes}</div>` : ''}${
       redes ? `<div class="lp-redes">${redes}</div>` : ''
     }</div>`,
-    links || menuSec
-      ? `<div><h4>Links úteis</h4><ul>${links}${menuSec}</ul></div>`
-      : '',
+    links ? `<div><h4>Links úteis</h4><ul>${links}</ul></div>` : '',
     contato ? `<div><h4>Contato</h4><ul class="lp-contato">${contato}</ul></div>` : '',
   ]
     .filter(Boolean)
