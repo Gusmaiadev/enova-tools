@@ -35,18 +35,45 @@ export function PorDispositivo<T>({
   valor,
   ativo,
   aoTrocar,
+  aoLimpar,
+  rotuloHerdado = 'do tema',
   children,
 }: {
   rotulo: string
   valor: PorDisp<T> | undefined
   ativo: Dispositivo
   aoTrocar: (d: Dispositivo) => void
+  /** Devolve o campo ao valor herdado. Sem isto, não aparece o botão. */
+  aoLimpar?: () => void
+  /** De onde vem o valor quando não há override — "do tema" só vale para o que
+   *  o tema realmente define; margem e padding, por exemplo, são "padrão". */
+  rotuloHerdado?: string
   children: ReactNode
 }) {
+  // O campo é "do tema" enquanto não houver valor próprio NESTE dispositivo —
+  // sem essa marca, o usuário não distingue o que ele mexeu do que veio da
+  // Identidade, e não sabe o que o botão de limpar vai desfazer.
+  const proprio = valor?.[ativo] !== undefined
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm text-text-dim">{rotulo}</span>
+        <span className="flex items-baseline gap-1.5 text-sm text-text-dim">
+          {rotulo}
+          {proprio ? (
+            aoLimpar && (
+              <button
+                type="button"
+                onClick={aoLimpar}
+                title="Voltar ao valor do tema"
+                className="text-[11px] text-blue underline-offset-2 hover:underline"
+              >
+                próprio ✕
+              </button>
+            )
+          ) : (
+            <span className="text-[11px] opacity-60">{rotuloHerdado}</span>
+          )}
+        </span>
         <div
           role="group"
           aria-label={`Dispositivo de "${rotulo}"`}

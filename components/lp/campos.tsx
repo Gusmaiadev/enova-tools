@@ -106,11 +106,14 @@ export function Cor({
   rotulo,
   valor,
   padrao = '#2563eb',
+  placeholder = 'automático',
   aoMudar,
 }: {
   rotulo: string
   valor: string | undefined
   padrao?: string
+  /** Texto do campo vazio — serve para mostrar o valor herdado do tema. */
+  placeholder?: string
   aoMudar: (valor: string) => void
 }) {
   const definido = Boolean(valor)
@@ -128,7 +131,7 @@ export function Cor({
         <input
           type="text"
           value={valor ?? ''}
-          placeholder="automático"
+          placeholder={placeholder}
           onChange={(e) => aoMudar(e.target.value)}
           className={`${CLASSE_CONTROLE} font-mono text-xs`}
         />
@@ -153,11 +156,14 @@ export function Fonte({
   valor,
   aoMudar,
   permitirVazio = false,
+  rotuloVazio = 'Automático',
 }: {
   rotulo: string
   valor: string | undefined
   aoMudar: (valor: string) => void
   permitirVazio?: boolean
+  /** Texto da opção vazia — serve para mostrar a fonte herdada do tema. */
+  rotuloVazio?: string
 }) {
   const grupos = [
     ['sans', 'Sem serifa'],
@@ -168,7 +174,7 @@ export function Fonte({
 
   return (
     <Selecao rotulo={rotulo} value={valor ?? ''} onChange={(e) => aoMudar(e.target.value)}>
-      {permitirVazio && <option value="">Automático</option>}
+      {permitirVazio && <option value="">{rotuloVazio}</option>}
       {grupos.map(([cat, nome]) => (
         <optgroup key={cat} label={nome}>
           {FONTES_GOOGLE.filter((f) => f.categoria === cat).map((f) => (

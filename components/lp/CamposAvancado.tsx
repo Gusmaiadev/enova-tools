@@ -69,7 +69,13 @@ export function CamposAvancado({
 
   return (
     <div className="space-y-3">
-      <PorDispositivo rotulo="Margem" valor={e.margem} ativo={dispositivo} aoTrocar={aoTrocarDispositivo}>
+      <PorDispositivo
+        rotulo="Margem"
+        valor={e.margem}
+        ativo={dispositivo}
+        aoTrocar={aoTrocarDispositivo}
+        rotuloHerdado="padrão"
+      >
         <CamposCaixa
           valor={e.margem?.[dispositivo]}
           aoMudar={(c) => mudar((est) => { est.margem = definir(est.margem, dispositivo, c) }, 'av-margem')}
@@ -81,6 +87,7 @@ export function CamposAvancado({
         valor={e.padding}
         ativo={dispositivo}
         aoTrocar={aoTrocarDispositivo}
+        rotuloHerdado="padrão"
       >
         <CamposCaixa
           valor={e.padding?.[dispositivo]}
@@ -88,7 +95,13 @@ export function CamposAvancado({
         />
       </PorDispositivo>
 
-      <PorDispositivo rotulo="Largura" valor={e.largura} ativo={dispositivo} aoTrocar={aoTrocarDispositivo}>
+      <PorDispositivo
+        rotulo="Largura"
+        valor={e.largura}
+        ativo={dispositivo}
+        aoTrocar={aoTrocarDispositivo}
+        rotuloHerdado="automática"
+      >
         <input
           className={CLASSE_CONTROLE}
           placeholder="automática (ex.: 320px, 50%)"

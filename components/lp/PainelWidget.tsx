@@ -156,7 +156,7 @@ export function PainelWidget({
         ) : (
           <CamposConteudo {...comuns} lpId={lpId} />
         ))}
-      {aba === 'estilo' && <CamposEstilo {...comuns} />}
+      {aba === 'estilo' && <CamposEstilo {...comuns} tema={doc.tema} />}
       {aba === 'avancado' && <CamposAvancado {...comuns} />}
     </div>
   )
