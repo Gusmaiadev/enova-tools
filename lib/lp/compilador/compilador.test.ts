@@ -1127,3 +1127,21 @@ describe('ordem dos links úteis', () => {
     expect(rotulos(compilarDoc(doc).html)).toEqual(['Blog', 'Sobre', 'Vagas'])
   })
 })
+
+describe('tamanho da logo por barra', () => {
+  it('header e rodapé guardam alturas próprias para a mesma imagem', () => {
+    const doc = docCom([novaSecao('cta')])
+    doc.header.logo = {
+      tipo: 'imagem',
+      url: 'https://cdn/logo.png',
+      alt: '',
+      busca: '',
+      orientacao: 'paisagem',
+    }
+    doc.header.estilo = { logo: 80 }
+    doc.footer.estilo = { logo: 32 }
+    const { css } = compilarDoc(doc)
+    expect(css).toContain('.lp-logo-img img{max-height:80px')
+    expect(css).toContain('.lp-logo-footer-img img{max-height:32px')
+  })
+})

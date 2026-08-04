@@ -190,8 +190,9 @@ export function PainelPropriedades({
           <Grupo titulo="Aparência" aberto>
             <CamposBarra
               estilo={doc.footer.estilo}
-              // No rodapé a marca é sempre o nome escrito, nunca a imagem.
-              logoImagem={false}
+              // O rodapé repete a logo do topo: com imagem enviada, o tamanho
+              // daqui é a altura dela; sem, é o corpo do nome escrito.
+              logoImagem={Boolean(doc.header.logo)}
               aoMudar={(patch, chave) =>
                 aplicar((d) => {
                   d.footer.estilo = { ...d.footer.estilo, ...patch }

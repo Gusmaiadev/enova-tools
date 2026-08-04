@@ -14,8 +14,8 @@ const ICONE: Record<Alinhamento, React.ReactNode> = {
 
 /**
  * Aparência de uma barra (header ou rodapé): onde o menu fica, tamanho da logo
- * e fonte dos links. Os mesmos campos no briefing e no editor — o que muda é o
- * que a logo significa: imagem no topo, nome escrito no rodapé.
+ * e fonte dos links. Os mesmos campos no briefing e no editor. Header e rodapé
+ * mostram a mesma marca, mas cada um guarda o seu tamanho.
  */
 export function CamposBarra({
   estilo,

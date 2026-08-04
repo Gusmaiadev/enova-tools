@@ -253,8 +253,9 @@ export function EtapaNavegacao({
             <p className="mb-3 text-sm font-medium">Aparência do rodapé</p>
             <CamposBarra
               estilo={briefing.footer.estilo}
-              // No rodapé a marca é o nome escrito, nunca a imagem da logo.
-              logoImagem={false}
+              // O rodapé repete a logo do topo: com imagem enviada, o tamanho
+              // daqui é a altura dela; sem, é o corpo do nome escrito.
+              logoImagem={Boolean(briefing.logo)}
               aoMudar={(patch) =>
                 mudarFooter({ estilo: { ...briefing.footer.estilo, ...patch } })
               }
