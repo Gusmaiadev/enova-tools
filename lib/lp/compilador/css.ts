@@ -482,6 +482,14 @@ export function compilarCss(doc: LpDocumento, idsPorSecao: Map<string, string>):
   // emitido — o mais especifico — ganha.
   const porDisp = new Map<Dispositivo, string[]>(DISPOSITIVOS.map((d) => [d, []]))
   for (const secao of doc.secoes) {
+    // "Não mostrar em" da seção: mesma ideia do `oculto` dos nós, só que presa
+    // ao id (que idHtmlSecao já saneou) em vez da classe do elemento.
+    const idHtml = idsPorSecao.get(secao.id)
+    if (idHtml && secao.oculto) {
+      for (const d of DISPOSITIVOS) {
+        if (secao.oculto[d]) porDisp.get(d)?.push(`#${idHtml}{display:none}`)
+      }
+    }
     if (!secao.raiz) continue
     const css = cssDaArvore(secao.raiz)
     for (const d of DISPOSITIVOS) if (css[d]) porDisp.get(d)?.push(css[d])

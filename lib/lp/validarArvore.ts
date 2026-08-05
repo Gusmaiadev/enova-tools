@@ -79,6 +79,9 @@ const umDe =
 
 const soVerdadeiro = (v: unknown) => (v === true ? true : undefined)
 
+/** "Não mostrar em", dos nós e das seções. Só a chave marcada sobrevive. */
+export const coergirOculto = (v: unknown) => porDisp(v, soVerdadeiro)
+
 function caixa(v: unknown): Caixa | undefined {
   const o = obj(v)
   const lado = (x: unknown) =>

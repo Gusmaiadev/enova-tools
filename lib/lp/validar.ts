@@ -59,7 +59,7 @@ import {
 } from './util'
 
 import { DISPOSITIVOS } from './padroes'
-import { coergirAnimacao, coergirRaiz } from './validarArvore'
+import { coergirAnimacao, coergirOculto, coergirRaiz } from './validarArvore'
 
 const TIPOS_LAYOUT = new Set<string>(LAYOUTS.map((l) => l.tipo))
 const ORIENTACOES = new Set<string>(['paisagem', 'retrato', 'quadrado'])
@@ -395,6 +395,9 @@ function coergirSecao(v: unknown, ancoras: Set<string>): LpSecao | null {
 
   const animacao = coergirAnimacao(s.animacao)
   if (animacao) secao.animacao = animacao
+
+  const oculto = coergirOculto(s.oculto)
+  if (oculto) secao.oculto = oculto
 
   const ajustes = obj(s.ajustes)
   const coletados: LpSecao['ajustes'] = {}

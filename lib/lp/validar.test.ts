@@ -1581,3 +1581,18 @@ describe('zip', () => {
     expect(new DataView(fim.buffer, fim.byteOffset).getUint16(10, true)).toBe(1)
   })
 })
+
+describe('não mostrar em — seção', () => {
+  const secaoCom = (oculto: unknown) =>
+    coergirDocumento({ secoes: [{ id: 'a', tipo: 'cta', nome: 'X', oculto }] })?.secoes[0]
+
+  it('guarda só as telas marcadas', () => {
+    expect(secaoCom({ celular: true, tablet: true })).toMatchObject({
+      oculto: { celular: true, tablet: true },
+    })
+  })
+
+  it('descarta tela inventada e valor que não é true', () => {
+    expect(secaoCom({ relogio: true, celular: 'sim', tablet: false })?.oculto).toBeUndefined()
+  })
+})

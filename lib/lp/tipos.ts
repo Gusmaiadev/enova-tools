@@ -242,6 +242,11 @@ export type LpSecao = {
   destinoForm?: string
   /** Animacao de entrada da secao inteira — ver lib/lp/animacoes.ts. */
   animacao?: LpAnimacao
+  /**
+   * Esconde a secao inteira nas telas marcadas. Mesmo campo dos nos da arvore:
+   * vira `display:none` no breakpoint, o conteudo continua no HTML.
+   */
+  oculto?: PorDisp<boolean>
 }
 
 /* ------------------------------- Arvore ---------------------------------- */

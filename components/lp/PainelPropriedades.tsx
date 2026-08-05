@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react'
 import { CampoMidia } from './CampoMidia'
 import { CamposAnimacao } from './CamposAnimacao'
 import { CamposBarra } from './CamposBarra'
+import { CamposVisibilidade } from './CamposVisibilidade'
 import { Cor, Faixa, Marcar, Opcoes, Selecao, Texto, Vazio } from './campos'
 import { ListaBotoes } from './ListaBotoes'
 import { ListaLinks } from './ListaLinks'
@@ -432,7 +433,7 @@ export function PainelPropriedades({
         )}
       </Grupo>
 
-      <Grupo titulo="Animação">
+      <Grupo titulo="Avançado">
         <CamposAnimacao
           animacao={secao.animacao}
           aoMudar={(a, agrupar) => mudarSecao({ animacao: a }, agrupar)}
@@ -441,6 +442,10 @@ export function PainelPropriedades({
           Anima a seção inteira de uma vez. Para os elementos entrarem um a um, deixe aqui
           &ldquo;Nenhuma&rdquo; e anime cada um na aba <strong className="text-text">Avançado</strong>.
         </p>
+        <CamposVisibilidade
+          oculto={secao.oculto}
+          aoMudar={(oculto) => mudarSecao({ oculto })}
+        />
       </Grupo>
     </div>
   )

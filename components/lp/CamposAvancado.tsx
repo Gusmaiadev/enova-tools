@@ -1,15 +1,11 @@
 'use client'
 
 import { CamposAnimacao } from './CamposAnimacao'
+import { CamposVisibilidade } from './CamposVisibilidade'
 import { PorDispositivo, definir } from './PorDispositivo'
 import type { MutarNo } from './CamposEstilo'
-import { CLASSE_CONTROLE, Marcar } from './campos'
-import {
-  CAIXA_ZERO,
-  DISPOSITIVOS,
-  NOME_DISPOSITIVO,
-  margemPadraoDe,
-} from '@/lib/lp/padroes'
+import { CLASSE_CONTROLE } from './campos'
+import { CAIXA_ZERO, margemPadraoDe } from '@/lib/lp/padroes'
 import type { Caixa, Dispositivo, LpElemento, LpEstilo } from '@/lib/lp/tipos'
 
 const LADOS: { chave: keyof Caixa; rotulo: string }[] = [
@@ -133,23 +129,14 @@ export function CamposAvancado({
         />
       </div>
 
-      <div className="rounded-md border border-border bg-surface-2/40 px-3 py-2.5">
-        <p className="mb-2 text-xs text-text-dim">Não mostrar em</p>
-        <div className="flex flex-wrap gap-3">
-          {DISPOSITIVOS.map((d) => (
-            <Marcar
-              key={d}
-              rotulo={NOME_DISPOSITIVO[d]}
-              valor={no.oculto?.[d] === true}
-              aoMudar={(v) =>
-                mutarNo((el) => {
-                  el.oculto = definir(el.oculto, d, v ? true : undefined)
-                })
-              }
-            />
-          ))}
-        </div>
-      </div>
+      <CamposVisibilidade
+        oculto={no.oculto}
+        aoMudar={(oculto) =>
+          mutarNo((el) => {
+            el.oculto = oculto
+          })
+        }
+      />
     </div>
   )
 }

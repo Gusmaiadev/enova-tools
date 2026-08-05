@@ -1209,3 +1209,45 @@ describe('animações de entrada', () => {
     expect(compilarDoc(comAnimacoes()).js).toContain(".lp-reveal,.lp-an'")
   })
 })
+
+describe('não mostrar em — seção', () => {
+  const ocultaEm = (oculto: Record<string, boolean>) => {
+    const doc = comArvore(docCom([novaSecao('cta'), novaSecao('faq')]))
+    doc.secoes[0].oculto = oculto as never
+    return compilarDoc(doc)
+  }
+
+  it('esconde a seção só no breakpoint marcado', () => {
+    const { css, html } = ocultaEm({ celular: true })
+    const id = (html.match(/<section id="([^"]+)"/) as RegExpMatchArray)[1]
+    expect(css).toContain(`@media (max-width:640px){\n#${id}{display:none}`)
+    // A seção continua no HTML: escondida não é apagada.
+    expect(html).toContain(`id="${id}"`)
+  })
+
+  it('aceita várias telas de uma vez', () => {
+    const { css, html } = ocultaEm({ tablet: true, celular: true, celularDeitado: true })
+    const id = (html.match(/<section id="([^"]+)"/) as RegExpMatchArray)[1]
+    for (const largura of [900, 767, 640]) {
+      expect(css).toContain(`@media (max-width:${largura}px){\n#${id}{display:none}`)
+    }
+    // Contado por id: o CSS base já tem display:none em outras regras (gaveta
+    // do menu, honeypot do formulário).
+    expect((css.match(new RegExp(`#${id}\\{display:none\\}`, 'g')) ?? []).length).toBe(3)
+  })
+
+  it('marcar o desktop esconde em toda tela, sem media query', () => {
+    const { css, html } = ocultaEm({ desktop: true })
+    const id = (html.match(/<section id="([^"]+)"/) as RegExpMatchArray)[1]
+    const antes = css.slice(0, css.indexOf(`#${id}{display:none}`))
+    // A regra do desktop sai fora de qualquer @media: a última chave aberta
+    // antes dela não pode ser um bloco de media query ainda por fechar.
+    expect(antes.lastIndexOf('@media')).toBeLessThan(antes.lastIndexOf('}'))
+  })
+
+  it('seção sem a marcação não gera regra nenhuma', () => {
+    const { css, html } = compilarDoc(comArvore(docCom([novaSecao('cta')])))
+    const id = (html.match(/<section id="([^"]+)"/) as RegExpMatchArray)[1]
+    expect(css).not.toContain(`#${id}{display:none}`)
+  })
+})
