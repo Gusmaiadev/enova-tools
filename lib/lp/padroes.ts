@@ -47,8 +47,39 @@ export const NOME_DISPOSITIVO: Record<Dispositivo, string> = {
   celular: 'Celular em pé',
 }
 
+/**
+ * Valor que VALE num dispositivo: o ultimo definido de desktop ate ele. E a
+ * mesma cascata do CSS — as media queries sao max-width e saem do mais largo
+ * para o mais estreito, entao valor posto no notebook vale dali para baixo ate
+ * alguem sobrepor.
+ *
+ * O painel usa para mostrar o que a pagina esta usando de fato: sem isto, um
+ * campo herdado aparece vazio (ou no minimo da faixa) como se nada estivesse
+ * valendo ali.
+ */
+export function valorEfetivo<T>(
+  valor: Partial<Record<Dispositivo, T>> | undefined,
+  ativo: Dispositivo,
+): T | undefined {
+  let atual: T | undefined
+  for (const d of DISPOSITIVOS) {
+    if (valor?.[d] !== undefined) atual = valor[d]
+    if (d === ativo) break
+  }
+  return atual
+}
+
 /** Espaco entre os filhos de um container, em px. */
 export const GAP_PADRAO = 15
+
+/**
+ * Tamanho do desenho do icone, em px — que e o font-size dele. A pastilha atras
+ * mede isto mais RESPIRO_ICONE (ver .lp-icone no CSS base), e por isso o campo
+ * "Tamanho" do painel cresce os dois de uma vez. Os 24 + 20 = 44px sao a
+ * pastilha que a pagina sempre teve.
+ */
+export const TAMANHO_ICONE = 24
+export const RESPIRO_ICONE = 20
 
 /**
  * Largura maxima do conteudo, em px — a de sempre, antes de o tema poder

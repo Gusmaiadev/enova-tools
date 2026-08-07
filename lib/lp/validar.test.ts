@@ -298,6 +298,19 @@ describe('coergirBriefing', () => {
     expect(coergirBriefing({ nome: '   ' }, 'Nome Atual').nome).toBe('Nome Atual')
   })
 
+  it('não guarda colunas: quem decide é o preset, e depois o editor', () => {
+    // O campo saiu do briefing. Um 2|3|4 escolhido antes de a página existir só
+    // competia com o número que o preset já tira do layout e da quantidade de
+    // itens — e que no editor se muda por container e por dispositivo.
+    const briefing = coergirBriefing(
+      { nome: 'P', secoes: [{ id: 's1', nome: 'A', layout: 'cards', colunas: 4 }] },
+      'P',
+    )
+    expect(briefing.secoes[0]).not.toHaveProperty('colunas')
+    // Documento gerado sem IA também não carimba número nenhum na seção.
+    expect(documentoBase(briefing).secoes[0].colunas).toBeUndefined()
+  })
+
   it('prefixa https:// em referência sem esquema e mantém o filtro de segurança', () => {
     const briefing = coergirBriefing(
       { nome: 'P', referencias: ['www.exemplo.com.br', 'javascript:alert(1)', 'ftp://x'] },
@@ -630,7 +643,8 @@ describe('itens escritos no briefing', () => {
     const secao = documentoBase(briefingCards(cards)).secoes[0]
     expect(secao.itens).toHaveLength(2)
     expect(secao.itens[0].titulo).toBe('Reforma completa')
-    expect(secao.itens[0].icone).toBe('check')
+    // Ícone não vem do briefing: fica o do item de exemplo daquela posição.
+    expect(secao.itens[0].icone).toBe(novoItem('cards', 0).icone)
     // Sem itens no briefing continuam os três de exemplo.
     expect(documentoBase(briefingCards([])).secoes[0].itens).toHaveLength(3)
   })
@@ -1407,11 +1421,23 @@ describe('operações do editor', () => {
 
   it('item novo nasce com exemplo que combina com o layout', () => {
     // `extra` muda de sentido por layout: antes a timeline nascia com "R$ 99".
-    expect(novoItem('cards').extra).toBe('Subtítulo do card')
-    expect(novoItem('cards').botao?.texto).toBe('Saiba mais')
-    expect(novoItem('timeline').extra).toBe('2020')
-    expect(novoItem('estatisticas').extra).toBe('100+')
-    expect(novoItem('precos').extra).toBe('R$ 99')
+    // As expectativas são pelo formato, não pelo texto — o exemplo é conteúdo de
+    // produto e vai mudando; o que não pode mudar é o que ele significa ali.
+    expect(novoItem('timeline').extra).toMatch(/^\d{4}$/)
+    expect(novoItem('estatisticas').extra).toMatch(/\d/)
+    expect(novoItem('precos').extra).toMatch(/^R\$/)
+    expect(novoItem('precos').detalhe).toMatch(/^\//)
+    expect(novoItem('grid-produtos').extra).toMatch(/^R\$/)
+    expect(novoItem('cards').extra).not.toBe('')
+    expect(novoItem('cards').botao?.texto).not.toBe('')
+  })
+
+  it('itens da mesma seção nascem diferentes uns dos outros', () => {
+    // Três cards com o mesmo texto é o que o usuário teria de apagar à mão.
+    const titulos = [0, 1, 2].map((i) => novoItem('cards', i).titulo)
+    expect(new Set(titulos).size).toBe(3)
+    // Passar do fim da lista volta ao começo em vez de devolver item vazio.
+    expect(novoItem('cards', 3).titulo).toBe(titulos[0])
   })
 
   it('âncora criada no editor não colide com a de outra seção', () => {

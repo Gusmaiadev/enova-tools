@@ -26,9 +26,18 @@ const colunasDe = (n: number | undefined, padrao: number) => {
   return { desktop, tablet: Math.min(2, desktop), celular: 1 }
 }
 
-/** cabeca + grade + botao da secao — o esqueleto de quase todos os presets. */
-function comGrade(s: LpSecao, grade: LpContainer): LpContainer {
-  return container([...cabeca(s), grade, ...botaoSecao(s)])
+/**
+ * cabeca + grade + botao da secao — o esqueleto de quase todos os presets.
+ *
+ * `centralizado` poe text-align no container de fora, e text-align herda: com
+ * uma propriedade so, titulo, subtitulo e texto de apoio da secao saem no meio,
+ * acompanhando a grade. Quem quiser um deles fora do padrao sobrepoe no
+ * Alinhamento do proprio elemento.
+ */
+function comGrade(s: LpSecao, grade: LpContainer, centralizado = false): LpContainer {
+  return container([...cabeca(s), grade, ...botaoSecao(s)], {
+    ...(centralizado ? { estilo: { alinhamento: { desktop: 'center' as const } } } : {}),
+  })
 }
 
 function grade(filhos: LpElemento[], colunas: LpContainer['colunas']): LpContainer {
@@ -40,12 +49,17 @@ export function pCards(s: LpSecao): LpContainer {
     container([
       ...(i.icone ? [wIcone(i.icone)] : []),
       ...(i.titulo ? [wTitulo(i.titulo, 'h3')] : []),
-      ...(i.extra ? [wTexto(i.extra, 'subtitulo')] : []),
+      // O segundo texto do card e um titulo menor, nao um paragrafo de apoio:
+      // h4 abaixo do h3 mantem a hierarquia dentro do card e pega a tipografia
+      // de titulos do tema.
+      ...(i.extra ? [wTitulo(i.extra, 'h4')] : []),
       ...(i.texto ? [wTexto(i.texto, 'corpo')] : []),
       ...(i.botao ? [wBotao(i.botao)] : []),
     ], { aparencia: 'card' }),
   )
-  return comGrade(s, grade(cards, colunasDe(s.colunas, 3)))
+  // A secao de cards nasce inteira no meio: os cards pela aparencia (ver
+  // .lp-ap-card no CSS base) e a cabeca por aqui.
+  return comGrade(s, grade(cards, colunasDe(s.colunas, 3)), true)
 }
 
 export function pPrecos(s: LpSecao): LpContainer {
@@ -125,7 +139,13 @@ export function pEstatisticas(s: LpSecao): LpContainer {
     valor: i.extra ?? '0',
     rotulo: i.titulo ?? '',
   }))
-  return comGrade(s, grade(numeros, colunasDe(s.colunas, Math.min(4, Math.max(2, s.itens.length)))))
+  // Os numeros ja saem centrados pela propria classe (.lp-stat no CSS base); o
+  // que faltava era a cabeca da secao acompanhar.
+  return comGrade(
+    s,
+    grade(numeros, colunasDe(s.colunas, Math.min(4, Math.max(2, s.itens.length)))),
+    true,
+  )
 }
 
 export function pBlocosAlternados(s: LpSecao): LpContainer {

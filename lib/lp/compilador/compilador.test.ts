@@ -6,6 +6,7 @@ import { compilarJs } from './js'
 import { compilarCss, idHtmlSecao } from './css'
 import { documentoBase } from '../documento'
 import { novaSecao } from '../layouts'
+import { NIVEIS_TEXTO, nivelEhTitulo } from '../niveis'
 import type { LpBriefing, LpDocumento, LpMidia, LpSecao, TipoLayout } from '../tipos'
 import { briefingVazio } from '../tipos'
 import { LAYOUTS } from '../layouts'
@@ -17,6 +18,19 @@ import { coergirDocumento } from '../validar'
  * formato tipado porque é o que `documentoBase` e a IA produzem.
  */
 const comArvore = (d: LpDocumento) => migrarDocumentoParaArvore(d)
+
+/**
+ * Seção no formato tipado, para o teste escrever nos campos e deixar a expansão
+ * montar a página a partir deles. `novaSecao` não serve: ela é a do editor e já
+ * vem montada, e numa seção com árvore é a árvore que manda — escrever em
+ * `secao.itens` ali não mudaria nada na página.
+ */
+const tipada = (tipo: TipoLayout): LpSecao => {
+  const secao = novaSecao(tipo)
+  delete secao.raiz
+  delete secao.preset
+  return secao
+}
 const compilarDoc = (d: LpDocumento, o?: Parameters<typeof compilar>[1]) =>
   compilar(comArvore(d), o)
 const compilarEditorDoc = (d: LpDocumento) => compilarEditor(comArvore(d))
@@ -56,7 +70,7 @@ function documentoCompleto(): LpDocumento {
       },
     }),
   )
-  doc.secoes.push(...LAYOUTS.map((l) => novaSecao(l.tipo)))
+  doc.secoes.push(...LAYOUTS.map((l) => tipada(l.tipo)))
   return doc
 }
 
@@ -137,7 +151,7 @@ describe('compilador', () => {
     const doc = documentoBase(briefing())
     doc.secoes = [
       {
-        ...novaSecao('texto-centralizado'),
+        ...tipada('texto-centralizado'),
         titulo: '<img src=x onerror="alert(1)">',
         texto: 'Fim & <script>alert(2)</script>',
       },
@@ -151,7 +165,7 @@ describe('compilador', () => {
 
   it('neutraliza URLs perigosas em botões e links', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('cta')
+    const secao = tipada('cta')
     secao.botao = { texto: 'Clique', url: 'javascript:alert(1)' }
     doc.secoes = [secao]
     const { html } = compilarDoc(doc)
@@ -192,7 +206,7 @@ describe('compilador', () => {
 
   it('pinta a cor própria de cada botão inline, sem vazar para os itens', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('precos')
+    const secao = tipada('precos')
     secao.itens[0].botao = { texto: 'Assinar', url: '#', corFundo: '#16a34a' }
     secao.itens[1].botao = { texto: 'Assinar', url: '#', corFundo: '#2563eb' }
     doc.secoes = [secao]
@@ -353,7 +367,7 @@ describe('compilador', () => {
     // Antes era a classe `.inv` mudando o `order` no CSS. Na árvore o lado é a
     // posição do filho, então a inversão se lê na ordem do HTML.
     const doc = documentoBase(briefing())
-    const tm = novaSecao('texto-midia')
+    const tm = tipada('texto-midia')
     tm.midia = {
       tipo: 'imagem',
       url: 'https://ex.com/a.jpg',
@@ -372,6 +386,24 @@ describe('compilador', () => {
 
     // A classe do CSS antigo não existe mais em lugar nenhum.
     expect(invertido).not.toContain('lp-tm')
+  })
+
+  it('trocar a ordem dos filhos troca os lados da seção já montada', () => {
+    // O contrato de "Ordem dos blocos", no painel do container: com a seção já
+    // em árvore não há mais campo `inverter` para mexer — quem troca o lado do
+    // conteúdo com o da mídia é a posição do filho.
+    const doc = documentoBase(briefing())
+    const secao = novaSecao('texto-midia')
+    const raiz = secao.raiz
+    if (!raiz) throw new Error('esperava a seção nova já montada')
+    doc.secoes = [secao]
+
+    const normal = compilarDoc(doc).html
+    expect(normal.indexOf('lp-el-titulo')).toBeLessThan(normal.indexOf('lp-midia'))
+
+    raiz.filhos = [...raiz.filhos].reverse()
+    const trocado = compilarDoc(doc).html
+    expect(trocado.indexOf('lp-midia')).toBeLessThan(trocado.indexOf('lp-el-titulo'))
   })
 
   it('leva os ajustes de header e rodapé para o CSS (e a fonte para o <head>)', () => {
@@ -419,8 +451,8 @@ describe('compilador', () => {
 
   it('gera âncoras únicas mesmo com seções de mesmo nome', () => {
     const doc = documentoBase(briefing())
-    const a = novaSecao('cards')
-    const b = novaSecao('cards')
+    const a = tipada('cards')
+    const b = tipada('cards')
     a.ancora = 'servicos'
     b.ancora = 'servicos'
     doc.secoes = [a, b]
@@ -431,7 +463,7 @@ describe('compilador', () => {
 
   it('reescreve as URLs de mídia para caminhos locais na exportação', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('texto-midia')
+    const secao = tipada('texto-midia')
     secao.midia = {
       tipo: 'imagem',
       url: 'https://cdn.exemplo.com/foto.jpg',
@@ -454,7 +486,7 @@ describe('compilador', () => {
 
   it('põe o poster no <video> e coleta a miniatura para a exportação', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('texto-midia')
+    const secao = tipada('texto-midia')
     secao.midia = {
       tipo: 'video',
       url: 'https://cdn.exemplo.com/filme.mp4',
@@ -479,7 +511,7 @@ describe('compilador', () => {
 
   const comVideo = (tipo: 'texto-midia' | 'banner', extra: Partial<LpMidia> = {}) => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao(tipo)
+    const secao = tipada(tipo)
     secao.midia = {
       tipo: 'video',
       url: 'https://cdn.exemplo.com/filme.mp4',
@@ -520,7 +552,7 @@ describe('compilador', () => {
 
   it('omite o poster quando a miniatura não passa pelo saneamento de URL', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('texto-midia')
+    const secao = tipada('texto-midia')
     secao.midia = {
       tipo: 'video',
       url: 'https://cdn.exemplo.com/filme.mp4',
@@ -536,7 +568,7 @@ describe('compilador', () => {
 
   it('big numbers sai com título, subtítulo, conteúdo e os números escritos', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('estatisticas')
+    const secao = tipada('estatisticas')
     secao.titulo = 'Nossos números'
     secao.subtitulo = 'Vinte anos construindo'
     secao.texto = 'Cada número aqui é obra entregue, não promessa.'
@@ -560,7 +592,10 @@ describe('compilador', () => {
 
   it('cada card sai com título, subtítulo, texto e botão próprios', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('cards')
+    const secao = tipada('cards')
+    // A contagem de h4 abaixo é sobre os cards: o subtítulo da seção sai do
+    // caminho para não entrar na conta.
+    delete secao.subtitulo
     secao.itens = [
       {
         id: 'c1',
@@ -581,12 +616,19 @@ describe('compilador', () => {
     // Cada card é um container com a aparência de card — é ela que carrega
     // borda, fundo e o hover que sobe 6px, coisas que LpEstilo não alcança.
     expect((html.match(/lp-ap-card/g) ?? []).length).toBe(2)
-    // Card sem subtítulo/botão não emite os blocos vazios. Conta pelo texto do
-    // botão, não por `lp-btn`: o header da página também tem um.
-    expect((html.match(/lp-subtitulo/g) ?? []).length).toBe(1)
+    // O segundo texto do card é um h4, e não um parágrafo de apoio: dentro do
+    // card ele é título de novo, um degrau abaixo do h3.
+    expect(html).toContain('<h4 class="lp-el-titulo')
+    // Card sem subtítulo/botão não emite os blocos vazios. Conta pelo h4 da
+    // ÁRVORE, não por `<h4`: o rodapé também tem h4 nos títulos das colunas.
+    expect((html.match(/<h4 class="lp-el-titulo/g) ?? []).length).toBe(1)
     expect((html.match(/>Quero esta</g) ?? []).length).toBe(1)
     expect(css).toMatch(/\.lp-ap-card\{[^}]*flex-direction:column/)
     expect(css).toContain('.lp-ap-card:hover')
+    // Card centralizado por padrão: o texto pelo text-align (que herda para os
+    // filhos) e o botão/ícone pelo align-self, que text-align não alcança.
+    expect(css).toContain('.lp-ap-card{text-align:center}')
+    expect(css).toContain('.lp-ap-card > .lp-btn,.lp-ap-card > .lp-icone{align-self:center}')
   })
 
   it('botão sai em qualquer layout, com posição, hover e animação', () => {
@@ -617,8 +659,8 @@ describe('compilador', () => {
 
   it('o botão da seção vira um widget dentro da árvore', () => {
     const doc = documentoBase(briefing())
-    const tm = novaSecao('texto-midia')
-    const cards = novaSecao('cards')
+    const tm = tipada('texto-midia')
+    const cards = tipada('cards')
     tm.botao = { texto: 'Ver', url: '#' }
     cards.botao = { texto: 'Ver', url: '#' }
     doc.secoes = [tm, cards]
@@ -660,7 +702,7 @@ describe('compilador', () => {
     const doc = documentoBase(
       briefing({ tipografia: { titulos: { fonte: 'Poppins', peso: 800, tamanho: '20px' } } }),
     )
-    doc.secoes = [novaSecao('hero')]
+    doc.secoes = [tipada('hero')]
     const { css } = compilarDoc(doc)
     expect(css).toContain('--tamanho-titulos: 20px')
     // Piso fixo (ex.: 2rem) vence o teto quando o usuário escolhe um tamanho
@@ -670,9 +712,41 @@ describe('compilador', () => {
     expect(pisos.filter((p) => !p.includes('var(--tamanho-titulos)'))).toEqual([])
   })
 
+  it('todo nível de título que o painel oferece tem tipografia de título', () => {
+    // O h4 ficava de fora da regra `h1,h2,h3` e saía com a fonte do corpo, em
+    // tamanho de parágrafo — a opção existia no painel e não fazia o combinado.
+    const { css } = compilarDoc(documentoCompleto())
+    for (const nivel of NIVEIS_TEXTO.filter((n) => nivelEhTitulo(n.valor))) {
+      const regra = css.match(new RegExp(`(?:^|[,}])${nivel.valor}[^{,]*\\{[^}]*font-size:[^}]*\\}`, 'm'))
+      expect(regra, `${nivel.valor} sem tamanho próprio`).not.toBeNull()
+    }
+    expect(css).toContain('h4.lp-el-titulo{font-family:var(--fonte-titulos)')
+  })
+
+  it('nas seções centralizadas o botão sai centralizado com o texto', () => {
+    // Regressão da virada para árvore: antes o botão era conteúdo inline de uma
+    // caixa com text-align:center; virou item de flex e passou a obedecer ao
+    // `align-self:flex-start` do CSS base, encostado à esquerda.
+    for (const tipo of ['texto-centralizado', 'cta', 'banner'] as TipoLayout[]) {
+      const secao = novaSecao(tipo)
+      const raiz = secao.raiz
+      if (!raiz) throw new Error(`${tipo} sem árvore`)
+      const doc = { ...documentoBase(briefing()), secoes: [secao] }
+      const { css } = compilarDoc(doc)
+
+      const base = css.indexOf('.lp-c > .lp-btn,.lp-c > .lp-icone{align-self:flex-start}')
+      const doNo = css.indexOf(`.lp-e-${raiz.id} > .lp-btn`)
+      expect(base, `${tipo}: regra base sumiu`).toBeGreaterThan(-1)
+      // As duas regras empatam em especificidade (duas classes cada): é a ordem
+      // na folha que decide. Emitida antes da base, a correção não valeria nada.
+      expect(doNo, `${tipo}: regra do nó precisa vir depois da base`).toBeGreaterThan(base)
+      expect(css.slice(doNo), tipo).toContain('align-self:center')
+    }
+  })
+
   it('mídia de fundo põe texto branco, e dá para voltar às cores do tema', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('texto-midia')
+    const secao = tipada('texto-midia')
     secao.fundo = {
       midia: {
         tipo: 'imagem',
@@ -695,7 +769,7 @@ describe('compilador', () => {
 
   it('libera o container nas seções de largura total', () => {
     const doc = documentoBase(briefing())
-    const secao = novaSecao('cta')
+    const secao = tipada('cta')
     secao.largura = 'full'
     doc.secoes = [secao]
     const { html, css } = compilarDoc(doc)
@@ -706,7 +780,7 @@ describe('compilador', () => {
 
   it('a mídia do banner vira fundo da seção, não elemento da página', () => {
     const doc = documentoBase(briefing())
-    const banner = novaSecao('banner')
+    const banner = tipada('banner')
     banner.midia = {
       tipo: 'imagem',
       url: 'https://ex.com/faixa.jpg',
@@ -763,7 +837,6 @@ describe('documentoBase', () => {
             titulo: 'O que fazemos',
             conteudo: '',
             layout: 'cards',
-            colunas: 3,
             midia: null,
           },
         ],
@@ -797,7 +870,7 @@ describe('documentoBase', () => {
 describe('catálogo de layouts', () => {
   it('cria seção de exemplo válida para cada layout', () => {
     for (const layout of LAYOUTS) {
-      const secao = novaSecao(layout.tipo as TipoLayout)
+      const secao = tipada(layout.tipo as TipoLayout)
       expect(secao.tipo).toBe(layout.tipo)
       if (layout.itens) expect(secao.itens.length).toBeGreaterThan(0)
       else expect(secao.itens).toHaveLength(0)
@@ -814,7 +887,7 @@ describe('compilador com árvore', () => {
   it('seção com raiz usa a árvore e ignora os campos tipados', () => {
     const doc = docCom([
       {
-        ...novaSecao('cta'),
+        ...tipada('cta'),
         titulo: 'IGNORADO',
         raiz: {
           id: 'r',
@@ -833,9 +906,9 @@ describe('compilador com árvore', () => {
     // Não deveria acontecer — todo documento passa pela migração ou pela
     // geração. Se acontecer, o resto da página continua de pé.
     const doc = docCom([
-      { ...novaSecao('cta'), titulo: 'IGNORADO' },
+      { ...tipada('cta'), titulo: 'IGNORADO' },
       {
-        ...novaSecao('cta'),
+        ...tipada('cta'),
         raiz: {
           id: 'r',
           tipo: 'container',
@@ -853,7 +926,7 @@ describe('compilador com árvore', () => {
   it('CSS traz as regras geradas dos elementos da árvore', () => {
     const doc = docCom([
       {
-        ...novaSecao('cta'),
+        ...tipada('cta'),
         raiz: {
           id: 'r',
           tipo: 'container',
@@ -879,7 +952,7 @@ describe('compilador com árvore', () => {
   it('JS do slider entra quando há widget de carrossel na árvore', () => {
     const doc = docCom([
       {
-        ...novaSecao('cta'),
+        ...tipada('cta'),
         raiz: {
           id: 'r',
           tipo: 'container',
@@ -894,7 +967,7 @@ describe('compilador com árvore', () => {
 
 describe('menu hambúrguer', () => {
   const comMenu = (menuMobile?: LpDocumento['header']['menuMobile']) => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.header.menu = [{ id: 'm1', rotulo: 'Início', alvo: '#topo' }]
     if (menuMobile) doc.header.menuMobile = menuMobile
     return doc
@@ -953,7 +1026,7 @@ describe('links úteis do rodapé', () => {
     linksUteis: { id: string; rotulo: string; url: string }[],
     menuSecundario: boolean,
   ) => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.header.menu = [
       { id: 'm1', rotulo: 'Início', alvo: '#topo' },
       { id: 'm2', rotulo: 'Contato', alvo: '#contato' },
@@ -1028,7 +1101,7 @@ describe('links úteis do rodapé', () => {
 
 describe('logo do rodapé', () => {
   const comLogo = () => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.header.logoTexto = 'Clínica Vida'
     doc.header.logo = {
       tipo: 'imagem',
@@ -1050,7 +1123,7 @@ describe('logo do rodapé', () => {
   })
 
   it('sem imagem o rodapé continua mostrando o nome escrito', () => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.header.logoTexto = 'Clínica Vida'
     const { html } = compilarDoc(doc)
     const rodape = html.slice(html.indexOf('lp-footer'))
@@ -1066,7 +1139,7 @@ describe('logo do rodapé', () => {
   })
 
   it('sem imagem, o mesmo ajuste continua sendo corpo de fonte', () => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.footer.estilo = { logo: 60 }
     const { css } = compilarDoc(doc)
     expect(css).toContain('.lp-logo-footer{font-size:60px}')
@@ -1083,7 +1156,7 @@ describe('ordem dos links úteis', () => {
   }
 
   it('termos e privacidade fecham a lista, mesmo entrando antes', () => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.footer.linksUteis = [
       { id: 'l1', rotulo: 'Termos de Uso', url: 'termos.html' },
       { id: 'l2', rotulo: 'Política de Privacidade', url: 'privacidade.html' },
@@ -1101,7 +1174,7 @@ describe('ordem dos links úteis', () => {
   it('o menu repetido do header não passa na frente dos legais', () => {
     // Era o caso real: menuSecundario concatena depois dos links úteis, e os
     // legais — que sincronizarLinksPaginas põe no fim — ficavam no meio.
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.header.menu = [{ id: 'm1', rotulo: 'Contato', alvo: '#contato' }]
     doc.footer.linksUteis = [{ id: 'l1', rotulo: 'Termos de Uso', url: 'termos.html' }]
     doc.footer.menuSecundario = true
@@ -1109,7 +1182,7 @@ describe('ordem dos links úteis', () => {
   })
 
   it('link legal escrito à mão, apontando para fora, também vai para o fim', () => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.footer.linksUteis = [
       { id: 'l1', rotulo: 'Privacidade', url: 'https://exemplo.com/privacidade' },
       { id: 'l2', rotulo: 'Blog', url: '/blog' },
@@ -1118,7 +1191,7 @@ describe('ordem dos links úteis', () => {
   })
 
   it('sem links legais a ordem do documento é preservada', () => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.footer.linksUteis = [
       { id: 'l1', rotulo: 'Blog', url: '/blog' },
       { id: 'l2', rotulo: 'Sobre', url: '#sobre' },
@@ -1130,7 +1203,7 @@ describe('ordem dos links úteis', () => {
 
 describe('tamanho da logo por barra', () => {
   it('header e rodapé guardam alturas próprias para a mesma imagem', () => {
-    const doc = docCom([novaSecao('cta')])
+    const doc = docCom([tipada('cta')])
     doc.header.logo = {
       tipo: 'imagem',
       url: 'https://cdn/logo.png',
@@ -1152,7 +1225,7 @@ describe('animações de entrada', () => {
    * que ainda não é versão 2, e apagaria uma raiz montada à mão aqui.
    */
   const comAnimacoes = () => {
-    const doc = comArvore(docCom([novaSecao('cta')]))
+    const doc = comArvore(docCom([tipada('cta')]))
     const secao = doc.secoes[0]
     secao.animacao = { tipo: 'fade-baixo' }
     const alvo = secao.raiz?.filhos[0]
@@ -1184,7 +1257,7 @@ describe('animações de entrada', () => {
   })
 
   it('página sem animação não carrega nada do mecanismo', () => {
-    const { css } = compilarDoc(docCom([novaSecao('cta')]))
+    const { css } = compilarDoc(docCom([tipada('cta')]))
     expect(css).not.toContain('@keyframes lp-k-')
     expect(css).not.toContain('.lp-an{')
   })
@@ -1212,7 +1285,7 @@ describe('animações de entrada', () => {
 
 describe('não mostrar em — seção', () => {
   const ocultaEm = (oculto: Record<string, boolean>) => {
-    const doc = comArvore(docCom([novaSecao('cta'), novaSecao('faq')]))
+    const doc = comArvore(docCom([tipada('cta'), tipada('faq')]))
     doc.secoes[0].oculto = oculto as never
     return compilarDoc(doc)
   }
@@ -1246,7 +1319,7 @@ describe('não mostrar em — seção', () => {
   })
 
   it('seção sem a marcação não gera regra nenhuma', () => {
-    const { css, html } = compilarDoc(comArvore(docCom([novaSecao('cta')])))
+    const { css, html } = compilarDoc(comArvore(docCom([tipada('cta')])))
     const id = (html.match(/<section id="([^"]+)"/) as RegExpMatchArray)[1]
     expect(css).not.toContain(`#${id}{display:none}`)
   })

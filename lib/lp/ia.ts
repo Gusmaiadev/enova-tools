@@ -257,7 +257,6 @@ function blocoSecoes(briefing: LpBriefing): string {
           ? `   o que dizer: ${s.conteudo}`
           : s.semIa?.conteudo &&
             '   NÃO gere "texto" aqui — o usuário quer a seção sem parágrafo de apoio',
-        s.colunas && `   colunas: ${s.colunas}`,
         s.botao &&
           `   botão: o usuário JÁ DEFINIU ("${s.botao.texto}" -> ${s.botao.url}) — não gere o campo "botao" nesta seção`,
         s.itens &&

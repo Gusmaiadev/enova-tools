@@ -302,6 +302,12 @@ export function PainelPropriedades({
           O conteúdo — títulos, textos, botões, mídia e itens — se edita clicando em cada
           elemento na página ou na árvore da aba Estrutura.
         </p>
+        {/* A pergunta "como troco o lado da mídia?" chega aqui, no painel da
+            seção, porque era aqui que ficava o seletor de lados antes da árvore. */}
+        <p className="text-xs text-text-dim">
+          Para trocar os lados do conteúdo e da mídia, clique no bloco que segura os dois (o
+          Container, na aba Estrutura) e use <strong className="text-text">Ordem dos blocos</strong>.
+        </p>
       </Grupo>
 
       <Grupo titulo="Layout">

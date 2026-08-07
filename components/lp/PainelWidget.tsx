@@ -1,5 +1,6 @@
 'use client'
 
+import { Copy, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { CamposAvancado } from './CamposAvancado'
 import { CamposConteudo } from './CamposConteudo'
@@ -7,6 +8,7 @@ import { CamposEstilo } from './CamposEstilo'
 import { CamposLista } from './CamposLista'
 import { SeletorDispositivo } from './PorDispositivo'
 import { Vazio } from './campos'
+import { NOME_ELEMENTO } from './elementos'
 import { acharNo } from '@/lib/lp/arvore'
 import type { Dispositivo, LpContainer, LpDocumento, LpElemento } from '@/lib/lp/tipos'
 
@@ -29,26 +31,6 @@ const COM_LISTA = new Set([
   'lista',
   'formulario',
 ])
-
-export const NOME_ELEMENTO: Record<string, string> = {
-  container: 'Container',
-  titulo: 'Título',
-  texto: 'Texto',
-  imagem: 'Imagem',
-  video: 'Vídeo',
-  botao: 'Botão',
-  icone: 'Ícone',
-  numero: 'Número',
-  lista: 'Lista',
-  espacador: 'Espaçador',
-  divisor: 'Divisor',
-  faq: 'FAQ',
-  abas: 'Abas',
-  carrossel: 'Carrossel',
-  depoimentos: 'Depoimentos',
-  comparacao: 'Comparação',
-  formulario: 'Formulário',
-}
 
 /** Ancestrais do nó, da raiz até ele — alimenta o caminho clicável. */
 function caminhoAte(raiz: LpContainer, id: string): LpElemento[] {
@@ -74,6 +56,8 @@ export function PainelWidget({
   noId,
   aplicar,
   aoSelecionar,
+  aoDuplicar,
+  aoRemover,
   dispositivo,
   aoTrocarDispositivo,
 }: {
@@ -82,6 +66,8 @@ export function PainelWidget({
   noId: string
   aplicar: Aplicar
   aoSelecionar: (id: string) => void
+  aoDuplicar: (id: string) => void
+  aoRemover: (id: string) => void
   /**
    * Vem do EditorLp, derivado da tela escolhida na barra de cima. Não é estado
    * daqui de propósito: com estado próprio, a prévia mostraria um tamanho e o
@@ -119,27 +105,56 @@ export function PainelWidget({
 
   return (
     <div className="space-y-3">
-      <nav aria-label="Caminho do elemento" className="flex flex-wrap items-center gap-0.5 text-xs">
-        {trilha.map((p, i) => (
-          <span key={p.id} className="flex items-center gap-0.5">
-            {i > 0 && (
-              <span aria-hidden className="text-text-dim">
-                ›
-              </span>
-            )}
+      <div className="flex items-start gap-1">
+        <nav
+          aria-label="Caminho do elemento"
+          className="flex flex-1 flex-wrap items-center gap-0.5 text-xs"
+        >
+          {trilha.map((p, i) => (
+            <span key={p.id} className="flex items-center gap-0.5">
+              {i > 0 && (
+                <span aria-hidden className="text-text-dim">
+                  ›
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => aoSelecionar(p.id)}
+                aria-current={p.id === noId ? 'true' : undefined}
+                className={`rounded px-1.5 py-0.5 transition-colors ${
+                  p.id === noId ? 'bg-blue/15 text-blue' : 'text-text-dim hover:text-text'
+                }`}
+              >
+                {NOME_ELEMENTO[p.tipo] ?? p.tipo}
+              </button>
+            </span>
+          ))}
+        </nav>
+        {/* A raiz não: ela é a seção, e duplicar ou excluir seção tem botão
+            próprio na aba Estrutura. */}
+        {no.id !== secao.raiz.id && (
+          <>
             <button
               type="button"
-              onClick={() => aoSelecionar(p.id)}
-              aria-current={p.id === noId ? 'true' : undefined}
-              className={`rounded px-1.5 py-0.5 transition-colors ${
-                p.id === noId ? 'bg-blue/15 text-blue' : 'text-text-dim hover:text-text'
-              }`}
+              aria-label={`Duplicar ${NOME_ELEMENTO[no.tipo] ?? no.tipo}`}
+              title="Duplicar este elemento"
+              onClick={() => aoDuplicar(no.id)}
+              className="shrink-0 rounded border border-border p-1.5 text-text-dim transition-colors hover:border-blue/60 hover:text-text"
             >
-              {NOME_ELEMENTO[p.tipo] ?? p.tipo}
+              <Copy className="h-3.5 w-3.5" />
             </button>
-          </span>
-        ))}
-      </nav>
+            <button
+              type="button"
+              aria-label={`Remover ${NOME_ELEMENTO[no.tipo] ?? no.tipo}`}
+              title="Remover este elemento"
+              onClick={() => aoRemover(no.id)}
+              className="shrink-0 rounded border border-border p-1.5 text-text-dim transition-colors hover:border-pink/60 hover:text-pink"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
 
       <div className="flex border-b border-border">
         {ABAS.map((a) => (

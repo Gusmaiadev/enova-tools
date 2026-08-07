@@ -3,12 +3,15 @@ import {
   acharNo,
   atualizarNo,
   caminharElementos,
+  definirQuantidadeFilhos,
   duplicarNo,
   midiasDoElemento,
+  paiDe,
+  quantoLeva,
   regerarIds,
   removerNo,
 } from './arvore'
-import type { LpContainer, LpMidia } from './tipos'
+import type { LpContainer, LpElemento, LpMidia } from './tipos'
 
 const midia = (url: string): LpMidia => ({
   tipo: 'imagem',
@@ -80,6 +83,43 @@ describe('midiasDoElemento', () => {
   })
 })
 
+describe('quantoLeva', () => {
+  it('no container, conta a subárvore inteira e não só os filhos diretos', () => {
+    // A árvore tem 4 nós além da raiz: t1, c1 e os dois filhos de c1.
+    expect(quantoLeva(arvore)).toBe(4)
+  })
+
+  it('conta a lista própria de cada widget composto', () => {
+    // Um composto esquecido aqui é uma lista inteira apagada sem o editor
+    // perguntar nada — o mesmo risco que midiasDoElemento tem.
+    const compostos: LpElemento[] = [
+      { id: 'f', tipo: 'faq', perguntas: [{ id: 'p1', pergunta: 'a', resposta: 'b' }] },
+      { id: 'a', tipo: 'abas', abas: [{ id: 'a1', titulo: 'a', texto: 'b' }] },
+      { id: 'c', tipo: 'carrossel', slides: [{ id: 's1' }, { id: 's2' }] },
+      {
+        id: 'd',
+        tipo: 'depoimentos',
+        depoimentos: [{ id: 'd1', texto: 'x', nome: 'y' }],
+      },
+      {
+        id: 'k',
+        tipo: 'comparacao',
+        rotulos: ['r'],
+        colunas: [{ id: 'k1', titulo: 'A', celulas: ['x'] }],
+      },
+      { id: 'l', tipo: 'lista', itens: [{ id: 'i1', texto: 'um' }, { id: 'i2', texto: 'dois' }] },
+    ]
+    expect(compostos.map(quantoLeva)).toEqual([1, 1, 2, 1, 1, 2])
+  })
+
+  it('widget simples não leva nada junto', () => {
+    expect(quantoLeva({ id: 't', tipo: 'titulo', nivel: 'h2', texto: 'A' })).toBe(0)
+    expect(quantoLeva({ id: 'i', tipo: 'imagem', midia: midia('a.jpg') })).toBe(0)
+    // Container vazio também: sem filhos, remover não surpreende ninguém.
+    expect(quantoLeva({ id: 'c', tipo: 'container', direcao: {}, filhos: [] })).toBe(0)
+  })
+})
+
 describe('operações de árvore', () => {
   const base = (): LpContainer => ({
     id: 'r',
@@ -127,6 +167,47 @@ describe('operações de árvore', () => {
 
   it('removerNo na raiz não faz nada', () => {
     expect(acharNo(removerNo(base(), 'r'), 'r')).not.toBeNull()
+  })
+
+  it('paiDe acha quem segura o nó, em qualquer profundidade', () => {
+    expect(paiDe(base(), 't1')?.id).toBe('r')
+    expect(paiDe(base(), 't2')?.id).toBe('c1')
+  })
+
+  it('paiDe devolve null para a raiz e para quem não está na árvore', () => {
+    // É por este null que o editor sabe que não há para onde subir a seleção
+    // depois de remover — e que a raiz não se remove por ali.
+    expect(paiDe(base(), 'r')).toBeNull()
+    expect(paiDe(base(), 'nada')).toBeNull()
+  })
+
+  it('definirQuantidadeFilhos cresce copiando o último, com ids novos', () => {
+    const c = base()
+    definirQuantidadeFilhos(c, 4)
+    expect(c.filhos).toHaveLength(4)
+    // As duas cópias saem do MESMO modelo (o 'c1' de antes), e não uma da
+    // outra: assim os blocos novos nascem iguais entre si.
+    for (const copia of c.filhos.slice(2)) {
+      expect(copia.tipo).toBe('container')
+      expect(copia.id).not.toBe('c1')
+    }
+    expect(new Set(caminharElementos(c).map((e) => e.id)).size).toBe(
+      caminharElementos(c).length,
+    )
+  })
+
+  it('definirQuantidadeFilhos encolhe cortando do fim', () => {
+    const c = base()
+    definirQuantidadeFilhos(c, 1)
+    expect(c.filhos.map((f) => f.id)).toEqual(['t1'])
+  })
+
+  it('definirQuantidadeFilhos não inventa filho em container vazio', () => {
+    // Sem um bloco de modelo não há o que multiplicar — inventar um widget aqui
+    // seria adivinhar o que o usuário quer.
+    const c: LpContainer = { id: 'v', tipo: 'container', direcao: {}, filhos: [] }
+    definirQuantidadeFilhos(c, 3)
+    expect(c.filhos).toHaveLength(0)
   })
 
   it('duplicarNo insere a cópia logo depois, com ids novos', () => {

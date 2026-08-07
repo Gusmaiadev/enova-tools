@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { expandirPreset } from './expandir'
 import { LAYOUTS } from '../layouts'
-import type { LpElemento, LpMidia, LpSecao, TipoLayout } from '../tipos'
+import type { LpContainer, LpElemento, LpMidia, LpSecao, TipoLayout } from '../tipos'
 
 /** So a raiz: quase todo teste ignora a secao ajustada (so o banner mexe nela). */
 const expandir = (s: LpSecao) => expandirPreset(s).raiz
@@ -130,18 +130,26 @@ describe('expandirPreset — composicao livre', () => {
         ],
       }),
     )
+    // O `extra` do card é o segundo título (h4), não um parágrafo de apoio —
+    // por isso dois 'titulo' seguidos dentro do card.
     expect(forma(raiz)).toEqual({
       container: [
         'titulo',
         {
           container: [
-            { container: ['icone', 'titulo', 'texto', 'texto', 'botao'] },
+            { container: ['icone', 'titulo', 'titulo', 'texto', 'botao'] },
             { container: ['titulo'] },
           ],
         },
         'botao',
       ],
     })
+    const card = (raiz.filhos[1] as LpContainer).filhos[0] as LpContainer
+    const sub = card.filhos[2]
+    expect(sub.tipo === 'titulo' && sub.nivel).toBe('h4')
+    // text-align no container de fora: herda para o título, o subtítulo e o
+    // texto de apoio da seção de uma vez, sem escrever em cada um.
+    expect(raiz.estilo?.alinhamento).toEqual({ desktop: 'center' })
     const grade = raiz.filhos[1]
     if (grade.tipo !== 'container') throw new Error('esperava container')
     expect(grade.colunas).toEqual({ desktop: 3, tablet: 2, celular: 1 })
@@ -168,6 +176,9 @@ describe('expandirPreset — composicao livre', () => {
     const num = grade.filhos[0]
     if (num.tipo !== 'numero') throw new Error('esperava numero')
     expect(num).toMatchObject({ valor: '100+', rotulo: 'Clientes' })
+    // Os números já saem centrados pela classe .lp-stat; o text-align aqui é
+    // para a cabeça da seção (título, subtítulo e texto) acompanhar.
+    expect(raiz.estilo?.alinhamento).toEqual({ desktop: 'center' })
   })
 
   it('precos monta nome, preco, periodo, lista de vantagens e botao', () => {

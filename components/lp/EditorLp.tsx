@@ -33,6 +33,15 @@ import { PainelWidget } from './PainelWidget'
 import { PainelTema } from './PainelTema'
 import { compilarEditor } from '@/lib/lp/compilador'
 import {
+  acharNo,
+  caminharElementos,
+  duplicarNo,
+  paiDe,
+  quantoLeva,
+  removerNo,
+} from '@/lib/lp/arvore'
+import { NOME_ELEMENTO } from './elementos'
+import {
   alterarDoc,
   aplicarTexto,
   duplicarSecao,
@@ -46,6 +55,7 @@ import { reordenar } from './arrastar'
 import type {
   Dispositivo,
   LpDocumento,
+  LpElemento,
   LpProjeto,
   PaginaLegal,
   TipoLayout,
@@ -105,6 +115,15 @@ const ABAS: { chave: Aba; rotulo: string; icone: typeof LayoutList }[] = [
   { chave: 'tema', rotulo: 'Tema', icone: Palette },
 ]
 
+/** Nó da árvore pelo id, em qualquer seção do documento. */
+function noDaArvore(doc: LpDocumento, id: string): LpElemento | null {
+  for (const s of doc.secoes) {
+    const no = s.raiz ? acharNo(s.raiz, id) : null
+    if (no) return no
+  }
+  return null
+}
+
 /**
  * 'el:ID' é um nó da árvore; 'sec:ID' é a seção inteira, que ainda tem painel
  * próprio para nome, âncora, fundo e espaçamento.
@@ -140,6 +159,8 @@ export function EditorLp({
   const [erro, setErro] = useState<string | null>(null)
   const [avisosVisiveis, setAvisosVisiveis] = useState(true)
   const [paraExcluir, setParaExcluir] = useState<string | null>(null)
+  /** Nó da árvore aguardando confirmação — só os que levam filhos junto. */
+  const [noParaExcluir, setNoParaExcluir] = useState<string | null>(null)
   const [paginaAberta, setPaginaAberta] = useState<TipoPaginaLegal | null>(null)
   const [paginaParaExcluir, setPaginaParaExcluir] = useState<TipoPaginaLegal | null>(null)
   const [podeDesfazer, setPodeDesfazer] = useState(false)
@@ -405,6 +426,91 @@ export function EditorLp({
   )
 
   /**
+   * Tira o elemento da árvore. A raiz da seção não sai por aqui: ela É a seção,
+   * e quem exclui seção é o botão da lista — remover a raiz deixaria uma faixa
+   * vazia sem nada para clicar.
+   *
+   * Depois de remover, a seleção sobe para o container que segurava o elemento.
+   * Sem isso o painel ficaria editando um nó que não está mais na página.
+   */
+  const removerElemento = useCallback(
+    (id: string) => {
+      const d = docRef.current
+      const secao = d.secoes.find((s) => s.raiz && acharNo(s.raiz, id))
+      const raiz = secao?.raiz
+      if (!raiz || raiz.id === id) return
+      const saindo = acharNo(raiz, id)
+      // O container leva os filhos junto — a seleção pode estar em qualquer um.
+      const idsQueSaem = new Set(
+        saindo?.tipo === 'container' ? caminharElementos(saindo).map((e) => e.id) : [id],
+      )
+      const pai = paiDe(raiz, id)
+
+      aplicar((novo) => {
+        const alvoSecao = novo.secoes.find((s) => s.id === secao.id)
+        if (alvoSecao?.raiz) alvoSecao.raiz = removerNo(alvoSecao.raiz, id)
+      })
+
+      if (noId && idsQueSaem.has(noId)) {
+        if (pai) selecionarNo(pai.id)
+        else {
+          setNoId(null)
+          setAlvo(null)
+          alvoSelecionado.current = null
+        }
+      }
+    },
+    [aplicar, noId, selecionarNo],
+  )
+
+  /**
+   * Copia o elemento logo depois dele, com ids novos. É como se põe mais um
+   * card, mais um benefício ou mais um número na página: o preset monta o
+   * primeiro, e daí em diante duplicar é mais barato do que remontar.
+   *
+   * A cópia entra selecionada — quem duplica é para editar o que copiou.
+   */
+  const duplicarElemento = useCallback(
+    (id: string) => {
+      const d = docRef.current
+      const secao = d.secoes.find((s) => s.raiz && acharNo(s.raiz, id))
+      if (!secao?.raiz || secao.raiz.id === id) return
+      // Array em vez de variável: o id nasce dentro do callback de alterarDoc, e
+      // o TypeScript não enxerga atribuição feita lá de dentro.
+      const novos: string[] = []
+
+      definirDoc(
+        alterarDoc(d, (novo) => {
+          const alvoSecao = novo.secoes.find((s) => s.id === secao.id)
+          if (!alvoSecao?.raiz) return
+          alvoSecao.raiz = duplicarNo(alvoSecao.raiz, id)
+          const pai = paiDe(alvoSecao.raiz, id)
+          const i = pai ? pai.filhos.findIndex((f) => f.id === id) : -1
+          const copia = i >= 0 ? pai?.filhos[i + 1] : undefined
+          if (copia) novos.push(copia.id)
+        }),
+      )
+
+      if (novos[0]) selecionarNo(novos[0])
+    },
+    [definirDoc, selecionarNo],
+  )
+
+  /**
+   * Pede confirmação só quando o elemento leva outros junto: apagar um título
+   * por engano se desfaz com um Ctrl+Z, mas apagar a coluna inteira — ou um FAQ
+   * com dez perguntas — sem avisar é outra história.
+   */
+  const pedirRemocao = useCallback(
+    (id: string) => {
+      const no = noDaArvore(docRef.current, id)
+      if (no && quantoLeva(no) > 0) setNoParaExcluir(id)
+      else removerElemento(id)
+    },
+    [removerElemento],
+  )
+
+  /**
    * Páginas de texto (termos, privacidade) vivem no documento, fora do canvas:
    * mexer nelas aqui evita ter de gerar de novo — o que substituiria a página.
    */
@@ -439,6 +545,9 @@ export function EditorLp({
   )
 
   const nomeExcluir = doc.secoes.find((s) => s.id === paraExcluir)?.nome ?? ''
+  /** O que o nó que espera confirmação leva junto — nome e quantos. */
+  const noExcluir = noParaExcluir ? noDaArvore(doc, noParaExcluir) : null
+  const quantosLeva = noExcluir ? quantoLeva(noExcluir) : 0
   const paginaAtual = doc.paginas?.find((p) => p.tipo === paginaAberta) ?? null
   const nomePaginaExcluir =
     doc.paginas?.find((p) => p.tipo === paginaParaExcluir)?.titulo ?? 'esta página'
@@ -614,6 +723,8 @@ export function EditorLp({
                 noSelecionadoId={noId}
                 aoSelecionar={selecionarSecao}
                 aoSelecionarNo={selecionarNo}
+                aoDuplicarNo={duplicarElemento}
+                aoRemoverNo={pedirRemocao}
                 aoMover={(de, para) =>
                   definirDoc(
                     alterarDoc(docRef.current, (d) => {
@@ -624,7 +735,9 @@ export function EditorLp({
                 aoDuplicar={(id) => definirDoc(duplicarSecao(docRef.current, id))}
                 aoExcluir={(id) => setParaExcluir(id)}
                 aoAdicionar={(tipo: TipoLayout, aposId) => {
-                  const secao = novaSecao(tipo)
+                  // Com o tema, os placeholders de imagem da seção nova saem nas
+                  // cores do projeto em vez de um bloco cinza.
+                  const secao = novaSecao(tipo, doc.tema)
                   definirDoc(inserirSecao(docRef.current, secao, aposId))
                   selecionarSecao(secao.id)
                 }}
@@ -643,6 +756,8 @@ export function EditorLp({
                   noId={noId}
                   aplicar={aplicar}
                   aoSelecionar={selecionarNo}
+                  aoDuplicar={duplicarElemento}
+                  aoRemover={pedirRemocao}
                   dispositivo={dispositivo}
                   aoTrocarDispositivo={setDispositivo}
                 />
@@ -722,6 +837,30 @@ export function EditorLp({
           <>
             A página <strong className="text-text">{nomePaginaExcluir}</strong> e o texto dela saem
             do projeto, junto com o link no rodapé. Você pode desfazer com Ctrl+Z.
+          </>
+        }
+      />
+
+      <ModalConfirmacao
+        aberto={noParaExcluir !== null}
+        titulo="Remover bloco"
+        variante="danger"
+        textoConfirmar="Remover"
+        onConfirmar={() => {
+          if (noParaExcluir) removerElemento(noParaExcluir)
+          setNoParaExcluir(null)
+        }}
+        onCancelar={() => setNoParaExcluir(null)}
+        mensagem={
+          <>
+            <strong className="text-text">
+              {noExcluir ? (NOME_ELEMENTO[noExcluir.tipo] ?? noExcluir.tipo) : 'Este bloco'}
+            </strong>{' '}
+            leva junto{' '}
+            <strong className="text-text">
+              {quantosLeva} {quantosLeva === 1 ? 'item' : 'itens'}
+            </strong>{' '}
+            que estão dentro dele. Você pode desfazer com Ctrl+Z.
           </>
         }
       />

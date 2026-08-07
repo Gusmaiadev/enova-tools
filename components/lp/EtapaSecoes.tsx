@@ -91,7 +91,6 @@ const MODELOS: { nome: string; descricao: string; secoes: [string, TipoLayout][]
 ]
 
 function novaSecaoBriefing(nome: string, layout: TipoLayout): SecaoBriefing {
-  const info = infoLayout(layout)
   return {
     id: gerarId(),
     nome,
@@ -99,7 +98,6 @@ function novaSecaoBriefing(nome: string, layout: TipoLayout): SecaoBriefing {
     titulo: '',
     conteudo: '',
     layout,
-    ...(info.temColunas ? { colunas: 3 as const } : {}),
     midia: null,
   }
 }
@@ -405,23 +403,6 @@ export function EtapaSecoes({
                             mudarSecao(s.id, { vincularMenu: v, itemMenu: v ? s.itemMenu : null })
                           }
                         />
-                        {info.temColunas && (
-                          <div className="w-40">
-                            <Selecao
-                              rotulo="Colunas"
-                              value={s.colunas ?? 3}
-                              onChange={(e) =>
-                                mudarSecao(s.id, {
-                                  colunas: Number(e.target.value) as 2 | 3 | 4,
-                                })
-                              }
-                            >
-                              <option value={2}>2 colunas</option>
-                              <option value={3}>3 colunas</option>
-                              <option value={4}>4 colunas</option>
-                            </Selecao>
-                          </div>
-                        )}
                         {temLados(s.layout) && (
                           <div className="w-56">
                             <SeletorLado
@@ -721,10 +702,8 @@ export function EtapaSecoes({
         atual={briefing.secoes.find((s) => s.id === trocandoLayout)?.layout}
         aoEscolher={(layout) => {
           if (!trocandoLayout) return
-          const info = infoLayout(layout)
           mudarSecao(trocandoLayout, {
             layout,
-            ...(info.temColunas ? { colunas: 3 as const } : { colunas: undefined }),
             // Layout sem lados (galeria, FAQ…) não carrega a escolha antiga.
             ...(temLados(layout) ? {} : { inverter: undefined }),
           })

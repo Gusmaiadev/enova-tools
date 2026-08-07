@@ -67,6 +67,27 @@ describe('migrarDocumentoParaArvore', () => {
     expect(migrarDocumentoParaArvore(ja)).toBe(ja)
   })
 
+  it('documento misto so monta a secao que nao tem arvore', () => {
+    // Existe documento assim salvo: o editor chegou a inserir secao sem `raiz`,
+    // o que apagava o `versao: 2` na gravacao e mandava o documento inteiro de
+    // volta para a migracao. Reexpandir a secao ja editada apagaria o que foi
+    // feito nela na arvore — a expansao le so os campos tipados.
+    const editada = secao({
+      id: 'ja',
+      raiz: {
+        id: 'r1',
+        tipo: 'container',
+        direcao: { desktop: 'coluna' },
+        filhos: [{ id: 'w1', tipo: 'titulo', nivel: 'h2', texto: 'Escrito no editor' }],
+      },
+    })
+    const migrado = migrarDocumentoParaArvore(doc([editada, secao({ id: 'nova' })]))
+
+    expect(migrado.versao).toBe(2)
+    expect(migrado.secoes[0].raiz).toEqual(editada.raiz)
+    expect(migrado.secoes[1].raiz).toBeDefined()
+  })
+
   it('preserva header, footer, tema e paginas', () => {
     const entrada = doc([secao()])
     entrada.paginas = [{ tipo: 'termos', titulo: 'Termos', conteudo: 'x' }]

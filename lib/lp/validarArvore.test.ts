@@ -178,6 +178,112 @@ describe('proporção das colunas', () => {
   })
 })
 
+describe('estilo das partes dos widgets compostos', () => {
+  const numero = (extra: Record<string, unknown>) => {
+    const el = coagir({ tipo: 'numero', valor: '250', rotulo: 'Clientes', ...extra })
+    if (el?.tipo !== 'numero') throw new Error('esperava numero')
+    return el
+  }
+
+  it('guarda o estilo de cada parte do catálogo', () => {
+    expect(
+      numero({ partes: { valor: { cor: { desktop: '#ff0000' } }, rotulo: { peso: { desktop: 700 } } } }),
+    ).toMatchObject({
+      partes: { valor: { cor: { desktop: '#ff0000' } }, rotulo: { peso: { desktop: 700 } } },
+    })
+  })
+
+  it('parte fora do catálogo não entra — não viraria seletor nenhum', () => {
+    expect(numero({ partes: { inventada: { cor: { desktop: '#ff0000' } } } })).not.toHaveProperty(
+      'partes',
+    )
+    // Nem parte de outro widget: cada tipo tem a lista dele.
+    expect(numero({ partes: { pergunta: { cor: { desktop: '#ff0000' } } } })).not.toHaveProperty(
+      'partes',
+    )
+  })
+
+  it('campo novo não é porta de entrada: passa pela coerção do estilo do nó', () => {
+    const el = numero({
+      partes: { rotulo: { cor: { desktop: 'javascript:alert(1)' }, peso: { desktop: 9999 } } },
+    })
+    // Cor que não é cor vira cor segura, e o peso fora da faixa é preso — o
+    // mesmo que acontece em qualquer outro estilo da árvore.
+    expect(el.partes?.rotulo?.cor?.desktop).not.toContain('javascript')
+    expect(el.partes?.rotulo?.peso?.desktop).toBe(900)
+  })
+
+  it('parte sem nada dentro não fica no documento', () => {
+    expect(numero({ partes: { valor: {} } })).not.toHaveProperty('partes')
+    expect(numero({ partes: 'nem objeto é' })).not.toHaveProperty('partes')
+  })
+
+  it('widget sem partes no catálogo ignora o campo', () => {
+    expect(coagir({ tipo: 'titulo', texto: 'T', partes: { valor: { cor: { desktop: '#ff0000' } } } }))
+      .not.toHaveProperty('partes')
+  })
+
+  it('o formato antigo do big number continua abrindo com o que foi ajustado', () => {
+    // `estiloValor`/`estiloRotulo` foi a primeira forma, antes do catálogo:
+    // documento gravado nesse meio-tempo não pode voltar em branco.
+    expect(numero({ estiloValor: { cor: { desktop: '#ff0000' } } })).toMatchObject({
+      partes: { valor: { cor: { desktop: '#ff0000' } } },
+    })
+  })
+})
+
+describe('estilo de hover', () => {
+  const hoverDe = (hover: unknown) =>
+    coagir({ tipo: 'titulo', texto: 'T', estilo: { hover } })?.estilo?.hover
+
+  it('aceita cor, sombra do catálogo e movimento dentro da faixa', () => {
+    expect(hoverDe({ cor: '#ff0000', fundo: '#000000', sombra: 'forte', subir: 8, escala: 105 })).toEqual(
+      { cor: '#ff0000', fundo: '#000000', sombra: 'forte', subir: 8, escala: 105 },
+    )
+  })
+
+  it('recusa sombra fora do catálogo — isto vira box-shadow', () => {
+    expect(hoverDe({ sombra: '0 0 9px red;}body{display:none' })).toBeUndefined()
+  })
+
+  it('prende o movimento na faixa e joga fora o que não muda nada', () => {
+    // subir 0 e escala 100 são "não faz nada": guardar seria encher o documento.
+    expect(hoverDe({ subir: 0, escala: 100 })).toBeUndefined()
+    expect(hoverDe({ subir: 9999 })?.subir).toBe(40)
+    expect(hoverDe({ escala: 400 })?.escala).toBe(150)
+  })
+
+  it('hover vazio some do estilo', () => {
+    expect(hoverDe({})).toBeUndefined()
+    expect(hoverDe('não é objeto')).toBeUndefined()
+  })
+
+  it('guarda o desligado com os valores dentro', () => {
+    // Desligar não é apagar: o PUT tem de devolver `ativo: false` junto com o
+    // que foi ajustado, senão religar no editor viria em branco.
+    expect(hoverDe({ ativo: false, cor: '#ff0000' })).toEqual({ ativo: false, cor: '#ff0000' })
+    // `ativo: true` sozinho segura o bloco enquanto nada foi preenchido.
+    expect(hoverDe({ ativo: true })).toEqual({ ativo: true })
+    expect(hoverDe({ ativo: 'sim', cor: '#ff0000' })).toEqual({ cor: '#ff0000' })
+  })
+})
+
+describe('botões na base', () => {
+  it('guarda só o `true` — a marcação sobrevive à gravação', () => {
+    expect(coagir({ tipo: 'container', botoesNaBase: true })).toMatchObject({
+      botoesNaBase: true,
+    })
+  })
+
+  it('qualquer outra coisa some do documento', () => {
+    // Ausente = os botões seguem o texto de cada bloco. Guardar `false` ou uma
+    // string encheria o documento de campo que não muda nada.
+    for (const valor of [false, 'sim', 1, null]) {
+      expect(coagir({ tipo: 'container', botoesNaBase: valor })).not.toHaveProperty('botoesNaBase')
+    }
+  })
+})
+
 describe('estilo, transformação e decoração', () => {
   it('aceita os valores do catálogo', () => {
     const el = coagir({

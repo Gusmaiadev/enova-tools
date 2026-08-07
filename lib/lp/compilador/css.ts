@@ -12,6 +12,8 @@ import {
   GAP_PADRAO,
   LARGURA_PADRAO,
   MARGEM_PADRAO,
+  RESPIRO_ICONE,
+  TAMANHO_ICONE,
 } from '../padroes'
 import { familiaCss } from '../fontes'
 import { cssDaArvore } from './estilo'
@@ -98,6 +100,11 @@ h1,h2,h3{font-family:var(--fonte-titulos);font-weight:var(--peso-titulos);line-h
 h1{font-size:clamp(calc(var(--tamanho-titulos) * 0.78),5.2vw,calc(var(--tamanho-titulos) * 1.45))}
 h2{font-size:clamp(calc(var(--tamanho-titulos) * 0.62),3.6vw,var(--tamanho-titulos))}
 h3{font-size:clamp(calc(var(--tamanho-titulos) * 0.4),2vw,calc(var(--tamanho-titulos) * 0.55))}
+/* O h4 da árvore precisa da regra escrita com o nome da classe: sem ela, o
+   nível que o painel oferece saía com a fonte do CORPO em tamanho de parágrafo,
+   porque a regra acima só alcança h1, h2 e h3. Presa em .lp-el-titulo de
+   propósito — o h4 do rodapé tem estilo próprio e não é para mudar. */
+h4.lp-el-titulo{font-family:var(--fonte-titulos);font-weight:var(--peso-titulos);line-height:var(--altura-titulos);letter-spacing:var(--espaco-titulos);color:var(--cor-titulos);font-size:clamp(calc(var(--tamanho-titulos) * 0.34),1.7vw,calc(var(--tamanho-titulos) * 0.46))}
 .lp-subtitulo{font-family:var(--fonte-subtitulos);font-weight:var(--peso-subtitulos);font-size:var(--tamanho-subtitulos);line-height:var(--altura-subtitulos);letter-spacing:var(--espaco-subtitulos);color:var(--cor-subtitulos)}
 .lp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--fonte-botoes);font-weight:var(--peso-botoes);font-size:var(--tamanho-botoes);letter-spacing:var(--espaco-botoes);color:var(--cor-botoes);background:var(--cor-fundo-botoes);border:2px solid var(--cor-fundo-botoes);border-radius:var(--raio);padding:12px 28px;cursor:pointer;transition:filter .2s,transform .2s;text-decoration:none}
 .lp-btn:hover{filter:brightness(1.12);transform:translateY(-1px)}
@@ -126,8 +133,12 @@ h3{font-size:clamp(calc(var(--tamanho-titulos) * 0.4),2vw,calc(var(--tamanho-tit
 .lp-sobre-midia h1,.lp-sobre-midia h2,.lp-sobre-midia h3,.lp-sobre-midia h4,.lp-sobre-midia .lp-subtitulo,.lp-sobre-midia p,.lp-sobre-midia .lp-stat-valor,.lp-sobre-midia .lp-stat-rotulo{color:#fff}
 .lp-midia{border-radius:var(--raio);overflow:hidden}
 .lp-midia img,.lp-midia video{width:100%;height:100%;object-fit:cover}
-.lp-icone{display:inline-flex;width:44px;height:44px;align-items:center;justify-content:center;border-radius:calc(var(--raio) * 0.75);background:color-mix(in srgb,var(--cor-principal) 14%,transparent);color:var(--cor-principal);flex:none}
-.lp-icone svg{width:24px;height:24px}
+/* O tamanho do icone e o font-size dele: o desenho vale 1em e a pastilha, 1em
+   mais o respiro. Assim o campo "Tamanho" do painel (que sai como font-size,
+   como em qualquer outro no) cresce os dois juntos, por breakpoint, sem campo
+   novo no modelo. Com os 24px de base a conta da 44px — o tamanho de sempre. */
+.lp-icone{display:inline-flex;font-size:${TAMANHO_ICONE}px;width:calc(1em + ${RESPIRO_ICONE}px);height:calc(1em + ${RESPIRO_ICONE}px);align-items:center;justify-content:center;border-radius:calc(var(--raio) * 0.75);background:color-mix(in srgb,var(--cor-principal) 14%,transparent);color:var(--cor-principal);flex:none}
+.lp-icone svg{width:1em;height:1em}
 .lp-reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
 .lp-vis{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.lp-reveal{opacity:1;transform:none;transition:none}.lp-btn{animation:none!important}}
@@ -226,7 +237,9 @@ const LEGAL = `
  */
 const POR_WIDGET: Record<string, string> = {
   faq: `
-.lp-faq{max-width:760px;margin:0 auto;display:grid;gap:12px}
+/* margin-inline, e nao o atalho de quatro lados: assim o espaco de cima e de
+   baixo escolhido no painel compoe com a centralizacao em vez de apaga-la. */
+.lp-faq{max-width:760px;margin-inline:auto;display:grid;gap:12px}
 .lp-faq details{border:1px solid color-mix(in srgb,var(--cor-titulos) 12%,transparent);border-radius:var(--raio);background:color-mix(in srgb,var(--cor-titulos) 3%,transparent)}
 .lp-faq summary{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;cursor:pointer;font-family:var(--fonte-subtitulos);font-weight:600;color:var(--cor-titulos);list-style:none}
 .lp-faq summary::-webkit-details-marker{display:none}
@@ -235,7 +248,7 @@ const POR_WIDGET: Record<string, string> = {
 .lp-faq .lp-faq-corpo{padding:0 22px 18px}
 `,
   depoimentos: `
-.lp-depo{max-width:820px;margin:0 auto}
+.lp-depo{max-width:820px;margin-inline:auto}
 .lp-depo blockquote{font-size:1.15rem;line-height:1.8;text-align:center}
 .lp-depo blockquote svg{width:36px;height:36px;color:var(--cor-principal);margin:0 auto 20px}
 .lp-depo .lp-depo-autor{margin-top:24px;text-align:center}
@@ -315,6 +328,15 @@ const APARENCIAS = `
 .lp-c > .lp-btn,.lp-c > .lp-icone{align-self:flex-start}
 .lp-ap-card{display:flex;flex-direction:column;background:color-mix(in srgb,var(--cor-titulos) 4%,transparent);border:1px solid color-mix(in srgb,var(--cor-titulos) 10%,transparent);border-radius:var(--raio);padding:32px 28px;transition:transform .25s,box-shadow .25s}
 .lp-ap-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px -24px color-mix(in srgb,var(--cor-principal) 45%,transparent)}
+/* Card nasce com tudo no meio. O text-align herda para todo texto de dentro,
+   inclusive o que quebra em varias linhas; botao e icone sao itens de flex e
+   nao ouvem text-align, entao vem no align-self — que precisa estar aqui, depois
+   da regra de flex-start logo acima, para vencer o empate de especificidade. Os
+   dois continuam sobrepostos por elemento: o Alinhamento da aba Estilo sai mais
+   tarde na folha, e no botao sai como margin-inline, que resolve antes de
+   qualquer alinhamento de flex. */
+.lp-ap-card{text-align:center}
+.lp-ap-card > .lp-btn,.lp-ap-card > .lp-icone{align-self:center}
 .lp-ap-plano{display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--cor-titulos) 12%,transparent);border-radius:var(--raio);padding:36px 30px;background:color-mix(in srgb,var(--cor-titulos) 3%,transparent)}
 .lp-ap-destaque{border-color:var(--cor-principal);box-shadow:0 24px 60px -28px color-mix(in srgb,var(--cor-principal) 55%,transparent);position:relative}
 .lp-ap-destaque::before{content:'Mais popular';position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--cor-principal);color:#fff;font-size:.75rem;font-weight:700;padding:4px 14px;border-radius:999px;letter-spacing:.04em}

@@ -534,11 +534,14 @@ export function documentoBase(briefing: LpBriefing): LpDocumento {
       largura: sb.layout === 'banner' ? 'full' : 'boxed',
       espacamento: { topo: 88, base: 88 },
     }
-    if (sb.colunas) secao.colunas = sb.colunas
+    // Colunas não vêm do briefing: quem escolhe é o preset, pelo layout e pela
+    // quantidade de itens — e depois o editor, por container e por tela.
     if (sb.inverter && temLados(sb.layout)) secao.inverter = true
     const modelo = novoItem(sb.layout)
     if (Object.keys(modelo).length > 1) {
-      secao.itens = [novoItem(sb.layout), novoItem(sb.layout), novoItem(sb.layout)]
+      // Um exemplo diferente por posição: três itens iguais viram três cards com
+      // o mesmo texto quando a IA não está configurada.
+      secao.itens = [0, 1, 2].map((i) => novoItem(sb.layout, i, tema))
       if (sb.layout === 'comparacao') {
         secao.itens = secao.itens.slice(0, 2)
         secao.rotulos = ['Característica um', 'Característica dois', 'Característica três']
@@ -546,7 +549,7 @@ export function documentoBase(briefing: LpBriefing): LpDocumento {
       // Escreveu os itens no briefing: a lista dele é a da página, e o item de
       // exemplo entra só como base (ícone, imagem de exemplo).
       if (sb.itens && sb.itens.length > 0) {
-        secao.itens = sb.itens.map((escrito) => mesclarItem(novoItem(sb.layout), escrito))
+        secao.itens = sb.itens.map((escrito, i) => mesclarItem(novoItem(sb.layout, i, tema), escrito))
       }
     }
     // Depois dos itens: em galeria e afins a midia do briefing e a imagem do

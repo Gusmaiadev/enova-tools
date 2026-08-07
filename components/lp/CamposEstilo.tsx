@@ -2,10 +2,21 @@
 
 import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 import { PorDispositivo, definir } from './PorDispositivo'
-import { CLASSE_CONTROLE, Cor, Faixa, Fonte, Opcoes, Selecao } from './campos'
+import { CLASSE_CONTROLE, Cor, Faixa, Fonte, Marcar, Opcoes, Selecao } from './campos'
 import { estiloHerdado } from '@/lib/lp/heranca'
-import { PROPORCOES_COLUNAS } from '@/lib/lp/padroes'
-import type { Dispositivo, LpElemento, LpEstilo, LpTema, PorDisp } from '@/lib/lp/tipos'
+import { NIVEIS_TEXTO, aplicarNivel, nivelDoNo, type NivelTexto } from '@/lib/lp/niveis'
+import { PROPORCOES_COLUNAS, TAMANHO_ICONE } from '@/lib/lp/padroes'
+import { partesDe } from '@/lib/lp/partes'
+import type {
+  Dispositivo,
+  EstiloHover,
+  LpElemento,
+  LpEstilo,
+  LpTema,
+  PorDisp,
+  Sombra,
+} from '@/lib/lp/tipos'
+import { ROTULO_SOMBRA, SOMBRAS } from '@/lib/lp/tipos'
 
 export type MutarNo = (mut: (el: LpElemento) => void, agrupar?: string) => void
 
@@ -66,6 +77,385 @@ const PROPORCOES: { valor: string; rotulo: string }[] = [
   { valor: '9/16', rotulo: '9:16 — story' },
   { valor: '21/9', rotulo: '21:9 — cinema' },
 ]
+
+/**
+ * Tipografia de uma PARTE de um widget composto — hoje as duas metades do big
+ * number. São os quatro campos que decidem a aparência de um número numa página:
+ * cor, fonte, tamanho e peso. Entrelinha e espaçamento de letras ficam de fora
+ * porque em um valor de uma linha não mudam nada visível.
+ */
+function TipografiaDaParte({
+  titulo,
+  estilo,
+  dispositivo,
+  soCor = false,
+  ehMidia = false,
+  aoMudar,
+}: {
+  titulo: string
+  estilo: LpEstilo
+  dispositivo: Dispositivo
+  /** Parte desenhada em SVG: fonte, tamanho e peso não mexem num desenho. */
+  soCor?: boolean
+  /** Parte que é imagem: os campos passam a ser os do quadro, não os do texto. */
+  ehMidia?: boolean
+  aoMudar: (patch: (e: LpEstilo) => void, agrupar?: string) => void
+}) {
+  const limpar = (chave: keyof LpEstilo) => () =>
+    aoMudar((e) => {
+      const atual = e[chave] as Record<string, unknown> | undefined
+      const novo = { ...atual }
+      delete novo[dispositivo]
+      if (Object.keys(novo).length > 0) (e as Record<string, unknown>)[chave] = novo
+      else delete e[chave]
+    })
+
+  if (ehMidia) {
+    return (
+      <div className="space-y-3 rounded-md border border-border bg-surface-2/40 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-text-dim">{titulo}</p>
+
+        <PorDispositivo
+          rotulo="Proporção"
+          valor={estilo.proporcao}
+          ativo={dispositivo}
+          aoLimpar={limpar('proporcao')}
+          rotuloHerdado="como está"
+        >
+          <Selecao
+            rotulo=""
+            value={estilo.proporcao?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              aoMudar((e) => {
+                e.proporcao = definir(e.proporcao, dispositivo, ev.target.value)
+              })
+            }
+          >
+            <option value="">Como está</option>
+            {PROPORCOES.filter((p) => p.valor).map((p) => (
+              <option key={p.valor} value={p.valor}>
+                {p.rotulo}
+              </option>
+            ))}
+          </Selecao>
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Encaixe"
+          valor={estilo.ajuste}
+          ativo={dispositivo}
+          aoLimpar={limpar('ajuste')}
+          rotuloHerdado="cobrir"
+        >
+          <Opcoes<'cobrir' | 'conter' | 'preencher'>
+            aria={`Encaixe — ${titulo}`}
+            valor={estilo.ajuste?.[dispositivo] ?? 'cobrir'}
+            aoMudar={(v) => aoMudar((e) => { e.ajuste = definir(e.ajuste, dispositivo, v) })}
+            opcoes={[
+              { valor: 'cobrir', rotulo: 'Cobrir' },
+              { valor: 'conter', rotulo: 'Conter' },
+              { valor: 'preencher', rotulo: 'Esticar' },
+            ]}
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Largura"
+          valor={estilo.largura}
+          ativo={dispositivo}
+          aoLimpar={limpar('largura')}
+          rotuloHerdado="como está"
+        >
+          <input
+            className={CLASSE_CONTROLE}
+            placeholder="ex.: 80px, 100%"
+            value={estilo.largura?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              aoMudar((e) => {
+                e.largura = definir(e.largura, dispositivo, ev.target.value)
+              }, `${titulo}-largura`)
+            }
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Altura"
+          valor={estilo.altura}
+          ativo={dispositivo}
+          aoLimpar={limpar('altura')}
+          rotuloHerdado="pela proporção"
+        >
+          <input
+            className={CLASSE_CONTROLE}
+            placeholder="ex.: 80px"
+            value={estilo.altura?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              aoMudar((e) => {
+                e.altura = definir(e.altura, dispositivo, ev.target.value)
+              }, `${titulo}-altura`)
+            }
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Cantos"
+          valor={estilo.raio}
+          ativo={dispositivo}
+          aoLimpar={limpar('raio')}
+          rotuloHerdado="como está"
+        >
+          <Faixa
+            rotulo=""
+            min={0}
+            max={200}
+            valor={estilo.raio?.[dispositivo] ?? 0}
+            aoMudar={(v) => aoMudar((e) => { e.raio = definir(e.raio, dispositivo, v) }, `${titulo}-raio`)}
+          />
+        </PorDispositivo>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-surface-2/40 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-dim">{titulo}</p>
+
+      <PorDispositivo
+        rotulo="Cor"
+        valor={estilo.cor}
+        ativo={dispositivo}
+        aoLimpar={limpar('cor')}
+        rotuloHerdado="como está"
+      >
+        <Cor
+          rotulo=""
+          valor={estilo.cor?.[dispositivo]}
+          placeholder="como está"
+          aoMudar={(v) => aoMudar((e) => { e.cor = definir(e.cor, dispositivo, v) }, `${titulo}-cor`)}
+        />
+      </PorDispositivo>
+
+      {!soCor && (
+        <>
+          <PorDispositivo
+            rotulo="Fonte"
+            valor={estilo.fonte}
+            ativo={dispositivo}
+            aoLimpar={limpar('fonte')}
+            rotuloHerdado="como está"
+          >
+            <Fonte
+              rotulo=""
+              permitirVazio
+              rotuloVazio="Como está"
+              valor={estilo.fonte?.[dispositivo]}
+              aoMudar={(v) => aoMudar((e) => { e.fonte = definir(e.fonte, dispositivo, v) })}
+            />
+          </PorDispositivo>
+
+          <PorDispositivo
+            rotulo="Tamanho"
+            valor={estilo.tamanho}
+            ativo={dispositivo}
+            aoLimpar={limpar('tamanho')}
+            rotuloHerdado="como está"
+          >
+            <input
+              className={CLASSE_CONTROLE}
+              placeholder="ex.: 20px"
+              value={estilo.tamanho?.[dispositivo] ?? ''}
+              onChange={(ev) =>
+                aoMudar((e) => {
+                  e.tamanho = definir(e.tamanho, dispositivo, ev.target.value)
+                }, `${titulo}-tamanho`)
+              }
+            />
+          </PorDispositivo>
+
+          <PorDispositivo
+            rotulo="Peso"
+            valor={estilo.peso}
+            ativo={dispositivo}
+            aoLimpar={limpar('peso')}
+            rotuloHerdado="como está"
+          >
+            <Faixa
+              rotulo=""
+              sufixo=""
+              min={100}
+              max={900}
+              passo={100}
+              valor={estilo.peso?.[dispositivo] ?? 400}
+              aoMudar={(v) =>
+                aoMudar((e) => { e.peso = definir(e.peso, dispositivo, v) }, `${titulo}-peso`)
+              }
+            />
+          </PorDispositivo>
+
+          <PorDispositivo
+            rotulo="Alinhamento"
+            valor={estilo.alinhamento}
+            ativo={dispositivo}
+            aoLimpar={limpar('alinhamento')}
+            rotuloHerdado="como está"
+          >
+            <Opcoes<'left' | 'center' | 'right'>
+              aria={`Alinhamento — ${titulo}`}
+              valor={estilo.alinhamento?.[dispositivo] ?? 'left'}
+              aoMudar={(v) =>
+                aoMudar((e) => { e.alinhamento = definir(e.alinhamento, dispositivo, v) })
+              }
+              opcoes={[
+                { valor: 'left', rotulo: '', aria: 'À esquerda', icone: <AlignLeft className="h-3.5 w-3.5" /> },
+                { valor: 'center', rotulo: '', aria: 'Centralizado', icone: <AlignCenter className="h-3.5 w-3.5" /> },
+                { valor: 'right', rotulo: '', aria: 'À direita', icone: <AlignRight className="h-3.5 w-3.5" /> },
+              ]}
+            />
+          </PorDispositivo>
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * O que muda ao passar o mouse. Fica fora do seletor de dispositivo de propósito:
+ * hover não existe em tela de toque, então o valor é um só para a página inteira
+ * — guardar um por breakpoint encheria o documento com o que nenhum celular usa.
+ *
+ * No botão o movimento não entra: ele já tem "Efeito ao passar o mouse" na aba
+ * Conteúdo, e dois controles mexendo no mesmo transform brigariam no CSS.
+ */
+function CamposHover({
+  no,
+  tema,
+  mutarNo,
+}: {
+  no: LpElemento
+  tema: LpTema
+  mutarNo: MutarNo
+}) {
+  const h = no.estilo?.hover ?? {}
+  const ehMidia = no.tipo === 'imagem' || no.tipo === 'video'
+  const ehBotao = no.tipo === 'botao'
+  const ehIcone = no.tipo === 'icone'
+  const ligado = Boolean(no.estilo?.hover) && h.ativo !== false
+
+  // Cada campo se chama pelo nome do que ele muda NESTE elemento — o mesmo
+  // vocabulário do estado normal logo acima. "Cor do texto" num container ou
+  // num ícone é um rótulo que não descreve nada do que está selecionado.
+  const rotuloCor = ehIcone
+    ? 'Cor do ícone'
+    : no.tipo === 'container'
+      ? 'Cor do texto de dentro'
+      : 'Cor do texto'
+  const rotuloFundo = ehIcone ? 'Pastilha atrás' : 'Cor de fundo'
+
+  const mudar = (patch: (x: EstiloHover) => void, agrupar?: string) =>
+    mutarNo((el) => {
+      const hover: EstiloHover = { ...(el.estilo?.hover ?? {}) }
+      patch(hover)
+      const estilo: LpEstilo = { ...(el.estilo ?? {}) }
+      // Hover sem nenhuma chave sai do documento — nada para animar, nada para
+      // emitir, e a transição no estado normal também deixa de sair.
+      if (Object.keys(hover).length > 0) estilo.hover = hover
+      else delete estilo.hover
+      el.estilo = Object.keys(estilo).length > 0 ? estilo : undefined
+    }, agrupar)
+
+  return (
+    <div className="space-y-3 border-t border-border pt-3">
+      <p className="font-mono text-xs uppercase tracking-[0.28em] text-text-dim">
+        Ao passar o mouse
+      </p>
+
+      {/* Desligar guarda o ajuste em vez de apagá-lo: `ativo: false` fica no
+          documento com os valores, e religar traz tudo de volta. */}
+      <Marcar
+        rotulo="Ativar efeito"
+        valor={ligado}
+        aoMudar={(v) => mudar((x) => { x.ativo = v })}
+      />
+
+      {ligado ? (
+        <>
+          {!ehMidia && (
+            <Cor
+              rotulo={rotuloCor}
+              valor={h.cor}
+              padrao={tema.cores.principal}
+              placeholder="não muda"
+              aoMudar={(v) => mudar((x) => { if (v) x.cor = v; else delete x.cor }, 'hover-cor')}
+            />
+          )}
+
+          <Cor
+            rotulo={rotuloFundo}
+            valor={h.fundo}
+            padrao={tema.cores.principal}
+            placeholder="não muda"
+            aoMudar={(v) => mudar((x) => { if (v) x.fundo = v; else delete x.fundo }, 'hover-fundo')}
+          />
+
+          <Selecao
+            rotulo="Sombra"
+            value={h.sombra ?? ''}
+            onChange={(ev) =>
+              mudar((x) => {
+                const v = ev.target.value as Sombra | ''
+                if (v) x.sombra = v
+                else delete x.sombra
+              })
+            }
+          >
+            <option value="">Não muda</option>
+            {SOMBRAS.map((s) => (
+              <option key={s} value={s}>
+                {ROTULO_SOMBRA[s]}
+              </option>
+            ))}
+          </Selecao>
+
+          {!ehBotao && (
+            <>
+              <Faixa
+                rotulo="Subir"
+                min={0}
+                max={40}
+                valor={h.subir ?? 0}
+                aoMudar={(v) =>
+                  mudar((x) => { if (v > 0) x.subir = v; else delete x.subir }, 'hover-subir')
+                }
+              />
+              <Faixa
+                rotulo="Crescer"
+                sufixo="%"
+                min={50}
+                max={150}
+                valor={h.escala ?? 100}
+                aoMudar={(v) =>
+                  mudar((x) => { if (v !== 100) x.escala = v; else delete x.escala }, 'hover-escala')
+                }
+              />
+            </>
+          )}
+
+          <p className="text-xs text-text-dim">
+            {ehBotao
+              ? 'O movimento do botão (subir, crescer, brilho) fica em “Efeito ao passar o mouse”, na aba Conteúdo.'
+              : 'Só o que estiver preenchido muda; o resto continua igual ao estado normal.'}
+          </p>
+        </>
+      ) : (
+        <p className="text-xs text-text-dim">
+          {no.estilo?.hover
+            ? 'Desligado. O que você ajustou está guardado e volta ao religar.'
+            : 'Nada muda quando o mouse passa por cima deste elemento.'}
+        </p>
+      )}
+    </div>
+  )
+}
 
 /**
  * Aba "Estilo": as sobreposições que valem para qualquer nó.
@@ -173,6 +563,31 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo }: Props) {
           </p>
         )}
 
+        {/* Alinhamento do container é text-align, e text-align HERDA: uma
+            escolha aqui alinha todo o texto de dentro de uma vez, em vez de
+            campo por campo. Quem quiser um elemento fora do padrão sobrepõe no
+            Alinhamento dele — regra direta no filho vence valor herdado. */}
+        <PorDispositivo
+          rotulo="Alinhamento do conteúdo"
+          valor={e.alinhamento}
+          ativo={dispositivo}
+          aoLimpar={limpar('alinhamento')}
+          rotuloHerdado="à esquerda"
+        >
+          <Opcoes<'left' | 'center' | 'right'>
+            aria="Alinhamento do texto do bloco"
+            valor={e.alinhamento?.[dispositivo] ?? 'left'}
+            aoMudar={(v) =>
+              mudar((est) => { est.alinhamento = definir(est.alinhamento, dispositivo, v) })
+            }
+            opcoes={[
+              { valor: 'left', rotulo: '', aria: 'À esquerda', icone: <AlignLeft className="h-3.5 w-3.5" /> },
+              { valor: 'center', rotulo: '', aria: 'Centralizado', icone: <AlignCenter className="h-3.5 w-3.5" /> },
+              { valor: 'right', rotulo: '', aria: 'À direita', icone: <AlignRight className="h-3.5 w-3.5" /> },
+            ]}
+          />
+        </PorDispositivo>
+
         <PorDispositivo
           rotulo="Cor de fundo"
           valor={e.fundo}
@@ -204,10 +619,226 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo }: Props) {
         </PorDispositivo>
 
         <p className="text-xs text-text-dim">
-          Direção, número de colunas e espaço entre itens ficam na aba{' '}
+          Direção, ordem dos blocos, número de colunas e espaço entre itens ficam na aba{' '}
           <strong className="text-text">Conteúdo</strong>; margem e espaçamento interno, na{' '}
           <strong className="text-text">Avançado</strong>.
         </p>
+
+        <CamposHover no={no} tema={tema} mutarNo={mutarNo} />
+      </div>
+    )
+  }
+
+  /*
+   * Ícone é desenho, não texto: fonte, peso, entrelinha, espaçamento de letras,
+   * caixa alta e sublinhado não fazem nada nele. O que existe para ajustar é o
+   * tamanho, a cor do traço, a pastilha atrás e onde ele fica na coluna.
+   *
+   * "Tamanho" grava em `estilo.tamanho`, o mesmo campo que nos textos vira
+   * font-size — e no ícone o font-size é justamente o que mede o desenho e a
+   * pastilha (ver .lp-icone no CSS base). Um campo do modelo, dois sentidos que
+   * não se cruzam, e o valor por dispositivo sai de graça.
+   */
+  if (no.tipo === 'icone') {
+    const tamanho = Number.parseInt(e.tamanho?.[dispositivo] ?? '', 10)
+    return (
+      <div className="space-y-3">
+        <PorDispositivo
+          rotulo="Tamanho"
+          valor={e.tamanho}
+          ativo={dispositivo}
+          aoLimpar={limpar('tamanho')}
+          rotuloHerdado="padrão"
+        >
+          <Faixa
+            rotulo=""
+            min={12}
+            max={96}
+            valor={Number.isFinite(tamanho) ? tamanho : TAMANHO_ICONE}
+            aoMudar={(v) =>
+              mudar((est) => {
+                est.tamanho = definir(est.tamanho, dispositivo, `${v}px`)
+              }, 'icone-tamanho')
+            }
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Cor do ícone"
+          valor={e.cor}
+          ativo={dispositivo}
+          aoLimpar={limpar('cor')}
+          rotuloHerdado="cor principal"
+        >
+          <Cor
+            rotulo=""
+            valor={e.cor?.[dispositivo]}
+            padrao={tema.cores.principal}
+            placeholder={tema.cores.principal}
+            aoMudar={(v) => mudar((est) => { est.cor = definir(est.cor, dispositivo, v) }, 'icone-cor')}
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Pastilha atrás"
+          valor={e.fundo}
+          ativo={dispositivo}
+          aoLimpar={limpar('fundo')}
+          rotuloHerdado="cor principal clara"
+        >
+          <Cor
+            rotulo=""
+            valor={e.fundo?.[dispositivo]}
+            padrao={tema.cores.principal}
+            placeholder="da cor principal"
+            aoMudar={(v) => mudar((est) => { est.fundo = definir(est.fundo, dispositivo, v) }, 'icone-fundo')}
+          />
+        </PorDispositivo>
+        <p className="text-xs text-text-dim">
+          Para o ícone sem pastilha, ponha nela a mesma cor do fundo da seção.
+        </p>
+
+        <PorDispositivo
+          rotulo="Cantos da pastilha"
+          valor={e.raio}
+          ativo={dispositivo}
+          aoLimpar={limpar('raio')}
+        >
+          <Faixa
+            rotulo=""
+            min={0}
+            max={64}
+            valor={e.raio?.[dispositivo] ?? Math.round(tema.raio * 0.75)}
+            aoMudar={(v) => mudar((est) => { est.raio = definir(est.raio, dispositivo, v) }, 'icone-raio')}
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Alinhamento"
+          valor={e.alinhamento}
+          ativo={dispositivo}
+          aoLimpar={limpar('alinhamento')}
+          rotuloHerdado="o do bloco"
+        >
+          <Opcoes<'left' | 'center' | 'right'>
+            aria="Alinhamento do ícone"
+            valor={e.alinhamento?.[dispositivo] ?? 'left'}
+            aoMudar={(v) =>
+              mudar((est) => { est.alinhamento = definir(est.alinhamento, dispositivo, v) })
+            }
+            opcoes={[
+              { valor: 'left', rotulo: '', aria: 'À esquerda', icone: <AlignLeft className="h-3.5 w-3.5" /> },
+              { valor: 'center', rotulo: '', aria: 'Centralizado', icone: <AlignCenter className="h-3.5 w-3.5" /> },
+              { valor: 'right', rotulo: '', aria: 'À direita', icone: <AlignRight className="h-3.5 w-3.5" /> },
+            ]}
+          />
+        </PorDispositivo>
+
+        <CamposHover no={no} tema={tema} mutarNo={mutarNo} />
+      </div>
+    )
+  }
+
+  /*
+   * Widget composto: um nó, vários textos dentro. Mexer no estilo do nó não
+   * alcançava nenhum deles — a folha base escreve cor, fonte, peso e tamanho
+   * direto em .lp-stat-valor, summary, .lp-depo-nome e companhia, e regra no
+   * filho vence herança. Era por isso que trocar a cor não fazia nada.
+   *
+   * Então aqui a tipografia solta dá lugar às PARTES (lib/lp/partes.ts), uma
+   * caixa por texto editável, e o estilo do nó fica com o que de fato é da
+   * caixa: fundo, cantos e o efeito de mouse.
+   */
+  const partes = partesDe(no.tipo)
+  if (partes.length > 0) {
+    const aoMudarParte =
+      (chave: string) =>
+      (patch: (est: LpEstilo) => void, agrupar?: string) =>
+        mutarNo((el) => {
+          const atual: LpEstilo = { ...(el.partes?.[chave] ?? {}) }
+          patch(atual)
+          const todas = { ...(el.partes ?? {}) }
+          if (Object.keys(atual).length > 0) todas[chave] = atual
+          else delete todas[chave]
+          el.partes = Object.keys(todas).length > 0 ? todas : undefined
+        }, agrupar)
+
+    return (
+      <div className="space-y-3">
+        {partes.map((p) => (
+          <TipografiaDaParte
+            key={p.chave}
+            titulo={p.rotulo}
+            estilo={no.partes?.[p.chave] ?? {}}
+            dispositivo={dispositivo}
+            soCor={p.soCor}
+            ehMidia={Boolean(p.midia)}
+            aoMudar={aoMudarParte(p.chave)}
+          />
+        ))}
+
+        {/* FAQ e depoimentos vêm com uma largura máxima de fábrica (760px e
+            820px). Escrever aqui vence esse limite — é o único jeito de deixar
+            um deles mais largo. */}
+        <PorDispositivo
+          rotulo="Largura da caixa"
+          valor={e.largura}
+          ativo={dispositivo}
+          aoLimpar={limpar('largura')}
+          rotuloHerdado="a do widget"
+        >
+          <input
+            className={CLASSE_CONTROLE}
+            placeholder="ex.: 100%, 960px"
+            value={e.largura?.[dispositivo] ?? ''}
+            onChange={(ev) =>
+              mudar((est) => {
+                est.largura = definir(est.largura, dispositivo, ev.target.value)
+              }, 'parte-largura')
+            }
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Cor de fundo da caixa"
+          valor={e.fundo}
+          ativo={dispositivo}
+          aoLimpar={limpar('fundo')}
+          rotuloHerdado="sem fundo"
+        >
+          <Cor
+            rotulo=""
+            valor={e.fundo?.[dispositivo]}
+            placeholder="sem fundo"
+            aoMudar={(v) =>
+              mudar((est) => { est.fundo = definir(est.fundo, dispositivo, v) }, 'parte-fundo')
+            }
+          />
+        </PorDispositivo>
+
+        <PorDispositivo
+          rotulo="Cantos da caixa"
+          valor={e.raio}
+          ativo={dispositivo}
+          aoLimpar={limpar('raio')}
+        >
+          <Faixa
+            rotulo=""
+            min={0}
+            max={64}
+            valor={e.raio?.[dispositivo] ?? tema.raio}
+            aoMudar={(v) =>
+              mudar((est) => { est.raio = definir(est.raio, dispositivo, v) }, 'parte-raio')
+            }
+          />
+        </PorDispositivo>
+
+        <p className="text-xs text-text-dim">
+          Campo em branco deixa a parte como está. Fundo, cantos e o efeito de mouse valem para a
+          caixa inteira, não para cada texto.
+        </p>
+
+        <CamposHover no={no} tema={tema} mutarNo={mutarNo} />
       </div>
     )
   }
@@ -338,12 +969,40 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo }: Props) {
             aoMudar={(v) => mudar((est) => { est.raio = definir(est.raio, dispositivo, v) }, 'midia-raio')}
           />
         </PorDispositivo>
+
+        <CamposHover no={no} tema={tema} mutarNo={mutarNo} />
       </div>
     )
   }
 
+  const nivel = nivelDoNo(no)
+
   return (
     <div className="space-y-3">
+      {/* Primeiro campo do texto de propósito: o nível é quem decide de qual
+          categoria do tema vêm os valores "do tema" mostrados abaixo. Não é por
+          dispositivo — a tag na página é uma só, em toda tela. */}
+      {nivel && (
+        <>
+          <Selecao
+            rotulo="Nível"
+            dica="a tag na página e a tipografia do tema"
+            value={nivel}
+            onChange={(ev) => mutarNo((el) => aplicarNivel(el, ev.target.value as NivelTexto))}
+          >
+            {NIVEIS_TEXTO.map((n) => (
+              <option key={n.valor} value={n.valor}>
+                {n.rotulo}
+              </option>
+            ))}
+          </Selecao>
+          <p className="text-xs text-text-dim">
+            h1 a h4 usam a tipografia de títulos; subtítulo e parágrafo saem em &lt;p&gt;, com a de
+            subtítulos e a de textos. Use um h1 só por página.
+          </p>
+        </>
+      )}
+
       <PorDispositivo
         rotulo="Cor do texto"
         valor={e.cor}
@@ -532,6 +1191,8 @@ export function CamposEstilo({ no, tema, mutarNo, dispositivo }: Props) {
           Mexer aqui vale só para este elemento.
         </p>
       )}
+
+      <CamposHover no={no} tema={tema} mutarNo={mutarNo} />
     </div>
   )
 }

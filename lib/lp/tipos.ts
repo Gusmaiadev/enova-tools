@@ -291,6 +291,41 @@ export type EstiloFonte = (typeof ESTILOS_FONTE)[number]
 export type Transformacao = (typeof TRANSFORMACOES)[number]
 export type Decoracao = (typeof DECORACOES)[number]
 
+/**
+ * Sombras do catalogo. Uniao fechada porque box-shadow e CSS livre e o
+ * documento nao e confiavel — e porque tres degraus prontos resolvem o caso de
+ * uso melhor do que um campo pedindo "0 12px 28px -12px rgba(...)".
+ */
+export const SOMBRAS = ['suave', 'media', 'forte'] as const
+export type Sombra = (typeof SOMBRAS)[number]
+export const ROTULO_SOMBRA: Record<Sombra, string> = {
+  suave: 'Suave',
+  media: 'Média',
+  forte: 'Forte',
+}
+
+/**
+ * Estilo ao passar o mouse, por cima do estado normal.
+ *
+ * NAO e por dispositivo, ao contrario do resto de LpEstilo: hover nao existe em
+ * tela de toque, entao um valor por breakpoint so encheria o documento com o
+ * que nenhum celular usaria.
+ */
+export type EstiloHover = {
+  /**
+   * Ausente = ligado (e o que documento antigo e preset produzem). `false`
+   * desliga o efeito SEM apagar o que foi ajustado: religar traz tudo de volta.
+   */
+  ativo?: boolean
+  cor?: string
+  fundo?: string
+  sombra?: Sombra
+  /** Px que o elemento sobe — o "elevar" que so o botao tinha. */
+  subir?: number
+  /** Escala em porcentagem: 105 = 5% maior; 100 (ou ausente) = nao cresce. */
+  escala?: number
+}
+
 export type LpEstilo = {
   cor?: PorDisp<string>
   fundo?: PorDisp<string>
@@ -310,7 +345,10 @@ export type LpEstilo = {
   padding?: PorDisp<Caixa>
   largura?: PorDisp<string>
   raio?: PorDisp<number>
+  /** Valor do catalogo (ver SOMBRAS); string livre so em documento antigo. */
   sombra?: PorDisp<string>
+  /** Ver EstiloHover: sem PorDisp de proposito. */
+  hover?: EstiloHover
   /* --- so fazem sentido em midia (imagem/video) --- */
   altura?: PorDisp<string>
   /** `aspect-ratio` do quadro: '16/9', '4/3', '1/1'… */
@@ -323,6 +361,12 @@ export type LpEstilo = {
 type NoBase = {
   id: string
   estilo?: LpEstilo
+  /**
+   * Estilo das partes de dentro, por chave do catalogo (ver lib/lp/partes.ts).
+   * So os widgets compostos tem: neles `estilo` fica com a caixa, porque a
+   * folha base escreve nos textos de dentro e regra no filho vence heranca.
+   */
+  partes?: Record<string, LpEstilo>
   /** Esconde o no no dispositivo marcado. */
   oculto?: PorDisp<boolean>
   /** Animacao de entrada — ver lib/lp/animacoes.ts. */
@@ -362,6 +406,13 @@ export type LpContainer = NoBase & {
   gap?: PorDisp<number>
   alinhar?: PorDisp<'inicio' | 'centro' | 'fim' | 'esticar'>
   justificar?: PorDisp<'inicio' | 'centro' | 'fim' | 'entre'>
+  /**
+   * Cola o botao de cada bloco filho na base dele. Numa grade os blocos ja tem
+   * a mesma altura, entao os botoes acabam todos na mesma linha, mesmo com
+   * textos de tamanhos diferentes. Nao e por dispositivo: e a mesma decisao de
+   * leitura em qualquer tela.
+   */
+  botoesNaBase?: boolean
   filhos: LpElemento[]
 }
 
@@ -374,6 +425,7 @@ export type LpWidget = NoBase &
     | { tipo: 'video'; midia: LpMidia }
     | { tipo: 'botao'; botao: LpBotao }
     | { tipo: 'icone'; nome: string }
+    /** Big number: valor grande em cima, informacao embaixo (ver `partes`). */
     | { tipo: 'numero'; valor: string; rotulo: string }
     | { tipo: 'lista'; itens: { id: string; icone?: string; texto: string }[] }
     | { tipo: 'espacador'; altura: PorDisp<number> }
@@ -661,7 +713,13 @@ export type SecaoBriefing = {
   subtitulo?: string
   conteudo: string
   layout: TipoLayout
-  colunas?: 2 | 3 | 4
+  /*
+   * Nao existe `colunas` aqui de proposito. Quantas colunas a grade tem e
+   * decisao de montagem, nao de briefing: o preset ja escolhe um numero que
+   * combina com o layout e com a quantidade de itens, e no editor isso se muda
+   * por container e por dispositivo (CamposConteudo). Um 2|3|4 escolhido antes
+   * de a pagina existir so competia com aquilo.
+   */
   /**
    * Midia do lado esquerdo e conteudo do direito (ver LpSecao.inverter). So os
    * layouts de LAYOUTS_COM_LADOS usam; a escolha do usuario vence a da IA.

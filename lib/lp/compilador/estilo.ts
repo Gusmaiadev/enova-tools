@@ -12,7 +12,16 @@ import { regrasTempo } from '../animacoes'
 import { caminharElementos } from '../arvore'
 import { familiaCss } from '../fontes'
 import { DISPOSITIVOS, PROPORCOES_VALIDAS } from '../padroes'
-import type { Caixa, Dispositivo, LpContainer, LpElemento, LpEstilo, PorDisp } from '../tipos'
+import { partesDe } from '../partes'
+import type {
+  Caixa,
+  Dispositivo,
+  EstiloHover,
+  LpContainer,
+  LpElemento,
+  LpEstilo,
+  PorDisp,
+} from '../tipos'
 import { DECORACOES, ESTILOS_FONTE, TRANSFORMACOES } from '../tipos'
 import { corSegura, escCss } from '../util'
 
@@ -78,6 +87,44 @@ const OBJECT_FIT: Record<string, string> = {
 }
 
 /**
+ * Os tres degraus de sombra do catalogo. Valor fora dele so aparece em
+ * documento anterior ao catalogo, e passa por escCss como qualquer outro CSS
+ * vindo do documento.
+ */
+const CSS_SOMBRA: Record<string, string> = {
+  suave: '0 4px 12px -4px rgba(15,23,42,.20)',
+  media: '0 14px 30px -14px rgba(15,23,42,.30)',
+  forte: '0 26px 50px -22px rgba(15,23,42,.42)',
+}
+
+const sombraCss = (v: string) => CSS_SOMBRA[v] ?? escCss(v)
+
+/**
+ * O que muda ao passar o mouse. So sai no desktop: hover nao existe em tela de
+ * toque, e repetir a regra por breakpoint encheria a folha a toa.
+ */
+function regrasHover(h: EstiloHover): string[] {
+  const r: string[] = []
+  if (h.cor) r.push(`color:${escCss(corSegura(h.cor, 'inherit'))}`)
+  if (h.fundo) r.push(`background:${escCss(corSegura(h.fundo, 'transparent'))}`)
+  if (h.sombra) r.push(`box-shadow:${sombraCss(h.sombra)}`)
+  // Os dois movimentos moram no mesmo transform: separados, o segundo apagaria
+  // o primeiro.
+  const movimento: string[] = []
+  if (h.subir) movimento.push(`translateY(-${num(h.subir)}px)`)
+  if (h.escala !== undefined && h.escala !== 100) {
+    movimento.push(`scale(${(limitarEscala(h.escala) / 100).toFixed(2)})`)
+  }
+  if (movimento.length > 0) r.push(`transform:${movimento.join(' ')}`)
+  return r
+}
+
+const limitarEscala = (n: number) => Math.min(150, Math.max(50, Number.isFinite(n) ? n : 100))
+
+/** Propriedades que o hover anima — as unicas que ele sabe mudar. */
+const TRANSICAO = 'transition:color .2s,background-color .2s,box-shadow .2s,transform .2s'
+
+/**
  * Nos que sao um BLOCO dentro do container, e nao texto corrido. Neles
  * `text-align` nao posiciona nada — no botao ele so centraliza o rotulo dentro
  * do proprio botao, que ja vem centralizado.
@@ -123,15 +170,28 @@ function regrasEstilo(e: LpEstilo, d: Dispositivo, posicionavel: boolean): strin
   const decoracao = em(e.decoracao)
   if (decoracao && DECORACOES.includes(decoracao)) r.push(`text-decoration-line:${decoracao}`)
   const margem = em(e.margem)
-  if (margem) r.push(`margin:${caixaCss(margem)}`)
+  if (margem) {
+    // Margem horizontal zerada sai como `margin-block`, e nao como o atalho de
+    // quatro lados. O atalho apagaria o `margin-inline:auto` que centraliza o
+    // FAQ e os depoimentos: mexer no espaco de cima jogava os dois para a
+    // esquerda. Escrevendo um valor nas laterais, ai sim o atalho vale.
+    r.push(
+      margem.esquerda === 0 && margem.direita === 0
+        ? `margin-block:${num(margem.topo)}px ${num(margem.base)}px`
+        : `margin:${caixaCss(margem)}`,
+    )
+  }
   const padding = em(e.padding)
   if (padding) r.push(`padding:${caixaCss(padding)}`)
   const largura = em(e.largura)
-  if (largura) r.push(`width:${escCss(largura)}`)
+  // `max-width:none` junto: sem isso o limite que o widget traz de fabrica
+  // (760px no FAQ, 820px nos depoimentos) vencia a largura escolhida, e o campo
+  // parecia quebrado para qualquer valor acima do limite.
+  if (largura) r.push(`width:${escCss(largura)}`, 'max-width:none')
   const raio = em(e.raio)
   if (raio !== undefined) r.push(`border-radius:${num(raio)}px`)
   const sombra = em(e.sombra)
-  if (sombra) r.push(`box-shadow:${escCss(sombra)}`)
+  if (sombra) r.push(`box-shadow:${sombraCss(sombra)}`)
   const alturaCaixa = em(e.altura)
   if (alturaCaixa) r.push(`height:${escCss(alturaCaixa)}`)
   const proporcao = em(e.proporcao)
@@ -163,16 +223,68 @@ function regrasDoNo(el: LpElemento, d: Dispositivo): string {
   // Duracao e atraso da animacao so no desktop: sao um tempo, nao um tamanho —
   // repetir por breakpoint so encheria a folha com a mesma regra.
   if (d === 'desktop') r.push(...regrasTempo(el.animacao))
+  // A transicao mora no estado NORMAL: sem ela o hover trocaria a cor de uma
+  // vez so, sem passagem. Entra antes da regra do no ser montada, para os dois
+  // sairem juntos em vez de virar um segundo bloco com o mesmo seletor.
+  const ligado = el.estilo?.hover && el.estilo.hover.ativo !== false
+  const hover = d === 'desktop' && ligado ? regrasHover(el.estilo!.hover!) : []
+  if (hover.length > 0) r.push(TRANSICAO)
   // `oculto` por ultimo: esconder vence qualquer display que o layout pos.
   if (el.oculto?.[d]) r.push('display:none')
 
   const regras = r.length > 0 ? [`.lp-e-${el.id}{${r.join(';')}}`] : []
+  if (hover.length > 0) regras.push(`.lp-e-${el.id}:hover{${hover.join(';')}}`)
+
+  // Partes do widget composto. Regra descendente porque a folha base escreve
+  // cor, fonte, peso e tamanho direto nos textos de dentro, e regra no filho
+  // vence heranca — o estilo do no de fora nunca alcancaria nenhum deles. Com a
+  // classe do no na frente, esta ganha por especificidade (uma classe a mais).
+  for (const parte of partesDe(el.tipo)) {
+    const estilo = el.partes?.[parte.chave]
+    if (!estilo) continue
+    const prefixados = parte.seletores.map((s) => `.lp-e-${el.id} ${s}`)
+    const rs = regrasEstilo(estilo, d, false)
+    if (rs.length > 0) regras.push(`${prefixados.join(',')}{${rs.join(';')}}`)
+
+    // O encaixe mora no <img>/<video>, nao no quadro que os envolve — a mesma
+    // separacao do no de midia. Na `foto` o seletor ja e a propria imagem.
+    const ajuste = parte.midia ? estilo.ajuste?.[d] : undefined
+    if (ajuste && OBJECT_FIT[ajuste]) {
+      const alvo =
+        parte.midia === 'foto'
+          ? prefixados
+          : prefixados.flatMap((s) => [`${s} img`, `${s} video`])
+      regras.push(`${alvo.join(',')}{object-fit:${OBJECT_FIT[ajuste]}}`)
+    }
+  }
 
   // `object-fit` mora no <img>/<video>, nao no quadro que os envolve — por isso
   // sai como regra descendente em vez de entrar na regra do no.
   const ajuste = ehMidia ? el.estilo?.ajuste?.[d] : undefined
   if (ajuste && OBJECT_FIT[ajuste]) {
     regras.push(`.lp-e-${el.id} img,.lp-e-${el.id} video{object-fit:${OBJECT_FIT[ajuste]}}`)
+  }
+
+  // Botao e icone chegam com `align-self:flex-start` do CSS base, que existe
+  // para eles nao esticarem de ponta a ponta num container em coluna. So que
+  // align-self VENCE o align-items do pai — e era isso que prendia o botao a
+  // esquerda na secao centralizada, no CTA e no banner, que antes da arvore
+  // saiam centralizados pelo text-align da caixa. Aqui o alinhamento escolhido
+  // no container volta a alcancar os dois.
+  const alinharPai = el.tipo === 'container' ? el.alinhar?.[d] : undefined
+  if (alinharPai && ALINHAR[alinharPai]) {
+    regras.push(
+      `.lp-e-${el.id} > .lp-btn,.lp-e-${el.id} > .lp-icone{align-self:${ALINHAR[alinharPai]}}`,
+    )
+  }
+
+  // Botao colado na base de cada bloco filho. `margin-top:auto` joga toda a
+  // sobra de espaco para cima dele; como os blocos de uma grade ja saem com a
+  // mesma altura, os botoes acabam todos na mesma linha. Alcanca o botao que e
+  // filho DIRETO do bloco, que e onde os presets o poem. Sai so no desktop: nao
+  // e valor por dispositivo, e a mesma decisao de leitura em qualquer tela.
+  if (d === 'desktop' && el.tipo === 'container' && el.botoesNaBase) {
+    regras.push(`.lp-e-${el.id} > * > .lp-btn{margin-top:auto}`)
   }
   return regras.join('\n')
 }

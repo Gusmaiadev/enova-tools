@@ -3,34 +3,12 @@
 import { ChevronRight, Copy, Eye, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Alca } from './Alca'
-import { NOME_ELEMENTO } from './PainelWidget'
+import { NOME_ELEMENTO, resumoNo } from './elementos'
 import { useArrastar } from './arrastar'
 import { SeletorLayout } from './SeletorLayout'
 import { infoLayout } from '@/lib/lp/layouts'
 import type { LpDocumento, LpElemento, TipoLayout, TipoPaginaLegal } from '@/lib/lp/tipos'
 import { PAGINAS_LEGAIS, infoPagina } from '@/lib/lp/tipos'
-
-/** Trecho do conteúdo do nó, para a linha não ser só o nome do tipo. */
-function resumoNo(el: LpElemento): string {
-  switch (el.tipo) {
-    case 'titulo':
-    case 'texto':
-      return el.texto
-    case 'botao':
-      return el.botao.texto
-    case 'numero':
-      return `${el.valor} ${el.rotulo}`
-    case 'icone':
-      return el.nome
-    case 'imagem':
-    case 'video':
-      return el.midia.alt || el.midia.busca
-    case 'container':
-      return `${el.filhos.length} ${el.filhos.length === 1 ? 'elemento' : 'elementos'}`
-    default:
-      return ''
-  }
-}
 
 /** Uma linha da árvore, e as dos filhos abaixo dela. */
 function LinhaNo({
@@ -38,31 +16,57 @@ function LinhaNo({
   nivel,
   selecionadoId,
   aoSelecionar,
+  aoDuplicar,
+  aoRemover,
 }: {
   no: LpElemento
   nivel: number
   selecionadoId: string | null
   aoSelecionar: (id: string) => void
+  aoDuplicar: (id: string) => void
+  aoRemover: (id: string) => void
 }) {
   const ativo = selecionadoId === no.id
   const resumo = resumoNo(no)
+  const nome = NOME_ELEMENTO[no.tipo] ?? no.tipo
+  // A raiz (nível 0) é a seção: duplicá-la ou removê-la é operação de seção, e
+  // isso já tem botão na linha de cima.
+  const proprio = nivel > 0
   return (
     <>
-      <li>
+      <li className="group/no flex items-center">
         <button
           type="button"
           onClick={() => aoSelecionar(no.id)}
           aria-current={ativo ? 'true' : undefined}
           style={{ paddingLeft: `${nivel * 12 + 6}px` }}
-          className={`flex w-full items-baseline gap-1.5 rounded py-1 pr-1.5 text-left transition-colors ${
+          className={`flex min-w-0 flex-1 items-baseline gap-1.5 rounded py-1 pr-1.5 text-left transition-colors ${
             ativo ? 'bg-blue/15 text-blue' : 'text-text-dim hover:bg-surface-2 hover:text-text'
           }`}
         >
-          <span className="shrink-0 text-[11px] font-medium">
-            {NOME_ELEMENTO[no.tipo] ?? no.tipo}
-          </span>
+          <span className="shrink-0 text-[11px] font-medium">{nome}</span>
           {resumo && <span className="truncate text-[11px] opacity-70">{resumo}</span>}
         </button>
+        {proprio && (
+          <>
+            <button
+              type="button"
+              aria-label={`Duplicar ${nome}`}
+              onClick={() => aoDuplicar(no.id)}
+              className="shrink-0 rounded p-1 text-text-dim opacity-0 transition-opacity hover:text-text group-hover/no:opacity-100 focus-visible:opacity-100"
+            >
+              <Copy className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Remover ${nome}`}
+              onClick={() => aoRemover(no.id)}
+              className="shrink-0 rounded p-1 text-text-dim opacity-0 transition-opacity hover:text-pink group-hover/no:opacity-100 focus-visible:opacity-100"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </>
+        )}
       </li>
       {no.tipo === 'container' &&
         no.filhos.map((f) => (
@@ -72,6 +76,8 @@ function LinhaNo({
             nivel={nivel + 1}
             selecionadoId={selecionadoId}
             aoSelecionar={aoSelecionar}
+            aoDuplicar={aoDuplicar}
+            aoRemover={aoRemover}
           />
         ))}
     </>
@@ -84,6 +90,8 @@ export function PainelEstrutura({
   noSelecionadoId,
   aoSelecionar,
   aoSelecionarNo,
+  aoDuplicarNo,
+  aoRemoverNo,
   aoMover,
   aoDuplicar,
   aoExcluir,
@@ -98,6 +106,8 @@ export function PainelEstrutura({
   noSelecionadoId: string | null
   aoSelecionar: (id: string) => void
   aoSelecionarNo: (id: string) => void
+  aoDuplicarNo: (id: string) => void
+  aoRemoverNo: (id: string) => void
   aoMover: (de: number, para: number) => void
   aoDuplicar: (id: string) => void
   aoExcluir: (id: string) => void
@@ -207,6 +217,8 @@ export function PainelEstrutura({
                   nivel={0}
                   selecionadoId={noSelecionadoId}
                   aoSelecionar={aoSelecionarNo}
+                  aoDuplicar={aoDuplicarNo}
+                  aoRemover={aoRemoverNo}
                 />
               </ul>
             )}

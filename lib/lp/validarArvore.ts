@@ -11,6 +11,7 @@ import type {
   Aparencia,
   Caixa,
   Dispositivo,
+  EstiloHover,
   LpContainer,
   LpElemento,
   LpEstilo,
@@ -19,7 +20,9 @@ import type {
   PorDisp,
 } from './tipos'
 import { ATRASO_MAX, DURACAO_MAX, animacaoValida, type LpAnimacao } from './animacoes'
-import { DECORACOES, ESTILOS_FONTE, TRANSFORMACOES } from './tipos'
+import { LIMITE_TITULO } from './niveis'
+import { partesDe } from './partes'
+import { DECORACOES, ESTILOS_FONTE, SOMBRAS, TRANSFORMACOES } from './tipos'
 import { DISPOSITIVOS, PROPORCOES_VALIDAS } from './padroes'
 import { corSegura, gerarId, limitar } from './util'
 
@@ -96,6 +99,32 @@ function caixa(v: unknown): Caixa | undefined {
   return c.topo || c.direita || c.base || c.esquerda ? c : undefined
 }
 
+/**
+ * Estilo de hover. Cada campo passa por catalogo ou por faixa: isto vira CSS
+ * direto, e "subir 9999px" some com o elemento da tela tanto quanto um valor
+ * mal-intencionado.
+ */
+function coergirHover(v: unknown): EstiloHover | undefined {
+  const o = obj(v)
+  const h: EstiloHover = {}
+  // Guardado como veio, os dois valores: `true` marca que o usuário ligou o
+  // efeito (e segura o bloco no documento enquanto ele não preenche nada),
+  // `false` guarda o ajuste desligado.
+  if (typeof o.ativo === 'boolean') h.ativo = o.ativo
+  const corTexto = cor(o.cor)
+  if (corTexto) h.cor = corTexto
+  const fundo = cor(o.fundo)
+  if (fundo) h.fundo = fundo
+  const sombra = umDe(SOMBRAS)(o.sombra)
+  if (sombra) h.sombra = sombra
+  const subir = numeroEntre(0, 40)(o.subir)
+  if (subir) h.subir = subir
+  const escala = numeroEntre(50, 150)(o.escala)
+  // 100 = tamanho normal: guardar isso seria guardar "nao faz nada".
+  if (escala !== undefined && escala !== 100) h.escala = escala
+  return Object.keys(h).length > 0 ? h : undefined
+}
+
 function coergirEstilo(v: unknown): LpEstilo | undefined {
   const o = obj(v)
   const e: LpEstilo = {}
@@ -122,6 +151,8 @@ function coergirEstilo(v: unknown): LpEstilo | undefined {
   por('altura', o.altura, textoAte(20))
   por('proporcao', o.proporcao, textoAte(12))
   por('ajuste', o.ajuste, umDe(['cobrir', 'conter', 'preencher'] as const))
+  const hover = coergirHover(o.hover)
+  if (hover) e.hover = hover
   return Object.keys(e).length > 0 ? e : undefined
 }
 
@@ -161,15 +192,35 @@ export function coergirAnimacao(v: unknown): LpAnimacao | undefined {
 type Base = {
   id: string
   estilo?: LpEstilo
+  partes?: Record<string, LpEstilo>
   oculto?: PorDisp<boolean>
   animacao?: LpAnimacao
 }
 
 /** Campos que todo nó tem. */
+/**
+ * Estilo das partes do widget composto. So entra chave do catalogo daquele
+ * tipo: parte inventada pelo cliente nao vira seletor nenhum, e cada valor
+ * passa pela MESMA coercao do estilo do no.
+ */
+function coergirPartes(v: unknown, tipo: string): Record<string, LpEstilo> | undefined {
+  const catalogo = partesDe(tipo)
+  if (catalogo.length === 0) return undefined
+  const o = obj(v)
+  const fora: Record<string, LpEstilo> = {}
+  for (const parte of catalogo) {
+    const estilo = coergirEstilo(o[parte.chave])
+    if (estilo) fora[parte.chave] = estilo
+  }
+  return Object.keys(fora).length > 0 ? fora : undefined
+}
+
 function base(o: Record<string, unknown>): Base {
   const b: Base = { id: idSeguro(o.id) }
   const estilo = coergirEstilo(o.estilo)
   if (estilo) b.estilo = estilo
+  const partes = coergirPartes(o.partes, String(o.tipo ?? ''))
+  if (partes) b.partes = partes
   const oculto = porDisp(o.oculto, soVerdadeiro)
   if (oculto) b.oculto = oculto
   const animacao = coergirAnimacao(o.animacao)
@@ -223,6 +274,8 @@ export function coergirElemento(
     if (alinhar) c.alinhar = alinhar
     const justificar = porDisp(o.justificar, umDe(['inicio', 'centro', 'fim', 'entre'] as const))
     if (justificar) c.justificar = justificar
+    // So o `true` e guardado: ausente = os botoes seguem o texto de cada bloco.
+    if (o.botoesNaBase === true) c.botoesNaBase = true
     return c
   }
 
@@ -232,7 +285,9 @@ export function coergirElemento(
         ...b,
         tipo: 'titulo',
         nivel: umDe(['h1', 'h2', 'h3', 'h4'] as const)(o.nivel) ?? 'h2',
-        texto: str(o.texto, 500),
+        // O painel avisa antes de cortar: quem passa um parágrafo para título
+        // vê o aviso do limite enquanto o texto ainda está inteiro.
+        texto: str(o.texto, LIMITE_TITULO),
       }
     case 'texto':
       return {
@@ -255,8 +310,21 @@ export function coergirElemento(
     }
     case 'icone':
       return { ...b, tipo: 'icone', nome: str(o.nome, 40) }
-    case 'numero':
-      return { ...b, tipo: 'numero', valor: str(o.valor, 40), rotulo: str(o.rotulo, 200) }
+    case 'numero': {
+      const n: LpElemento = {
+        ...b,
+        tipo: 'numero',
+        valor: str(o.valor, 40),
+        rotulo: str(o.rotulo, 200),
+      }
+      // `estiloValor`/`estiloRotulo` foi a primeira forma do estilo por parte,
+      // antes do catalogo. Documento gravado nesse meio-tempo continua abrindo
+      // com o que foi ajustado, em vez de voltar em branco.
+      const legado: Record<string, unknown> = { valor: o.estiloValor, rotulo: o.estiloRotulo }
+      const daPeca = coergirPartes(legado, 'numero')
+      if (daPeca) n.partes = { ...daPeca, ...n.partes }
+      return n
+    }
     case 'lista':
       return {
         ...b,

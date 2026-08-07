@@ -544,10 +544,6 @@ export function coergirBriefing(bruto: unknown, nomeAtual: string): LpBriefing {
         // Arquivo enviado pelo usuário: passa pela mesma coerção da mídia do
         // documento (url, dimensões, caminho no bucket).
         const arquivo = coergirMidia(midiaBruta.arquivo)
-        const colunas: 2 | 3 | 4 | undefined =
-          secao.colunas === 2 || secao.colunas === 3 || secao.colunas === 4
-            ? secao.colunas
-            : undefined
         // Com arquivo enviado, tipo e formato são os do arquivo real.
         const tipoMidia: TipoMidia =
           arquivo?.tipo ?? (midiaBruta.tipo === 'video' ? 'video' : 'imagem')
@@ -600,7 +596,6 @@ export function coergirBriefing(bruto: unknown, nomeAtual: string): LpBriefing {
           conteudo,
           ...(Object.keys(semIa).length > 0 ? { semIa } : {}),
           layout: layout as TipoLayout,
-          ...(colunas ? { colunas } : {}),
           // Lado da mídia: só onde o layout põe conteúdo e mídia lado a lado.
           ...(secao.inverter === true && temLados(layout as TipoLayout)
             ? { inverter: true }

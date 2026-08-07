@@ -30,6 +30,12 @@ export function migrarDocumentoParaArvore(doc: LpDocumento): LpDocumento {
     ...doc,
     versao: 2,
     secoes: doc.secoes.map((secao) => {
+      // Secao que ja tem arvore fica como esta. Um documento misto nao deveria
+      // existir, mas existe: o editor chegou a inserir secao sem `raiz`, e isso
+      // apagava o `versao: 2` na gravacao (validar.ts). Reexpandir tudo aqui
+      // levaria junto as edicoes de widget das outras secoes — a expansao le so
+      // os campos tipados, que nao acompanham o que foi editado na arvore.
+      if (secao.raiz) return { ...secao, preset: secao.preset ?? secao.tipo }
       // `expandirPreset` e puro: `ajustada` ja vem com a midia do banner movida
       // para o fundo, e `secao` continua intacta para o documentoV1.
       const { raiz, secao: ajustada } = expandirPreset(secao)
